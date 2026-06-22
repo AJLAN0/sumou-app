@@ -1,2 +1,1 @@
 # sumou-app
-# sumou-app

@@ -7,10 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/app/app.dart';
 
 void main() {
-  testWidgets('Unauthenticated boot redirects to the entry route in RTL',
-      (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: SumouApp()));
-    await tester.pumpAndSettle();
+  testWidgets('App boots in RTL with Sumou branding', (tester) async {
+    await tester.pumpWidget(const SumouApp());
+    await tester.pump();
 
     // Redirect sends the initial route to the (placeholder) entry screen.
     expect(find.text('الدخول'), findsOneWidget);

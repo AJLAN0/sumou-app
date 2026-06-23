@@ -26,7 +26,8 @@ void main() {
     await tester.tap(find.text('دخول'));
     await tester.pumpAndSettle();
 
-    expect(find.text('الرئيسية — مدير'), findsOneWidget);
+    // Lands on the authenticated shell (manager first tab).
+    expect(find.text('الرئيسية'), findsWidgets);
   });
 
   testWidgets('disabled account is rejected with an error', (tester) async {

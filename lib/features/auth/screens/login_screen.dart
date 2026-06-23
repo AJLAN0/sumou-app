@@ -149,11 +149,7 @@ const List<_DevAccount> _devAccounts = [
     label: 'مصور',
     icon: Icons.camera_alt_outlined,
   ),
-  _DevAccount(
-    username: 'admin',
-    label: 'الإدارة',
-    icon: Icons.shield_outlined,
-  ),
+  _DevAccount(username: 'admin', label: 'الإدارة', icon: Icons.shield_outlined),
   _DevAccount(
     username: 'multi',
     label: 'متعدد الأدوار',

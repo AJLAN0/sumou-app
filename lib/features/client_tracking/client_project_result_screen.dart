@@ -27,15 +27,16 @@ class ClientProjectResultScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
       ),
-      body: result == null
-          ? SumouEmptyState(
-              title: 'لا توجد نتيجة',
-              message: 'أدخل الرمز السري لمتابعة مشروعك',
-              icon: Icons.search_off,
-              actionLabel: 'العودة للتتبع',
-              onAction: () => context.go(AppRoutes.track),
-            )
-          : _Result(result: result),
+      body:
+          result == null
+              ? SumouEmptyState(
+                title: 'لا توجد نتيجة',
+                message: 'أدخل الرمز السري لمتابعة مشروعك',
+                icon: Icons.search_off,
+                actionLabel: 'العودة للتتبع',
+                onAction: () => context.go(AppRoutes.track),
+              )
+              : _Result(result: result),
     );
   }
 }
@@ -46,16 +47,16 @@ class _Result extends StatelessWidget {
   final ClientTrackingModel result;
 
   SumouStatus _statusFor(String status) => switch (status) {
-        'active' => SumouStatus.active,
-        'done' => SumouStatus.delivered,
-        _ => SumouStatus.inProgress,
-      };
+    'active' => SumouStatus.active,
+    'done' => SumouStatus.delivered,
+    _ => SumouStatus.inProgress,
+  };
 
   double _progressFor(String status) => switch (status) {
-        'done' => 1.0,
-        'active' => 0.5,
-        _ => 0.25,
-      };
+    'done' => 1.0,
+    'active' => 0.5,
+    _ => 0.25,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -135,9 +136,7 @@ class _Result extends StatelessWidget {
           const SizedBox(height: 12),
           const SumouSectionHeader(title: 'رسالة'),
           const SizedBox(height: 12),
-          SumouCard(
-            child: Text(result.message!, style: AppTextStyles.body),
-          ),
+          SumouCard(child: Text(result.message!, style: AppTextStyles.body)),
         ],
         const SizedBox(height: 24),
       ],

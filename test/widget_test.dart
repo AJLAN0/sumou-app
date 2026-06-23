@@ -10,11 +10,11 @@ void main() {
     await tester.pumpWidget(const SumouApp());
     await tester.pumpAndSettle();
 
-    // Brand title renders.
-    expect(find.text('سمو الإبداع'), findsOneWidget);
+    // The component preview (current dev home) renders its title.
+    expect(find.text('مكوّنات سمو'), findsOneWidget);
 
     // The interface is right-to-left.
-    expect(Directionality.of(tester.element(find.text('سمو الإبداع'))),
+    expect(Directionality.of(tester.element(find.text('مكوّنات سمو'))),
         TextDirection.rtl);
   });
 }

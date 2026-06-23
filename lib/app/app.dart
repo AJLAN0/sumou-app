@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import '../dev/component_preview_screen.dart';
 import '../theme/app_theme.dart';
-import 'app_placeholder_home.dart';
 
 /// Root of the Sumou Mobile App.
 ///
@@ -31,7 +31,9 @@ class SumouApp extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: child ?? const SizedBox.shrink(),
       ),
-      home: const AppPlaceholderHome(),
+      // Temporary dev gallery for Sprint 1 step 2; replaced by the
+      // Splash/Entry flow once routing lands.
+      home: const ComponentPreviewScreen(),
     );
   }
 }

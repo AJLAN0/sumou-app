@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../auth/providers/auth_controller.dart';
+import '../dashboard/admin_dashboard_screen.dart';
+import '../dashboard/manager_home_screen.dart';
+import '../dashboard/photographer_home_screen.dart';
+import '../dashboard/role_placeholder_home.dart';
 import 'more_menu_screen.dart';
 import 'nav_item.dart';
 import 'role_based_bottom_nav.dart';
@@ -41,10 +45,15 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final current = items[index];
     final accent = RoleModel.of(role).color;
 
-    final Widget body =
-        current.label == RoleNavConfig.moreLabel
-            ? const MoreMenuScreen()
-            : TabPlaceholderScreen(title: current.label, icon: current.icon);
+    final Widget body;
+    if (current.label == RoleNavConfig.moreLabel) {
+      body = const MoreMenuScreen();
+    } else if (index == 0) {
+      // The first tab is each role's home / dashboard.
+      body = _homeFor(role);
+    } else {
+      body = TabPlaceholderScreen(title: current.label, icon: current.icon);
+    }
 
     return SumouScaffold(
       appBar: SumouAppBar(title: current.label),
@@ -57,4 +66,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       ),
     );
   }
+
+  Widget _homeFor(RoleType role) => switch (role) {
+        RoleType.manager => const ManagerHomeScreen(),
+        RoleType.photographer => const PhotographerHomeScreen(),
+        RoleType.admin => const AdminDashboardScreen(),
+        _ => RolePlaceholderHome(role: role),
+      };
 }

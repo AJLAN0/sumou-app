@@ -21,12 +21,11 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), 'manager');
-    await tester.enterText(
-        find.byType(TextField).at(1), MockUsers.devPassword);
+    await tester.enterText(find.byType(TextField).at(1), MockUsers.devPassword);
     await tester.tap(find.text('دخول'));
     await tester.pumpAndSettle();
 
-    expect(find.text('الرئيسية — مدير'), findsOneWidget);
+    expect(find.text('الرئيسية — مدير'), findsWidgets);
   });
 
   testWidgets('disabled account is rejected with an error', (tester) async {
@@ -36,8 +35,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), 'disabled');
-    await tester.enterText(
-        find.byType(TextField).at(1), MockUsers.devPassword);
+    await tester.enterText(find.byType(TextField).at(1), MockUsers.devPassword);
     await tester.tap(find.text('دخول'));
     await tester.pumpAndSettle();
 

@@ -7,23 +7,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/app/app.dart';
 
 void main() {
-  testWidgets('Unauthenticated boot shows splash, then the entry screen in RTL',
-      (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: SumouApp()));
+  testWidgets(
+    'Unauthenticated boot shows splash, then the entry screen in RTL',
+    (tester) async {
+      await tester.pumpWidget(const ProviderScope(child: SumouApp()));
 
-    // Splash is shown first.
-    await tester.pump();
-    expect(find.text('سمو الإبداع'), findsOneWidget);
+      // Splash is shown first.
+      await tester.pump();
+      expect(find.text('سمو الإبداع'), findsOneWidget);
 
-    // After the splash delay it routes to the entry screen.
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
+      // After the splash delay it routes to the entry screen.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
 
-    expect(find.text('دخول سمو'), findsOneWidget);
-    expect(find.text('تتبع مشروع'), findsOneWidget);
-    expect(
-      Directionality.of(tester.element(find.text('دخول سمو'))),
-      TextDirection.rtl,
-    );
-  });
+      expect(find.text('دخول سمو'), findsOneWidget);
+      expect(find.text('تتبع مشروع'), findsOneWidget);
+      expect(
+        Directionality.of(tester.element(find.text('دخول سمو'))),
+        TextDirection.rtl,
+      );
+    },
+  );
 }

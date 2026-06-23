@@ -59,11 +59,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // Splash routes itself after a brief auth check.
       if (loc == AppRoutes.splash) return null;
 
-      const authFlow = {
-        AppRoutes.entry,
-        AppRoutes.login,
-        AppRoutes.roleSelect,
-      };
+      const authFlow = {AppRoutes.entry, AppRoutes.login, AppRoutes.roleSelect};
 
       // Not signed in → allow entry/login, send everything else to entry.
       if (!auth.isAuthenticated) {

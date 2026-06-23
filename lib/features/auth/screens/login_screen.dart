@@ -31,10 +31,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _submit() {
     FocusScope.of(context).unfocus();
-    ref.read(authControllerProvider.notifier).login(
-          username: _username.text.trim(),
-          password: _password.text,
-        );
+    ref
+        .read(authControllerProvider.notifier)
+        .login(username: _username.text.trim(), password: _password.text);
   }
 
   @override

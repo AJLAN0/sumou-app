@@ -21,6 +21,9 @@ class RoleNavConfig {
   /// Label used to detect the "More" tab (renders [MoreMenuScreen]).
   static const String moreLabel = 'المزيد';
 
+  /// Label used to detect the profile tab (renders the profile view).
+  static const String profileLabel = 'صفحتي';
+
   static List<NavItem> forRole(RoleType role) => switch (role) {
         RoleType.manager => const [
             NavItem(label: 'الرئيسية', icon: Icons.home_outlined),

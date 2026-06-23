@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -13,25 +15,39 @@ import '../auth/providers/auth_controller.dart';
 class MoreMenuScreen extends ConsumerWidget {
   const MoreMenuScreen({super.key});
 
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showSumouConfirmSheet(
+      context,
+      title: 'تسجيل الخروج',
+      message: 'هل تريد تسجيل الخروج من حسابك؟',
+      confirmLabel: 'تسجيل الخروج',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    await ref.read(authControllerProvider.notifier).logout();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListView(
       children: [
         const SizedBox(height: 8),
-        const _MoreItem(icon: Icons.person_outline, label: 'صفحتي'),
+        _MoreItem(
+          icon: Icons.person_outline,
+          label: 'صفحتي',
+          onTap: () => context.push(AppRoutes.profile),
+        ),
         const SizedBox(height: 12),
         const _MoreItem(
           icon: Icons.notifications_outlined,
           label: 'الإشعارات',
         ),
         const SizedBox(height: 12),
-        const _MoreItem(icon: Icons.settings_outlined, label: 'الإعدادات'),
-        const SizedBox(height: 12),
         _MoreItem(
           icon: Icons.logout,
           label: 'تسجيل الخروج',
           color: AppColors.error,
-          onTap: () => ref.read(authControllerProvider.notifier).logout(),
+          onTap: () => _confirmLogout(context, ref),
         ),
       ],
     );

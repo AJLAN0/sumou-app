@@ -8,7 +8,7 @@ import 'package:sumou_app/app/app.dart';
 void main() {
   testWidgets('App boots in RTL with Sumou branding', (tester) async {
     await tester.pumpWidget(const SumouApp());
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     // The component preview (current dev home) renders its title.
     expect(find.text('مكوّنات سمو'), findsOneWidget);

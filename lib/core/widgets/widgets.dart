@@ -1,6 +1,8 @@
 /// Barrel file for the Sumou design-system components.
 ///
 /// Import this single file to access all shared widgets.
+library;
+
 export 'sumou_app_bar.dart';
 export 'sumou_button.dart';
 export 'sumou_card.dart';

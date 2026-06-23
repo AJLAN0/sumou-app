@@ -8,7 +8,7 @@ import 'mock_users.dart';
 /// disabled accounts. Holds no real secrets — see [MockUsers].
 class MockAuthRepository implements AuthRepository {
   MockAuthRepository({List<MockAccount>? accounts})
-      : _accounts = accounts ?? MockUsers.accounts {
+    : _accounts = accounts ?? MockUsers.accounts {
     for (final account in _accounts) {
       _passwords[account.user.username] = account.password;
     }

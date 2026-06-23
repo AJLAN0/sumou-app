@@ -68,14 +68,13 @@ class AuthController extends Notifier<AuthState> {
   void clearError() => state = state.copyWith(errorMessage: null);
 
   String _messageFor(AuthFailure reason) => switch (reason) {
-        AuthFailure.invalidCredentials =>
-          'اسم المستخدم أو كلمة المرور غير صحيحة',
-        AuthFailure.accountDisabled =>
-          'هذا الحساب موقوف، يرجى التواصل مع الإدارة',
-        AuthFailure.notAuthenticated => 'يجب تسجيل الدخول أولاً',
-      };
+    AuthFailure.invalidCredentials => 'اسم المستخدم أو كلمة المرور غير صحيحة',
+    AuthFailure.accountDisabled => 'هذا الحساب موقوف، يرجى التواصل مع الإدارة',
+    AuthFailure.notAuthenticated => 'يجب تسجيل الدخول أولاً',
+  };
 }
 
 /// Global auth/session provider.
-final authControllerProvider =
-    NotifierProvider<AuthController, AuthState>(AuthController.new);
+final authControllerProvider = NotifierProvider<AuthController, AuthState>(
+  AuthController.new,
+);

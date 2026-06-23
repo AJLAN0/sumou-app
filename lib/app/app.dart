@@ -31,10 +31,11 @@ class SumouApp extends ConsumerWidget {
       ],
       routerConfig: router,
       // Force RTL across the app regardless of platform/device locale.
-      builder: (context, child) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder:
+          (context, child) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: child ?? const SizedBox.shrink(),
+          ),
     );
   }
 }

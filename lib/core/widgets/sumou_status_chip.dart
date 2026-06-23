@@ -20,26 +20,26 @@ enum SumouStatus {
 
 extension SumouStatusView on SumouStatus {
   String get labelAr => switch (this) {
-        SumouStatus.active => 'نشط',
-        SumouStatus.ended => 'منتهي',
-        SumouStatus.pendingApproval => 'بانتظار الموافقة',
-        SumouStatus.rejected => 'مرفوض',
-        SumouStatus.accepted => 'مقبول',
-        SumouStatus.inProgress => 'قيد التنفيذ',
-        SumouStatus.creating => 'جاري الإبداع',
-        SumouStatus.delivered => 'تم التسليم',
-      };
+    SumouStatus.active => 'نشط',
+    SumouStatus.ended => 'منتهي',
+    SumouStatus.pendingApproval => 'بانتظار الموافقة',
+    SumouStatus.rejected => 'مرفوض',
+    SumouStatus.accepted => 'مقبول',
+    SumouStatus.inProgress => 'قيد التنفيذ',
+    SumouStatus.creating => 'جاري الإبداع',
+    SumouStatus.delivered => 'تم التسليم',
+  };
 
   Color get color => switch (this) {
-        SumouStatus.active => AppColors.projectTeal,
-        SumouStatus.ended => AppColors.textMuted,
-        SumouStatus.pendingApproval => AppColors.financeYellow,
-        SumouStatus.rejected => AppColors.error,
-        SumouStatus.accepted => AppColors.accentGreen,
-        SumouStatus.inProgress => AppColors.primaryTeal,
-        SumouStatus.creating => AppColors.projectTeal,
-        SumouStatus.delivered => AppColors.accentGreen,
-      };
+    SumouStatus.active => AppColors.projectTeal,
+    SumouStatus.ended => AppColors.textMuted,
+    SumouStatus.pendingApproval => AppColors.financeYellow,
+    SumouStatus.rejected => AppColors.error,
+    SumouStatus.accepted => AppColors.accentGreen,
+    SumouStatus.inProgress => AppColors.primaryTeal,
+    SumouStatus.creating => AppColors.projectTeal,
+    SumouStatus.delivered => AppColors.accentGreen,
+  };
 }
 
 /// Small pill badge showing a [SumouStatus].

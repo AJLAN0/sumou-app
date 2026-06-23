@@ -26,8 +26,9 @@ void main() {
       expect(manager.has(AppFeature.canAddProject), isTrue);
       expect(manager.has(AppFeature.canApproveClosure), isTrue);
 
-      final photographer =
-          FeaturePermissions.defaultsFor(RoleType.photographer);
+      final photographer = FeaturePermissions.defaultsFor(
+        RoleType.photographer,
+      );
       expect(photographer.has(AppFeature.canAddProject), isFalse);
       expect(photographer.has(AppFeature.canRequestClosure), isTrue);
     });
@@ -80,7 +81,11 @@ void main() {
     });
 
     test('initials derived from full name', () {
-      expect(UserModel.initialsFrom('نورة الحنايا'), 'ن' 'ا');
+      expect(
+        UserModel.initialsFrom('نورة الحنايا'),
+        'ن'
+        'ا',
+      );
       expect(singleRole.avatarInitials.isNotEmpty, isTrue);
     });
   });

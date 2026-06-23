@@ -5,7 +5,7 @@ import 'mock_users.dart';
 /// In-memory [UserRepository] backed by [MockUsers].
 class MockUserRepository implements UserRepository {
   MockUserRepository({List<UserModel>? users})
-      : _users = users ?? MockUsers.users;
+    : _users = users ?? MockUsers.users;
 
   final List<UserModel> _users;
 

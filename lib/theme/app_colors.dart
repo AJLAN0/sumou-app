@@ -10,7 +10,9 @@ class AppColors {
   // Core surfaces
   static const Color background = Color(0xFF152127); // app background (dark)
   static const Color surface = Color(0xFF1E2E35); // cards
-  static const Color surfaceSecondary = Color(0xFF243840); // raised cards/inputs
+  static const Color surfaceSecondary = Color(
+    0xFF243840,
+  ); // raised cards/inputs
 
   // Brand
   static const Color primaryTeal = Color(0xFF215C66); // brand elements

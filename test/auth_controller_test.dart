@@ -26,10 +26,9 @@ void main() {
 
   test('single-role login resolves active role without selection', () async {
     final c = makeContainer();
-    await controllerOf(c).login(
-      username: 'manager',
-      password: MockUsers.devPassword,
-    );
+    await controllerOf(
+      c,
+    ).login(username: 'manager', password: MockUsers.devPassword);
     final s = c.read(authControllerProvider);
     expect(s.isAuthenticated, isTrue);
     expect(s.needsRoleSelection, isFalse);
@@ -40,15 +39,16 @@ void main() {
 
   test('multi-role login requires role selection', () async {
     final c = makeContainer();
-    await controllerOf(c).login(
-      username: 'multi',
-      password: MockUsers.devPassword,
-    );
+    await controllerOf(
+      c,
+    ).login(username: 'multi', password: MockUsers.devPassword);
     var s = c.read(authControllerProvider);
     expect(s.needsRoleSelection, isTrue);
     expect(s.activeRole, isNull);
-    expect(s.availableRoles,
-        containsAll([RoleType.manager, RoleType.photographer]));
+    expect(
+      s.availableRoles,
+      containsAll([RoleType.manager, RoleType.photographer]),
+    );
 
     controllerOf(c).selectRole(RoleType.photographer);
     s = c.read(authControllerProvider);
@@ -58,10 +58,9 @@ void main() {
 
   test('selectRole ignores a role the user does not hold', () async {
     final c = makeContainer();
-    await controllerOf(c).login(
-      username: 'multi',
-      password: MockUsers.devPassword,
-    );
+    await controllerOf(
+      c,
+    ).login(username: 'multi', password: MockUsers.devPassword);
     controllerOf(c).selectRole(RoleType.admin);
     expect(c.read(authControllerProvider).selectedRole, isNull);
   });
@@ -76,10 +75,9 @@ void main() {
 
   test('disabled account is rejected with an error', () async {
     final c = makeContainer();
-    await controllerOf(c).login(
-      username: 'disabled',
-      password: MockUsers.devPassword,
-    );
+    await controllerOf(
+      c,
+    ).login(username: 'disabled', password: MockUsers.devPassword);
     final s = c.read(authControllerProvider);
     expect(s.isAuthenticated, isFalse);
     expect(s.errorMessage, isNotNull);
@@ -87,10 +85,9 @@ void main() {
 
   test('logout resets to signed-out state', () async {
     final c = makeContainer();
-    await controllerOf(c).login(
-      username: 'admin',
-      password: MockUsers.devPassword,
-    );
+    await controllerOf(
+      c,
+    ).login(username: 'admin', password: MockUsers.devPassword);
     await controllerOf(c).logout();
     final s = c.read(authControllerProvider);
     expect(s.isAuthenticated, isFalse);

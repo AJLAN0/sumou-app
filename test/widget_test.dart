@@ -7,16 +7,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/app/app.dart';
 
 void main() {
-  testWidgets('App boots in RTL with Sumou branding', (tester) async {
-    await tester.pumpWidget(const SumouApp());
-    await tester.pump();
+  testWidgets('App boots in RTL on the entry screen', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: SumouApp()));
+    await tester.pumpAndSettle();
 
-    // Redirect sends the initial route to the (placeholder) entry screen.
-    expect(find.text('الدخول'), findsOneWidget);
+    // Unauthenticated boot redirects to the (placeholder) entry screen, which
+    // renders its title in both the app bar and the body.
+    expect(find.text('الدخول'), findsWidgets);
 
     // The interface is right-to-left.
     expect(
-      Directionality.of(tester.element(find.text('الدخول'))),
+      Directionality.of(tester.element(find.text('الدخول').first)),
       TextDirection.rtl,
     );
   });

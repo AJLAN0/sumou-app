@@ -16,42 +16,35 @@ void main() {
     expect(homePathFor(RoleType.admin), AppRoutes.adminHome);
   });
 
-  testWidgets('authenticated single-role user lands on their role home',
-      (tester) async {
+  testWidgets('authenticated single-role user lands on their role home', (
+    tester,
+  ) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).login(
-          username: 'manager',
-          password: MockUsers.devPassword,
-        );
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: 'manager', password: MockUsers.devPassword);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const SumouApp(),
-      ),
+      UncontrolledProviderScope(container: container, child: const SumouApp()),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('الرئيسية — مدير'), findsOneWidget);
+    expect(find.text('الرئيسية — مدير'), findsWidgets);
   });
 
   testWidgets('multi-role user is sent to role selection', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).login(
-          username: 'multi',
-          password: MockUsers.devPassword,
-        );
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: 'multi', password: MockUsers.devPassword);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const SumouApp(),
-      ),
+      UncontrolledProviderScope(container: container, child: const SumouApp()),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('اختيار الدور'), findsOneWidget);
+    expect(find.text('اختيار الدور'), findsWidgets);
   });
 }

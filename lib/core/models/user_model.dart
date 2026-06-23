@@ -32,8 +32,7 @@ class UserModel {
   final String? _avatarInitials;
 
   /// Initials shown in avatars; computed from [fullName] when not provided.
-  String get avatarInitials =>
-      _avatarInitials ?? initialsFrom(fullName);
+  String get avatarInitials => _avatarInitials ?? initialsFrom(fullName);
 
   /// True when the user holds more than one role and must pick one on login.
   bool get hasMultipleRoles => roles.length > 1;
@@ -55,11 +54,8 @@ class UserModel {
 
   /// Derive up-to-two-character initials from a full name (Arabic or Latin).
   static String initialsFrom(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return '';
     if (parts.length == 1) {
       final only = parts.first;

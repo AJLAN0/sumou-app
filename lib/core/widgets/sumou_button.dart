@@ -51,26 +51,30 @@ class SumouButton extends StatelessWidget {
         foreground = AppColors.textWhite;
     }
 
-    final Widget child = loading
-        ? SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              valueColor: AlwaysStoppedAnimation<Color>(foreground),
-            ),
-          )
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 20, color: foreground),
-                const SizedBox(width: 8),
+    final Widget child =
+        loading
+            ? SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                valueColor: AlwaysStoppedAnimation<Color>(foreground),
+              ),
+            )
+            : Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 20, color: foreground),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  label,
+                  style: AppTextStyles.button.copyWith(color: foreground),
+                ),
               ],
-              Text(label, style: AppTextStyles.button.copyWith(color: foreground)),
-            ],
-          );
+            );
 
     return Opacity(
       opacity: disabled ? 0.5 : 1,

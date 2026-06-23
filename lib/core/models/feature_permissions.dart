@@ -58,62 +58,59 @@ class FeaturePermissions {
 
   /// Query a permission by [AppFeature].
   bool has(AppFeature feature) => switch (feature) {
-        AppFeature.canAddProject => canAddProject,
-        AppFeature.canEditProject => canEditProject,
-        AppFeature.canAssignPhotographers => canAssignPhotographers,
-        AppFeature.canRequestPhotographer => canRequestPhotographer,
-        AppFeature.canRequestDesign => canRequestDesign,
-        AppFeature.canUpdateStages => canUpdateStages,
-        AppFeature.canRequestClosure => canRequestClosure,
-        AppFeature.canApproveClosure => canApproveClosure,
-        AppFeature.canManageUsers => canManageUsers,
-        AppFeature.canManagePermissions => canManagePermissions,
-        AppFeature.canViewReports => canViewReports,
-        AppFeature.canManageAttendance => canManageAttendance,
-        AppFeature.canManageWeddingProjects => canManageWeddingProjects,
-        AppFeature.canManageFinance => canManageFinance,
-      };
+    AppFeature.canAddProject => canAddProject,
+    AppFeature.canEditProject => canEditProject,
+    AppFeature.canAssignPhotographers => canAssignPhotographers,
+    AppFeature.canRequestPhotographer => canRequestPhotographer,
+    AppFeature.canRequestDesign => canRequestDesign,
+    AppFeature.canUpdateStages => canUpdateStages,
+    AppFeature.canRequestClosure => canRequestClosure,
+    AppFeature.canApproveClosure => canApproveClosure,
+    AppFeature.canManageUsers => canManageUsers,
+    AppFeature.canManagePermissions => canManagePermissions,
+    AppFeature.canViewReports => canViewReports,
+    AppFeature.canManageAttendance => canManageAttendance,
+    AppFeature.canManageWeddingProjects => canManageWeddingProjects,
+    AppFeature.canManageFinance => canManageFinance,
+  };
 
   /// Sensible default feature set for a role, mirroring the reference
   /// prototype's defaults. Users may have these overridden per-account later.
   factory FeaturePermissions.defaultsFor(RoleType role) => switch (role) {
-        RoleType.manager => const FeaturePermissions(
-            canAddProject: true,
-            canEditProject: true,
-            canAssignPhotographers: true,
-            canUpdateStages: true,
-            canApproveClosure: true,
-            canViewReports: true,
-          ),
-        RoleType.photographer => const FeaturePermissions(
-            canRequestPhotographer: true,
-            canRequestDesign: true,
-            canUpdateStages: true,
-            canRequestClosure: true,
-          ),
-        RoleType.admin => const FeaturePermissions(
-            canManageUsers: true,
-            canManagePermissions: true,
-            canViewReports: true,
-          ),
-        RoleType.finance => const FeaturePermissions(
-            canManageFinance: true,
-            canViewReports: true,
-          ),
-        RoleType.weddingAdmin => const FeaturePermissions(
-            canAddProject: true,
-            canAssignPhotographers: true,
-            canManageWeddingProjects: true,
-          ),
-        RoleType.weddingFinance =>
-          const FeaturePermissions(canManageFinance: true),
-        RoleType.attendance =>
-          const FeaturePermissions(canManageAttendance: true),
-        RoleType.designer ||
-        RoleType.personalPhoto ||
-        RoleType.clientTracking =>
-          const FeaturePermissions(),
-      };
+    RoleType.manager => const FeaturePermissions(
+      canAddProject: true,
+      canEditProject: true,
+      canAssignPhotographers: true,
+      canUpdateStages: true,
+      canApproveClosure: true,
+      canViewReports: true,
+    ),
+    RoleType.photographer => const FeaturePermissions(
+      canRequestPhotographer: true,
+      canRequestDesign: true,
+      canUpdateStages: true,
+      canRequestClosure: true,
+    ),
+    RoleType.admin => const FeaturePermissions(
+      canManageUsers: true,
+      canManagePermissions: true,
+      canViewReports: true,
+    ),
+    RoleType.finance => const FeaturePermissions(
+      canManageFinance: true,
+      canViewReports: true,
+    ),
+    RoleType.weddingAdmin => const FeaturePermissions(
+      canAddProject: true,
+      canAssignPhotographers: true,
+      canManageWeddingProjects: true,
+    ),
+    RoleType.weddingFinance => const FeaturePermissions(canManageFinance: true),
+    RoleType.attendance => const FeaturePermissions(canManageAttendance: true),
+    RoleType.designer ||
+    RoleType.personalPhoto ||
+    RoleType.clientTracking => const FeaturePermissions(),
+  };
 
   FeaturePermissions copyWith({
     bool? canAddProject,

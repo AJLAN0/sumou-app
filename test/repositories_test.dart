@@ -21,8 +21,13 @@ void main() {
       final auth = MockAuthRepository();
       await expectLater(
         auth.login(username: 'manager', password: 'wrong'),
-        throwsA(isA<AuthException>().having(
-            (e) => e.reason, 'reason', AuthFailure.invalidCredentials)),
+        throwsA(
+          isA<AuthException>().having(
+            (e) => e.reason,
+            'reason',
+            AuthFailure.invalidCredentials,
+          ),
+        ),
       );
     });
 
@@ -30,8 +35,13 @@ void main() {
       final auth = MockAuthRepository();
       await expectLater(
         auth.login(username: 'disabled', password: MockUsers.devPassword),
-        throwsA(isA<AuthException>()
-            .having((e) => e.reason, 'reason', AuthFailure.accountDisabled)),
+        throwsA(
+          isA<AuthException>().having(
+            (e) => e.reason,
+            'reason',
+            AuthFailure.accountDisabled,
+          ),
+        ),
       );
     });
 
@@ -50,8 +60,10 @@ void main() {
         newPassword: 'new-dev-pass',
       );
       await auth.logout();
-      final user =
-          await auth.login(username: 'admin', password: 'new-dev-pass');
+      final user = await auth.login(
+        username: 'admin',
+        password: 'new-dev-pass',
+      );
       expect(user.username, 'admin');
     });
   });
@@ -61,8 +73,10 @@ void main() {
       final repo = MockUserRepository();
       expect((await repo.getUsers()).length, MockUsers.users.length);
       expect((await repo.getUserById('u-admin'))?.username, 'admin');
-      expect((await repo.getUserByUsername('photographer'))?.id,
-          'u-photographer');
+      expect(
+        (await repo.getUserByUsername('photographer'))?.id,
+        'u-photographer',
+      );
       expect(await repo.getUserById('missing'), isNull);
     });
   });

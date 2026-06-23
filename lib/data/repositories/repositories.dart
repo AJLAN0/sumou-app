@@ -1,4 +1,6 @@
 /// Barrel file for repository interfaces.
+library;
+
 export 'auth_repository.dart';
 export 'notification_repository.dart';
 export 'permission_repository.dart';

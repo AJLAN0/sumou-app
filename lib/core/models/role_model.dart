@@ -27,12 +27,12 @@ class RoleModel {
 
   /// Build the [RoleModel] for a given [RoleType].
   factory RoleModel.of(RoleType type) => RoleModel(
-        type: type,
-        nameAr: type.nameAr,
-        nameEn: type.nameEn,
-        color: _colors[type] ?? AppColors.primaryTeal,
-        icon: _icons[type] ?? Icons.person_outline,
-      );
+    type: type,
+    nameAr: type.nameAr,
+    nameEn: type.nameEn,
+    color: _colors[type] ?? AppColors.primaryTeal,
+    icon: _icons[type] ?? Icons.person_outline,
+  );
 
   static const Map<RoleType, Color> _colors = {
     RoleType.admin: AppColors.projectTeal,

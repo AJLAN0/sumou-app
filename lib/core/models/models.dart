@@ -1,4 +1,6 @@
 /// Barrel file for core domain models and enums.
+library;
+
 export 'client_tracking_model.dart';
 export 'feature_permissions.dart';
 export 'permission_model.dart';

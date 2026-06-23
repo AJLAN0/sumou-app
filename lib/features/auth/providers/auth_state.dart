@@ -60,16 +60,19 @@ class AuthState {
     Object? errorMessage = _unset,
   }) {
     return AuthState(
-      currentUser: identical(currentUser, _unset)
-          ? this.currentUser
-          : currentUser as UserModel?,
-      selectedRole: identical(selectedRole, _unset)
-          ? this.selectedRole
-          : selectedRole as RoleType?,
+      currentUser:
+          identical(currentUser, _unset)
+              ? this.currentUser
+              : currentUser as UserModel?,
+      selectedRole:
+          identical(selectedRole, _unset)
+              ? this.selectedRole
+              : selectedRole as RoleType?,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: identical(errorMessage, _unset)
-          ? this.errorMessage
-          : errorMessage as String?,
+      errorMessage:
+          identical(errorMessage, _unset)
+              ? this.errorMessage
+              : errorMessage as String?,
     );
   }
 }

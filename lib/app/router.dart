@@ -26,11 +26,11 @@ class AppRoutes {
 /// Home path for the active role. Falls back to the manager home until the
 /// other roles' homes are implemented in later steps.
 String homePathFor(RoleType? role) => switch (role) {
-      RoleType.manager => AppRoutes.managerHome,
-      RoleType.photographer => AppRoutes.photographerHome,
-      RoleType.admin => AppRoutes.adminHome,
-      _ => AppRoutes.managerHome,
-    };
+  RoleType.manager => AppRoutes.managerHome,
+  RoleType.photographer => AppRoutes.photographerHome,
+  RoleType.admin => AppRoutes.adminHome,
+  _ => AppRoutes.managerHome,
+};
 
 /// The app router. Watches auth/session state and redirects accordingly.
 ///
@@ -78,78 +78,85 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: AppRoutes.splash,
-        builder: (context, state) =>
-            const RoutePlaceholder(title: 'سمو', path: AppRoutes.splash),
+        builder:
+            (context, state) =>
+                const RoutePlaceholder(title: 'سمو', path: AppRoutes.splash),
       ),
       GoRoute(
         path: AppRoutes.entry,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'الدخول',
-          path: AppRoutes.entry,
-        ),
+        builder:
+            (context, state) =>
+                const RoutePlaceholder(title: 'الدخول', path: AppRoutes.entry),
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'تسجيل الدخول',
-          path: AppRoutes.login,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'تسجيل الدخول',
+              path: AppRoutes.login,
+            ),
       ),
       GoRoute(
         path: AppRoutes.roleSelect,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'اختيار الدور',
-          path: AppRoutes.roleSelect,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'اختيار الدور',
+              path: AppRoutes.roleSelect,
+            ),
       ),
       GoRoute(
         path: AppRoutes.track,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'تتبع مشروع',
-          path: AppRoutes.track,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'تتبع مشروع',
+              path: AppRoutes.track,
+            ),
       ),
       GoRoute(
         path: AppRoutes.trackResult,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'حالة المشروع',
-          path: AppRoutes.trackResult,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'حالة المشروع',
+              path: AppRoutes.trackResult,
+            ),
       ),
       GoRoute(
         path: AppRoutes.managerHome,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'الرئيسية — مدير',
-          path: AppRoutes.managerHome,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'الرئيسية — مدير',
+              path: AppRoutes.managerHome,
+            ),
       ),
       GoRoute(
         path: AppRoutes.photographerHome,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'الرئيسية — مصور',
-          path: AppRoutes.photographerHome,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'الرئيسية — مصور',
+              path: AppRoutes.photographerHome,
+            ),
       ),
       GoRoute(
         path: AppRoutes.adminHome,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'لوحة التحكم — الإدارة',
-          path: AppRoutes.adminHome,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'لوحة التحكم — الإدارة',
+              path: AppRoutes.adminHome,
+            ),
       ),
       GoRoute(
         path: AppRoutes.profile,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'صفحتي',
-          path: AppRoutes.profile,
-        ),
+        builder:
+            (context, state) =>
+                const RoutePlaceholder(title: 'صفحتي', path: AppRoutes.profile),
       ),
       GoRoute(
         path: AppRoutes.changePassword,
-        builder: (context, state) => const RoutePlaceholder(
-          title: 'تغيير كلمة المرور',
-          path: AppRoutes.changePassword,
-        ),
+        builder:
+            (context, state) => const RoutePlaceholder(
+              title: 'تغيير كلمة المرور',
+              path: AppRoutes.changePassword,
+            ),
       ),
     ],
   );

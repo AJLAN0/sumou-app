@@ -17,43 +17,43 @@ enum RoleType {
 
   /// Stable serialization key (matches backend / reference prototype).
   String get key => switch (this) {
-        RoleType.admin => 'admin',
-        RoleType.manager => 'manager',
-        RoleType.photographer => 'photographer',
-        RoleType.designer => 'designer',
-        RoleType.finance => 'finance',
-        RoleType.weddingAdmin => 'wedding_admin',
-        RoleType.weddingFinance => 'wedding_finance',
-        RoleType.attendance => 'attendance',
-        RoleType.personalPhoto => 'personal_photo',
-        RoleType.clientTracking => 'client_tracking',
-      };
+    RoleType.admin => 'admin',
+    RoleType.manager => 'manager',
+    RoleType.photographer => 'photographer',
+    RoleType.designer => 'designer',
+    RoleType.finance => 'finance',
+    RoleType.weddingAdmin => 'wedding_admin',
+    RoleType.weddingFinance => 'wedding_finance',
+    RoleType.attendance => 'attendance',
+    RoleType.personalPhoto => 'personal_photo',
+    RoleType.clientTracking => 'client_tracking',
+  };
 
   String get nameAr => switch (this) {
-        RoleType.admin => 'الإدارة',
-        RoleType.manager => 'مدير مشاريع',
-        RoleType.photographer => 'مصور',
-        RoleType.designer => 'مصمم',
-        RoleType.finance => 'مالية سمو',
-        RoleType.weddingAdmin => 'إدارة الزواجات',
-        RoleType.weddingFinance => 'مالية الزواجات',
-        RoleType.attendance => 'تسجيل الحضور',
-        RoleType.personalPhoto => 'التصوير الشخصي',
-        RoleType.clientTracking => 'تتبع مشروع',
-      };
+    RoleType.admin => 'الإدارة',
+    RoleType.manager => 'مدير مشاريع',
+    RoleType.photographer => 'مصور',
+    RoleType.designer => 'مصمم',
+    RoleType.finance => 'مالية سمو',
+    RoleType.weddingAdmin => 'إدارة الزواجات',
+    RoleType.weddingFinance => 'مالية الزواجات',
+    RoleType.attendance => 'تسجيل الحضور',
+    RoleType.personalPhoto => 'التصوير الشخصي',
+    RoleType.clientTracking => 'تتبع مشروع',
+  };
 
   String get nameEn => switch (this) {
-        RoleType.admin => 'Admin',
-        RoleType.manager => 'Project Manager',
-        RoleType.photographer => 'Photographer',
-        RoleType.designer => 'Designer',
-        RoleType.finance => 'Finance',
-        RoleType.weddingAdmin => 'Wedding Admin',
-        RoleType.weddingFinance => 'Wedding Finance',
-        RoleType.attendance => 'Attendance',
-        RoleType.personalPhoto => 'Personal Photography',
-        RoleType.clientTracking => 'Client Tracking',
-      };
+    RoleType.admin => 'Admin',
+    RoleType.manager => 'Project Manager',
+    RoleType.photographer => 'Photographer',
+    RoleType.designer => 'Designer',
+    RoleType.finance => 'Finance',
+    RoleType.weddingAdmin => 'Wedding Admin',
+    RoleType.weddingFinance => 'Wedding Finance',
+    RoleType.attendance => 'Attendance',
+    RoleType.personalPhoto => 'Personal Photography',
+    RoleType.clientTracking => 'Client Tracking',
+  };
 
   /// Resolve a [RoleType] from its serialization [key].
   /// Returns null when the key is unknown (caller decides the fallback).

@@ -1,11 +1,7 @@
 import '../../core/models/user_model.dart';
 
 /// Why an auth operation failed. UI maps these to Arabic messages later.
-enum AuthFailure {
-  invalidCredentials,
-  accountDisabled,
-  notAuthenticated,
-}
+enum AuthFailure { invalidCredentials, accountDisabled, notAuthenticated }
 
 /// Thrown by [AuthRepository] implementations on a failed operation.
 class AuthException implements Exception {
@@ -25,10 +21,7 @@ class AuthException implements Exception {
 abstract interface class AuthRepository {
   /// Authenticate a user. Throws [AuthException] on failure
   /// ([AuthFailure.invalidCredentials] or [AuthFailure.accountDisabled]).
-  Future<UserModel> login({
-    required String username,
-    required String password,
-  });
+  Future<UserModel> login({required String username, required String password});
 
   /// Clear the current session.
   Future<void> logout();

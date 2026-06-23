@@ -9,6 +9,7 @@ import '../features/auth/screens/entry_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/role_selection_screen.dart';
 import '../features/auth/screens/splash_screen.dart';
+import '../features/shell/main_shell_screen.dart';
 
 /// Centralized route paths. Use these constants instead of string literals.
 class AppRoutes {
@@ -116,27 +117,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.managerHome,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'الرئيسية — مدير',
-              path: AppRoutes.managerHome,
-            ),
+        builder: (context, state) => const MainShellScreen(),
       ),
       GoRoute(
         path: AppRoutes.photographerHome,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'الرئيسية — مصور',
-              path: AppRoutes.photographerHome,
-            ),
+        builder: (context, state) => const MainShellScreen(),
       ),
       GoRoute(
         path: AppRoutes.adminHome,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'لوحة التحكم — الإدارة',
-              path: AppRoutes.adminHome,
-            ),
+        builder: (context, state) => const MainShellScreen(),
       ),
       GoRoute(
         path: AppRoutes.profile,

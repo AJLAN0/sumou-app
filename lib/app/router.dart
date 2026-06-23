@@ -5,6 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../core/models/role_type.dart';
 import '../dev/route_placeholder.dart';
 import '../features/auth/providers/auth_controller.dart';
+import '../features/auth/screens/entry_screen.dart';
+import '../features/auth/screens/login_screen.dart';
+import '../features/auth/screens/role_selection_screen.dart';
+import '../features/auth/screens/splash_screen.dart';
 
 /// Centralized route paths. Use these constants instead of string literals.
 class AppRoutes {
@@ -52,8 +56,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // Client tracking is public — accessible without employee login.
       if (loc == AppRoutes.track || loc == AppRoutes.trackResult) return null;
 
+      // Splash routes itself after a brief auth check.
+      if (loc == AppRoutes.splash) return null;
+
       const authFlow = {
-        AppRoutes.splash,
         AppRoutes.entry,
         AppRoutes.login,
         AppRoutes.roleSelect,
@@ -78,31 +84,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: AppRoutes.splash,
-        builder:
-            (context, state) =>
-                const RoutePlaceholder(title: 'سمو', path: AppRoutes.splash),
+        builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
         path: AppRoutes.entry,
-        builder:
-            (context, state) =>
-                const RoutePlaceholder(title: 'الدخول', path: AppRoutes.entry),
+        builder: (context, state) => const EntryScreen(),
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'تسجيل الدخول',
-              path: AppRoutes.login,
-            ),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: AppRoutes.roleSelect,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'اختيار الدور',
-              path: AppRoutes.roleSelect,
-            ),
+        builder: (context, state) => const RoleSelectionScreen(),
       ),
       GoRoute(
         path: AppRoutes.track,

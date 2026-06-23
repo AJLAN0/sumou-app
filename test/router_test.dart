@@ -28,6 +28,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const SumouApp()),
     );
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
     expect(find.text('الرئيسية — مدير'), findsWidgets);
@@ -43,6 +44,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const SumouApp()),
     );
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
     expect(find.text('اختيار الدور'), findsWidgets);

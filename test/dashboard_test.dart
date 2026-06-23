@@ -1,5 +1,6 @@
 // Tests that each role's home tab renders its dashboard.
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -21,8 +22,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('manager home shows dashboard stats and quick actions',
-      (tester) async {
+  testWidgets('manager home shows dashboard stats and quick actions', (
+    tester,
+  ) async {
     await pumpAs(tester, 'manager');
     expect(find.text('مشاريع نشطة'), findsOneWidget);
     expect(find.text('طلبات إنهاء'), findsOneWidget);
@@ -32,6 +34,13 @@ void main() {
   testWidgets('photographer home shows dashboard content', (tester) async {
     await pumpAs(tester, 'photographer');
     expect(find.text('مشاريعي النشطة'), findsOneWidget);
+
+    // The quick-action button is below the fold; scroll it into view.
+    await tester.scrollUntilVisible(
+      find.text('تحديث مرحلة'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('تحديث مرحلة'), findsOneWidget);
   });
 

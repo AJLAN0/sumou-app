@@ -46,7 +46,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     }
     if (next.length < _minLength) {
       setState(
-        () => _localError = 'كلمة المرور يجب أن تكون $_minLength أحرف على الأقل',
+        () =>
+            _localError = 'كلمة المرور يجب أن تكون $_minLength أحرف على الأقل',
       );
       return;
     }

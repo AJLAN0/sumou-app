@@ -38,10 +38,7 @@ class MoreMenuScreen extends ConsumerWidget {
           onTap: () => context.push(AppRoutes.profile),
         ),
         const SizedBox(height: 12),
-        const _MoreItem(
-          icon: Icons.notifications_outlined,
-          label: 'الإشعارات',
-        ),
+        const _MoreItem(icon: Icons.notifications_outlined, label: 'الإشعارات'),
         const SizedBox(height: 12),
         _MoreItem(
           icon: Icons.logout,
@@ -77,10 +74,7 @@ class _MoreItem extends StatelessWidget {
           Icon(icon, color: tint, size: 22),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.body.copyWith(color: tint),
-            ),
+            child: Text(label, style: AppTextStyles.body.copyWith(color: tint)),
           ),
           const Icon(Icons.chevron_left, color: AppColors.textMuted),
         ],

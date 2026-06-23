@@ -66,11 +66,7 @@ class ManagerHomeScreen extends StatelessWidget {
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'إجراءات سريعة'),
         const SizedBox(height: 12),
-        SumouButton(
-          label: 'إضافة مشروع',
-          icon: Icons.add,
-          onPressed: () {},
-        ),
+        SumouButton(label: 'إضافة مشروع', icon: Icons.add, onPressed: () {}),
         const SizedBox(height: 10),
         SumouButton(
           label: 'عرض الطلبات',

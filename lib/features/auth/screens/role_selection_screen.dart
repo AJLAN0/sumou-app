@@ -30,16 +30,18 @@ class RoleSelectionScreen extends ConsumerWidget {
           for (final role in roles) ...[
             _RoleCard(
               role: RoleModel.of(role),
-              onTap: () =>
-                  ref.read(authControllerProvider.notifier).selectRole(role),
+              onTap:
+                  () => ref
+                      .read(authControllerProvider.notifier)
+                      .selectRole(role),
             ),
             const SizedBox(height: 12),
           ],
           const SizedBox(height: 8),
           Center(
             child: TextButton(
-              onPressed: () =>
-                  ref.read(authControllerProvider.notifier).logout(),
+              onPressed:
+                  () => ref.read(authControllerProvider.notifier).logout(),
               child: Text(
                 'تسجيل الخروج',
                 style: AppTextStyles.label.copyWith(color: AppColors.textMuted),

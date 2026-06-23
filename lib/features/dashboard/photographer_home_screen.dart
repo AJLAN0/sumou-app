@@ -90,11 +90,7 @@ class PhotographerHomeScreen extends StatelessWidget {
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'إجراءات سريعة'),
         const SizedBox(height: 12),
-        SumouButton(
-          label: 'تحديث مرحلة',
-          icon: Icons.update,
-          onPressed: () {},
-        ),
+        SumouButton(label: 'تحديث مرحلة', icon: Icons.update, onPressed: () {}),
         const SizedBox(height: 10),
         SumouButton(
           label: 'طلب إغلاق',
@@ -125,10 +121,7 @@ class _ScheduleRow extends StatelessWidget {
       children: [
         Icon(icon, color: AppColors.projectTeal, size: 20),
         const SizedBox(width: 12),
-        SizedBox(
-          width: 44,
-          child: Text(day, style: AppTextStyles.label),
-        ),
+        SizedBox(width: 44, child: Text(day, style: AppTextStyles.label)),
         const SizedBox(width: 8),
         Expanded(child: Text(detail, style: AppTextStyles.body)),
       ],

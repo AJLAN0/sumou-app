@@ -34,9 +34,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.watch(
-      authControllerProvider.select((s) => s.activeRole),
-    );
+    final role = ref.watch(authControllerProvider.select((s) => s.activeRole));
 
     // Should not happen on a role-home route (redirect guards it), but stay
     // safe if the session is cleared while the shell is mounted.
@@ -82,9 +80,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   }
 
   Widget _homeFor(RoleType role) => switch (role) {
-        RoleType.manager => const ManagerHomeScreen(),
-        RoleType.photographer => const PhotographerHomeScreen(),
-        RoleType.admin => const AdminDashboardScreen(),
-        _ => RolePlaceholderHome(role: role),
-      };
+    RoleType.manager => const ManagerHomeScreen(),
+    RoleType.photographer => const PhotographerHomeScreen(),
+    RoleType.admin => const AdminDashboardScreen(),
+    _ => RolePlaceholderHome(role: role),
+  };
 }

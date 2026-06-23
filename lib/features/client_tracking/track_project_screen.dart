@@ -50,8 +50,9 @@ class _TrackProjectScreenState extends ConsumerState<TrackProjectScreen> {
       _error = null;
     });
 
-    final result =
-        await ref.read(trackingRepositoryProvider).trackBySerial(code);
+    final result = await ref
+        .read(trackingRepositoryProvider)
+        .trackBySerial(code);
     if (!mounted) return;
 
     setState(() => _loading = false);

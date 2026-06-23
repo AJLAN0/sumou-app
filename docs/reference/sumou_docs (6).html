@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sumou App Documentation | توثيق تطبيق سمو</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Alexandria,sans-serif;background:#f8f9fa;color:#1a1a2e;line-height:1.7;}
+  .cover{background:linear-gradient(135deg,#152127 0%,#215C66 100%);color:#fff;padding:60px 40px;text-align:center;}
+  .cover h1{font-size:32px;font-weight:700;margin-bottom:6px;}
+  .cover h2{font-size:18px;font-weight:400;opacity:.7;margin-bottom:4px;}
+  .cover .sub{font-size:13px;opacity:.5;margin-bottom:16px;}
+  .cover .badge{display:inline-block;background:rgba(167,207,91,.2);border:1px solid rgba(167,207,91,.4);color:#A7CF5B;border-radius:20px;padding:4px 16px;font-size:13px;}
+  .lang-toggle{position:fixed;top:12px;left:12px;z-index:200;display:flex;gap:4px;}
+  .lang-btn{padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:12px;font-family:Alexandria,sans-serif;}
+  .lang-btn.active{background:#A7CF5B;color:#152127;border-color:#A7CF5B;}
+  nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 32px;position:sticky;top:0;z-index:100;display:flex;gap:20px;overflow-x:auto;}
+  nav a{display:block;padding:13px 2px;font-size:12px;color:#6b7280;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;transition:.15s;}
+  nav a:hover,nav a.active{color:#215C66;border-bottom-color:#215C66;}
+  .container{max-width:920px;margin:0 auto;padding:36px 20px;}
+  section{margin-bottom:48px;}
+  h2{font-size:22px;font-weight:700;color:#152127;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #A7CF5B;display:flex;align-items:center;gap:8px;}
+  h3{font-size:16px;font-weight:600;color:#215C66;margin:18px 0 8px;}
+  h4{font-size:13px;font-weight:600;color:#374151;margin:12px 0 5px;}
+  p{color:#374151;margin-bottom:8px;font-size:14px;}
+  .bilingual{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;}
+  .bilingual .ar{background:#f0f9ff;border-right:3px solid #215C66;padding:10px 12px;border-radius:6px;font-size:13px;color:#1e3a5f;}
+  .bilingual .en{background:#f0fdf4;border-left:3px solid #A7CF5B;padding:10px 12px;border-radius:6px;font-size:13px;color:#14532d;direction:ltr;text-align:left;}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px;margin-bottom:10px;}
+  .card-teal{border-right:4px solid #215C66;}
+  .card-green{border-right:4px solid #A7CF5B;}
+  .card-red{border-right:4px solid #F0524B;}
+  .card-pink{border-right:4px solid #e8a0b0;}
+  .card-yellow{border-right:4px solid #f5c842;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;}
+  th{background:#f3f4f6;padding:9px 12px;text-align:right;font-weight:600;color:#374151;border:1px solid #e5e7eb;}
+  td{padding:8px 12px;border:1px solid #e5e7eb;color:#374151;vertical-align:top;}
+  tr:nth-child(even) td{background:#fafafa;}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;font-size:11px;font-family:monospace;color:#0f172a;}
+  .flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0;}
+  .flow-step{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:5px 10px;font-size:12px;color:#166534;}
+  .flow-arrow{color:#9ca3af;font-size:16px;}
+  .screen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:10px;}
+  .screen-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;text-align:center;}
+  .screen-card .emoji{font-size:24px;margin-bottom:6px;}
+  .screen-card h4{font-size:12px;margin:0 0 3px;color:#152127;}
+  .screen-card p{font-size:11px;color:#6b7280;margin:0;}
+  .tech-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+  .tech-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center;}
+  .tech-card .name{font-size:13px;font-weight:600;color:#152127;}
+  .tech-card .desc{font-size:11px;color:#6b7280;margin-top:3px;}
+  .prio-high{color:#dc2626;font-weight:600;}
+  .prio-med{color:#d97706;font-weight:600;}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e;margin:10px 0;}
+  ul,ol{padding-right:18px;margin-bottom:8px;}
+  li{font-size:13px;color:#374151;margin-bottom:3px;}
+  .color-swatch{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:middle;margin-left:4px;border:1px solid rgba(0,0,0,.1);}
+  .en-label{font-size:11px;color:#6b7280;direction:ltr;display:inline-block;}
+  .role-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;}
+  .role-creds{font-size:11px;background:#f1f5f9;padding:4px 8px;border-radius:6px;font-family:monospace;direction:ltr;}
+  @media(max-width:600px){.bilingual{grid-template-columns:1fr;} .role-header{flex-direction:column;}}
+
+  /* Users Section */
+  .u-section-title{font-size:15px;font-weight:700;color:#152127;padding:10px 0 8px;border-bottom:2px solid #A7CF5B;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .u-count{background:#A7CF5B;color:#152127;border-radius:20px;padding:1px 10px;font-size:11px;font-weight:700;}
+  .u-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;margin-bottom:16px;}
+  .u-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;}
+  .u-mgr{border-right:4px solid #215C66;}
+  .u-photo{border-right:4px solid #A7CF5B;}
+  .u-other{border-right:4px solid #e8a0b0;}
+  .u-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;}
+  .u-av-teal{background:#215C66;} .u-av-green{background:#A7CF5B;color:#152127;}
+  .u-av-pink{background:#e8a0b0;color:#152127;} .u-av-red{background:#F0524B;}
+  .u-av-gold{background:#f5c842;color:#152127;}
+  .u-info{flex:1;min-width:0;}
+  .u-name{font-size:13px;font-weight:600;color:#152127;}
+  .u-creds{font-size:10px;color:#9ca3af;font-family:monospace;margin-top:1px;}
+  .u-badges{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+  .ub{font-size:10px;padding:1px 7px;border-radius:10px;font-weight:500;}
+  .ub-mgr{background:#dbeafe;color:#1e40af;} .ub-photo{background:#ede9fe;color:#5b21b6;}
+  .ub-wed{background:#fce7f3;color:#9d174d;} .ub-des{background:#fff7ed;color:#c2410c;}
+  .ub-fin{background:#fef9c3;color:#854d0e;} .ub-adm{background:#fee2e2;color:#991b1b;}
+  .ub-pers{background:#e0f2fe;color:#0369a1;}
+  .u-num{font-size:10px;color:#9ca3af;font-weight:600;margin-left:4px;}
+  .u-edit-label{font-size:10px;color:#9ca3af;margin-top:5px;}
+  .u-editable{border:1.5px dashed #d1d5db;border-radius:5px;padding:4px 7px;font-size:11px;color:#374151;margin-top:3px;min-height:22px;cursor:text;font-family:Alexandria,sans-serif;}
+  .u-editable:focus{outline:none;border-color:#215C66;background:#f0f9ff;}
+
+  </style>
+</head>
+<body>
+
+<div class="lang-toggle">
+  <button class="lang-btn active" onclick="setLang('ar')">العربية</button>
+  <button class="lang-btn" onclick="setLang('en')">English</button>
+</div>
+
+<!-- COVER -->
+<div class="cover">
+  <div style="font-size:56px;margin-bottom:12px;">📸</div>
+  <h1>سمو الإبداع للإنتاج المرئي</h1>
+  <h2>Sumou Creative for Visual Production</h2>
+  <p class="sub">Technical Documentation — توثيق تقني — v1.0 — 2026</p>
+  <span class="badge">جاهز للتطوير على iOS · Ready for Native App Development</span>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a href="#overview"><span class="ar-t">نظرة عامة</span><span class="en-t" style="display:none">Overview</span></a>
+  <a href="#roles"><span class="ar-t">الأدوار</span><span class="en-t" style="display:none">Roles</span></a>
+  <a href="#modules"><span class="ar-t">الأنظمة</span><span class="en-t" style="display:none">Modules</span></a>
+  <a href="#flows"><span class="ar-t">سير العمل</span><span class="en-t" style="display:none">Workflows</span></a>
+  <a href="#data"><span class="ar-t">البيانات</span><span class="en-t" style="display:none">Data Models</span></a>
+  <a href="#tech"><span class="ar-t">التقنية</span><span class="en-t" style="display:none">Tech Stack</span></a>
+  <a href="#screens"><span class="ar-t">الشاشات</span><span class="en-t" style="display:none">Screens</span></a>
+  <a href="#notes"><span class="ar-t">ملاحظات</span><span class="en-t" style="display:none">Dev Notes</span></a>
+  <a href="#users"><span class="ar-t">المستخدمون</span><span class="en-t" style="display:none">Users</span></a>
+</nav>
+
+<div class="container">
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <h2>🏢 <span class="ar-t">نظرة عامة</span><span class="en-t" style="display:none">Overview</span></h2>
+
+  <div class="bilingual">
+    <div class="ar">تطبيق <strong>سمو الإبداع</strong> هو نظام إدارة داخلي متكامل لشركة تصوير إنتاج مرئي. يشمل إدارة المشاريع، الزواجات، الحضور، الصلاحيات، والتسليمات — مع ربط خارجي بمنصة ركاز للحجوزات.</div>
+    <div class="en"><strong>Sumou Creative</strong> is a comprehensive internal management system for a visual production company. It covers project management, weddings, attendance, permissions, and deliverables — with external integration via Rekaz booking platform.</div>
+  </div>
+
+  <h3><span class="ar-t">الهدف الرئيسي</span><span class="en-t" style="display:none">Main Goal</span></h3>
+  <div class="bilingual">
+    <div class="ar">بوابة موحدة يدخل منها كل موظف (مدير، مصور، مصمم، إداري) لإدارة مهامه — بينما يتابع العميل مشروعه من خارج التطبيق عبر رمز سري.</div>
+    <div class="en">A unified portal for all staff (manager, photographer, designer, admin) to manage their tasks — while clients track their projects externally via a secret code.</div>
+  </div>
+
+  <h3><span class="ar-t">إحصائيات</span><span class="en-t" style="display:none">Stats</span></h3>
+  <table>
+    <tr><th>العنصر / Item</th><th>القيمة / Value</th></tr>
+    <tr><td>المصورون / Photographers</td><td>41</td></tr>
+    <tr><td>المديرون / Managers</td><td>7</td></tr>
+    <tr><td>الأنظمة / Systems</td><td>13</td></tr>
+    <tr><td>أنواع المشاريع / Project Types</td><td>3 (ميدان · اجتماعي · زواجات / Field · Social · Wedding)</td></tr>
+    <tr><td>اللغات / Languages</td><td>العربية + الإنجليزية / Arabic + English</td></tr>
+    <tr><td>الاستضافة / Hosting</td><td>Netlify (Web) → App Store (Native)</td></tr>
+  </table>
+</section>
+
+<!-- ROLES -->
+<section id="roles">
+  <h2>👥 <span class="ar-t">الأدوار والصلاحيات</span><span class="en-t" style="display:none">Roles & Permissions</span></h2>
+
+  <div class="bilingual" style="margin-bottom:14px;">
+    <div class="ar">نظام الأدوار ديناميكي — كل مستخدم يمكن أن يحمل أدواراً متعددة. لو دور واحد يدخل مباشرة، لو أكثر يختار من شاشة.</div>
+    <div class="en">Dynamic role system — each user can hold multiple roles. Single role = direct login. Multiple roles = role selection screen appears.</div>
+  </div>
+
+  <div class="card card-teal">
+    <div class="role-header">
+      <h3 style="margin:0;">📋 <span class="ar-t">مدير المشاريع</span><span class="en-t" style="display:none">Project Manager</span></h3>
+      <span class="role-creds">talal.saadoun / Talal@2025 (example)</span>
+    </div>
+    <table style="margin-top:10px;">
+      <tr><th>الصلاحية / Permission</th><th>التفاصيل / Details</th></tr>
+      <tr><td><span class="ar-t">إضافة مشاريع</span><span class="en-t" style="display:none">Add Projects</span></td><td><span class="ar-t">ميدانية + اجتماعية</span><span class="en-t" style="display:none">Field + Social</span></td></tr>
+      <tr><td><span class="ar-t">إسناد المصورين</span><span class="en-t" style="display:none">Assign Photographers</span></td><td><span class="ar-t">مع القيمة ونوع التصوير</span><span class="en-t" style="display:none">With value and type</span></td></tr>
+      <tr><td><span class="ar-t">قبول/رفض الإنهاء</span><span class="en-t" style="display:none">Approve/Reject Closure</span></td><td><span class="ar-t">للمشاريع الاجتماعية والميدانية</span><span class="en-t" style="display:none">Social & Field projects</span></td></tr>
+      <tr><td><span class="ar-t">اعتماد طلب المصور</span><span class="en-t" style="display:none">Approve Photo Requests</span></td><td><span class="ar-t">اختيار مصورين + قيمة</span><span class="en-t" style="display:none">Select photographers + value</span></td></tr>
+    </table>
+    <p style="font-size:12px;color:#6b7280;margin-top:6px;"><span class="ar-t">الشاشات: الرئيسية · الطلبات · فريق العمل · مشاريعي · المنجزة · التقويم</span><span class="en-t" style="display:none">Screens: Home · Requests · Team · My Projects · Done · Calendar</span></p>
+  </div>
+
+  <div class="card card-green">
+    <div class="role-header">
+      <h3 style="margin:0;">📷 <span class="ar-t">المصور</span><span class="en-t" style="display:none">Photographer</span></h3>
+      <span class="role-creds">noura.hanaya / Noura@1101 (example)</span>
+    </div>
+    <p style="font-size:12px;margin-top:8px;"><span class="ar-t"><strong>الأنواع:</strong> فوتوغرافي · فيديو · درون · بث مباشر · منتجات · هوائي · مونتاج · إضاءة · مساعد مصور</span><span class="en-t" style="display:none"><strong>Types:</strong> Photography · Video · Drone · Live Stream · Products · Aerial · Editing · Lighting · Assistant</span></p>
+    <table style="margin-top:8px;">
+      <tr><th>الصلاحية / Permission</th><th>التفاصيل / Details</th></tr>
+      <tr><td><span class="ar-t">مشاريعه ومراحلها</span><span class="en-t" style="display:none">His projects & stages</span></td><td><span class="ar-t">يحدث المراحل ويتابع</span><span class="en-t" style="display:none">Update & track</span></td></tr>
+      <tr><td><span class="ar-t">قبول/رفض طلبات التصوير</span><span class="en-t" style="display:none">Accept/Reject photo requests</span></td><td><span class="ar-t">أول من يقبل يأخذ الأوردر</span><span class="en-t" style="display:none">First to accept gets the job</span></td></tr>
+      <tr><td><span class="ar-t">رفع رابط التسليم</span><span class="en-t" style="display:none">Upload delivery link</span></td><td><span class="ar-t">للزواجات — تحتاج موافقة (عدا البث)</span><span class="en-t" style="display:none">Weddings — needs approval (except live)</span></td></tr>
+      <tr><td><span class="ar-t">رفع الخام</span><span class="en-t" style="display:none">Upload raw files</span></td><td><span class="ar-t">خلال أسبوع من الزواج</span><span class="en-t" style="display:none">Within 1 week of wedding</span></td></tr>
+      <tr><td><span class="ar-t">ساعة إضافية</span><span class="en-t" style="display:none">Extra hour</span></td><td><span class="ar-t">تُسجَّل عند الإنهاء</span><span class="en-t" style="display:none">Logged at closure</span></td></tr>
+    </table>
+    <p style="font-size:12px;color:#6b7280;margin-top:6px;"><span class="ar-t">الشاشات: الرئيسية · الطلبات · صفحتي · تقويمي · مشاريعي · المنجزة · أيامي الخاصة</span><span class="en-t" style="display:none">Screens: Home · Requests · My Profile · My Calendar · My Projects · Done · My Days</span></p>
+  </div>
+
+  <div class="card card-pink">
+    <div class="role-header">
+      <h3 style="margin:0;">💍 <span class="ar-t">إدارة الزواجات</span><span class="en-t" style="display:none">Wedding Admin</span></h3>
+      <span class="role-creds">wedding.admin / Wedding@2025</span>
+    </div>
+    <table style="margin-top:10px;">
+      <tr><th>الصلاحية / Permission</th><th>التفاصيل / Details</th></tr>
+      <tr><td><span class="ar-t">استقبال حجوزات ركاز</span><span class="en-t" style="display:none">Receive Rekaz bookings</span></td><td><span class="ar-t">تلقائياً عبر Webhook — لا إضافة يدوية</span><span class="en-t" style="display:none">Auto via Webhook — no manual add</span></td></tr>
+      <tr><td><span class="ar-t">تعديل تفاصيل الطلب</span><span class="en-t" style="display:none">Edit booking details</span></td><td><span class="ar-t">إضافة/حذف تفاصيل من طلب ركاز</span><span class="en-t" style="display:none">Add/remove details from Rekaz booking</span></td></tr>
+      <tr><td><span class="ar-t">حذف مشروع</span><span class="en-t" style="display:none">Delete project</span></td><td><span class="ar-t">حذف كامل للمشروع</span><span class="en-t" style="display:none">Full project deletion</span></td></tr>
+      <tr><td><span class="ar-t">إسناد المصورين</span><span class="en-t" style="display:none">Assign photographers</span></td><td><span class="ar-t">من المصورين المسجلين بنوع "زواجات"</span><span class="en-t" style="display:none">From photographers with "weddings" type</span></td></tr>
+      <tr><td><span class="ar-t">موافقة على التسليم</span><span class="en-t" style="display:none">Approve deliveries</span></td><td><span class="ar-t">فوتو + فيديو فقط — البث مباشر بدون موافقة</span><span class="en-t" style="display:none">Photo + Video only — Live bypassed</span></td></tr>
+      <tr><td><span class="ar-t">رفض مع سبب</span><span class="en-t" style="display:none">Reject with reason</span></td><td><span class="ar-t">يرجع للمصور مع إمكانية إعادة الإرسال</span><span class="en-t" style="display:none">Returns to photographer with resubmit</span></td></tr>
+    </table>
+    <div class="note" style="margin-top:8px;">🔴 <span class="ar-t">لا تقدر تضيف مشروع يدوياً — المصدر الوحيد هو ركاز.</span><span class="en-t" style="display:none">Cannot add projects manually — Rekaz is the only source.</span></div>
+    <div class="note">⚡ <span class="ar-t">البث المباشر يتخطى الموافقة ويظهر للعميل مباشرة.</span><span class="en-t" style="display:none">Live stream bypasses approval and shows directly to client.</span></div>
+  </div>
+
+  <div class="card card-yellow">
+    <div class="role-header">
+      <h3 style="margin:0;">💰 <span class="ar-t">مالية الزواجات</span><span class="en-t" style="display:none">Wedding Finance</span></h3>
+      <span class="role-creds">wedding.finance / WedFin@2025</span>
+    </div>
+    <ul style="margin-top:8px;">
+      <li><span class="ar-t">استلام طلبات التحويل بعد الموافقة على الإنهاء</span><span class="en-t" style="display:none">Receive payment requests after delivery approval</span></li>
+      <li><span class="ar-t">رفع إيصال التحويل لكل مصور</span><span class="en-t" style="display:none">Upload transfer receipts per photographer</span></li>
+      <li><span class="ar-t">أرشيف جميع التحويلات</span><span class="en-t" style="display:none">Archive of all transfers</span></li>
+    </ul>
+  </div>
+
+  <div class="card card-red">
+    <div class="role-header">
+      <h3 style="margin:0;">📊 <span class="ar-t">دخول الإدارة</span><span class="en-t" style="display:none">Admin Access</span></h3>
+      <span class="role-creds">admin.att / Admin@att2025</span>
+    </div>
+    <ul style="margin-top:8px;">
+      <li><span class="ar-t">لوحة الحضور الكاملة + إدارة الجداول + التقارير</span><span class="en-t" style="display:none">Full attendance board + schedule management + reports</span></li>
+      <li><span class="ar-t">إدارة كاملة للصلاحيات والأدوار لجميع المستخدمين</span><span class="en-t" style="display:none">Full permissions & role management for all users</span></li>
+      <li><span class="ar-t">الإعلانات والأخبار</span><span class="en-t" style="display:none">Announcements & news</span></li>
+    </ul>
+  </div>
+
+  <div class="card" style="border-right:4px solid #4ec4d8;">
+    <div class="role-header">
+      <h3 style="margin:0;">📸 <span class="ar-t">التصوير الشخصي</span><span class="en-t" style="display:none">Personal Photography</span></h3>
+      <span class="role-creds">personal.sumou / Personal@2025</span>
+    </div>
+    <ul style="margin-top:8px;">
+      <li><span class="ar-t">حجوزات ركاز تصل تلقائياً عبر Webhook</span><span class="en-t" style="display:none">Rekaz bookings arrive automatically via Webhook</span></li>
+      <li><span class="ar-t">كلندر + قائمة الحجوزات + إضافة يدوية</span><span class="en-t" style="display:none">Calendar + bookings list + manual add</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section id="modules">
+  <h2>⚙️ <span class="ar-t">الأنظمة الرئيسية</span><span class="en-t" style="display:none">Main Modules</span></h2>
+
+  <h3>١ / 1 — <span class="ar-t">نظام المشاريع</span><span class="en-t" style="display:none">Projects System</span></h3>
+  <table>
+    <tr><th>النوع / Type</th><th>المراحل / Stages</th><th>الميزات / Features</th></tr>
+    <tr>
+      <td><strong><span class="ar-t">ميدان</span><span class="en-t" style="display:none">Field</span></strong><br><span style="font-size:11px;color:#6b7280">فوتو·فيديو·درون / Photo·Video·Drone</span></td>
+      <td><span class="ar-t">طلب إنهاء فقط</span><span class="en-t" style="display:none">Closure request only</span></td>
+      <td><span class="ar-t">إسناد · قيمة · إنهاء</span><span class="en-t" style="display:none">Assignment · Value · Closure</span></td>
+    </tr>
+    <tr>
+      <td><strong><span class="ar-t">اجتماعي</span><span class="en-t" style="display:none">Social</span></strong><br><span style="font-size:11px;color:#6b7280">انستقرام·تيك توك·وحدة نشر</span></td>
+      <td><span class="ar-t">7 مراحل</span><span class="en-t" style="display:none">7 stages</span></td>
+      <td><span class="ar-t">طلب تصميم · طلب مصور · إنهاء</span><span class="en-t" style="display:none">Design req · Photo req · Closure</span></td>
+    </tr>
+    <tr>
+      <td><strong><span class="ar-t">زواجات</span><span class="en-t" style="display:none">Weddings</span></strong></td>
+      <td><span class="ar-t">3 مراحل</span><span class="en-t" style="display:none">3 stages</span></td>
+      <td><span class="ar-t">روابط تسليم · موافقة · عرض للعميل</span><span class="en-t" style="display:none">Delivery links · Approval · Client view</span></td>
+    </tr>
+  </table>
+
+  <h3>١.٥ — <span class="ar-t">أنواع التصوير وصلاحياتها</span><span class="en-t" style="display:none">Photography Types & Permissions</span></h3>
+  <table>
+    <tr>
+      <th><span class="ar-t">النوع / Type</span></th>
+      <th><span class="ar-t">مشاريع / Projects</span></th>
+      <th><span class="ar-t">زواجات / Weddings</span></th>
+      <th><span class="ar-t">رابط للعميل / Client Link</span></th>
+      <th><span class="ar-t">موافقة / Approval</span></th>
+      <th><span class="ar-t">خطوات / Stages</span></th>
+    </tr>
+    <tr><td><span class="ar-t">مصور فوتوغرافي</span><span class="en-t" style="display:none">Photographer</span></td><td>✅</td><td>✅</td><td><span class="ar-t">صور معدلة + خام</span><span class="en-t" style="display:none">Edited + Raw photos</span></td><td>✅</td><td>3</td></tr>
+    <tr><td><span class="ar-t">مصور فيديو</span><span class="en-t" style="display:none">Videographer</span></td><td>✅</td><td>✅</td><td><span class="ar-t">فيديو معدل + خام</span><span class="en-t" style="display:none">Edited + Raw video</span></td><td>✅</td><td>3</td></tr>
+    <tr><td><span class="ar-t">بث مباشر</span><span class="en-t" style="display:none">Live Stream</span></td><td>—</td><td>✅</td><td><span class="ar-t">رابط البث</span><span class="en-t" style="display:none">Live link</span></td><td>❌ <span class="ar-t">مباشر</span><span class="en-t" style="display:none">Instant</span></td><td>—</td></tr>
+    <tr><td><span class="ar-t">مصور فيديو + مونتاج</span><span class="en-t" style="display:none">Video + Editing</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>3</td></tr>
+    <tr><td><span class="ar-t">درون</span><span class="en-t" style="display:none">Drone</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td><span class="ar-t">مونتير</span><span class="en-t" style="display:none">Editor</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>3</td></tr>
+    <tr><td><span class="ar-t">معالج صور</span><span class="en-t" style="display:none">Photo Editor</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>3</td></tr>
+    <tr><td><span class="ar-t">مساعد مصور</span><span class="en-t" style="display:none">Photo Assistant</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td><span class="ar-t">مصور منتجات</span><span class="en-t" style="display:none">Product Photographer</span></td><td>✅ <span style="font-size:10px;color:#6b7280;">(<span class="ar-t">يقبل الطلبات</span><span class="en-t" style="display:none">accepts requests</span>)</span></td><td>—</td><td>—</td><td>—</td><td>3</td></tr>
+    <tr><td><span class="ar-t">إضاءة</span><span class="en-t" style="display:none">Lighting</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td><span class="ar-t">كواليس</span><span class="en-t" style="display:none">BTS</span></td><td>✅</td><td>✅</td><td>—</td><td>—</td><td>3</td></tr>
+    <tr><td><span class="ar-t">انستقرام</span><span class="en-t" style="display:none">Instagram</span></td><td>✅</td><td>—</td><td>—</td><td>—</td><td>7</td></tr>
+    <tr><td><span class="ar-t">تيك توك</span><span class="en-t" style="display:none">TikTok</span></td><td>✅</td><td>—</td><td>—</td><td>—</td><td>7</td></tr>
+    <tr><td><span class="ar-t">وحدة نشر</span><span class="en-t" style="display:none">Publishing Unit</span></td><td>✅</td><td>—</td><td>—</td><td>—</td><td>7</td></tr>
+  </table>
+  <div class="note">💡 <span class="ar-t">فقط مصور المنتجات يستقبل الطلبات التلقائية — باقي الأنواع لا تظهر لهم طلبات.</span><span class="en-t" style="display:none">Only product photographers receive automatic requests — other types don't see requests.</span></div>
+  <div class="note">⏳ <span class="ar-t">لو المصور ما رفع رابط — يظهر للعميل مكان الرابط: "جاري الإبداع ⏳"</span><span class="en-t" style="display:none">If photographer hasn't uploaded a link — client sees: "Creative in progress ⏳"</span></div>
+  <div class="note"><span class="ar-t">الخطوات الـ3: استلام الأوردر ← في رحلة الإبداع ← تم التسليم</span><span class="en-t" style="display:none">3 Stages: Receive Order → Creative Journey → Delivered</span></div>
+  <div class="note"><span class="ar-t">الخطوات الـ7 (Marketing): استلام الأوردر ← الاجتماع مع العميل ← كتابة الخطة ← رحلة الإبداع ← رحلة التعديل ← التسليم ← النشر</span><span class="en-t" style="display:none">7 Stages: Receive → Client Meeting → Plan Writing → Creative Journey → Revision → Delivery → Publishing</span></div>
+
+  <h3>٢ / 2 — <span class="ar-t">نظام الزواجات</span><span class="en-t" style="display:none">Wedding System</span></h3>
+  <table>
+    <tr><th>الدور / Role</th><th>مدة التسليم / Deadline</th><th>موافقة / Approval</th></tr>
+    <tr><td><span class="ar-t">مصور فوتوغرافي</span><span class="en-t" style="display:none">Photographer</span></td><td>3-5 <span class="ar-t">أيام</span><span class="en-t" style="display:none">days</span></td><td>✅</td></tr>
+    <tr><td><span class="ar-t">مصور فيديو</span><span class="en-t" style="display:none">Videographer</span></td><td>6-10 <span class="ar-t">أيام</span><span class="en-t" style="display:none">days</span></td><td>✅</td></tr>
+    <tr><td><span class="ar-t">بث مباشر</span><span class="en-t" style="display:none">Live Stream</span></td><td><span class="ar-t">فوري</span><span class="en-t" style="display:none">Immediate</span></td><td>❌ <span class="ar-t">يتخطى</span><span class="en-t" style="display:none">Bypassed</span></td></tr>
+    <tr><td><span class="ar-t">خام</span><span class="en-t" style="display:none">Raw Files</span></td><td>7 <span class="ar-t">أيام</span><span class="en-t" style="display:none">days</span></td><td>—</td></tr>
+  </table>
+
+  <h3>٣ / 3 — <span class="ar-t">نظام القدرة الاستيعابية</span><span class="en-t" style="display:none">Capacity System</span></h3>
+  <div class="bilingual">
+    <div class="ar">كل مصور له حد شهري. المصور الممتلئ يظهر بالأحمر ومُعطَّل في قائمة الاختيار. الحساب شهري وليس يومياً.</div>
+    <div class="en">Each photographer has a monthly capacity limit. A full photographer appears in red and is disabled in the selection list. Calculation is monthly, not daily.</div>
+  </div>
+
+  <h3>٤ / 4 — <span class="ar-t">نظام التقييم والستريك</span><span class="en-t" style="display:none">Ratings & Streak</span></h3>
+  <table>
+    <tr><th>الرمز / Symbol</th><th>المعنى / Meaning</th></tr>
+    <tr><td>⭐</td><td><span class="ar-t">سلّم خلال 5 أيام</span><span class="en-t" style="display:none">Delivered within 5 days</span></td></tr>
+    <tr><td>🟡</td><td><span class="ar-t">سلّم بين 5-10 أيام</span><span class="en-t" style="display:none">Delivered between 5-10 days</span></td></tr>
+    <tr><td>🔴</td><td><span class="ar-t">تأخر أكثر من 10 أيام</span><span class="en-t" style="display:none">Delayed over 10 days</span></td></tr>
+  </table>
+
+  <h3>٥ / 5 — <span class="ar-t">نظام الصلاحيات الديناميكي</span><span class="en-t" style="display:none">Dynamic Permissions</span></h3>
+  <div class="bilingual">
+    <div class="ar">كل مستخدم يحمل أدواراً متعددة. المصور تُحدَّد له أنواع التصوير ويظهر في القوائم المناسبة. تعطيل الحساب يمنع الدخول نهائياً.</div>
+    <div class="en">Each user can hold multiple roles. Photographer types define which project lists they appear in. Disabling an account blocks all access.</div>
+  </div>
+
+  <h3>٦ / 6 — <span class="ar-t">ربط ركاز</span><span class="en-t" style="display:none">Rekaz Integration</span></h3>
+  <div class="bilingual">
+    <div class="ar">حجوزات ركاز تصل عبر Webhook إلى Supabase وتظهر في التطبيق. حجوزات الزواجات تظهر كـ"طلب جديد" لإدارة الزواجات لتحويلها لمشروع.</div>
+    <div class="en">Rekaz bookings arrive via Webhook → saved to Supabase → displayed in app. Wedding bookings appear as "New Request" for the wedding admin to convert to a project.</div>
+  </div>
+</section>
+
+<!-- FLOWS -->
+<section id="flows">
+  <h2>🔄 <span class="ar-t">سير العمل الرئيسية</span><span class="en-t" style="display:none">Key Workflows</span></h2>
+
+  <style>
+    .flow-diagram{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;}
+    .flow-diagram h4{font-size:15px;font-weight:700;color:#152127;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .fd-row{display:flex;align-items:stretch;gap:0;margin-bottom:8px;flex-wrap:wrap;}
+    .fd-box{background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;padding:8px 12px;font-size:12px;color:#0369a1;font-weight:500;text-align:center;min-width:100px;flex:1;display:flex;align-items:center;justify-content:center;}
+    .fd-box.green{background:#f0fdf4;border-color:#bbf7d0;color:#166534;}
+    .fd-box.pink{background:#fdf2f8;border-color:#fbcfe8;color:#9d174d;}
+    .fd-box.yellow{background:#fefce8;border-color:#fde68a;color:#92400e;}
+    .fd-box.red{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+    .fd-box.teal{background:#f0fdfa;border-color:#99f6e4;color:#134e4a;}
+    .fd-box.gray{background:#f9fafb;border-color:#e5e7eb;color:#6b7280;}
+    .fd-arrow{display:flex;align-items:center;justify-content:center;padding:0 6px;color:#9ca3af;font-size:18px;font-weight:700;}
+    .fd-arrow.down{padding:4px 0;justify-content:center;color:#9ca3af;font-size:16px;}
+    .fd-label{font-size:10px;color:#9ca3af;text-align:center;margin-bottom:4px;}
+    .fd-note{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;font-size:11px;color:#92400e;margin-top:8px;}
+    .fd-branch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+    .fd-branch-item{border-radius:8px;padding:8px 10px;font-size:11px;border:1px solid;}
+    .example-box{background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px;}
+    .example-box .ex-title{font-size:13px;font-weight:700;color:#152127;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+    .ex-step{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
+    .ex-num{width:22px;height:22px;border-radius:50%;background:#215C66;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+    .ex-text{font-size:12px;color:#374151;flex:1;}
+    .ex-text strong{color:#152127;}
+    .ex-text .actor{display:inline-block;background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;}
+    .ex-text .actor.photo{background:#ede9fe;color:#5b21b6;}
+    .ex-text .actor.wed{background:#fce7f3;color:#9d174d;}
+    .ex-text .actor.client{background:#f0fdf4;color:#166534;}
+    .ex-text .actor.fin{background:#fefce8;color:#854d0e;}
+  </style>
+
+
+  <!-- FLOW 1: Wedding Project -->
+  <div class="flow-diagram">
+    <h4>💍 <span class="ar-t">سير مشروع زواج كامل</span><span class="en-t" style="display:none">Full Wedding Project Flow</span></h4>
+
+    <div class="fd-row">
+      <div class="fd-box pink"><span class="ar-t">📲 حجز يصل من ركاز</span><span class="en-t" style="display:none">📲 Booking arrives from Rekaz</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box pink"><span class="ar-t">💍 إدارة الزواجات تستلم</span><span class="en-t" style="display:none">💍 Wedding admin receives</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box pink"><span class="ar-t">تعدل التفاصيل وتسند المصورين</span><span class="en-t" style="display:none">Edit details & assign photographers</span></div>
+    </div>
+    <div class="fd-row" style="justify-content:flex-end;padding-left:33%;">
+      <div class="fd-arrow down">↓</div>
+    </div>
+    <div class="fd-row">
+      <div class="fd-box teal"><span class="ar-t">📷 المصور يستلم الأوردر ويبدأ الخطوات</span><span class="en-t" style="display:none">📷 Photographer receives & starts stages</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box teal"><span class="ar-t">ينتهي التصوير</span><span class="en-t" style="display:none">Photography done</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box teal"><span class="ar-t">يرفع رابط الخام (خلال أسبوع)</span><span class="en-t" style="display:none">Upload raw files (within 1 week)</span></div>
+    </div>
+    <div class="fd-row" style="justify-content:flex-end;padding-left:33%;">
+      <div class="fd-arrow down">↓</div>
+    </div>
+    <div class="fd-row">
+      <div class="fd-box" style="background:#e0f2fe;border-color:#bae6fd;color:#0369a1;"><span class="ar-t">📸 مصور فوتو يرفع رابط الصور</span><span class="en-t" style="display:none">📸 Photographer uploads photos link</span></div>
+      <div class="fd-arrow" style="color:#d1d5db;">|</div>
+      <div class="fd-box" style="background:#f3e8ff;border-color:#d8b4fe;color:#6d28d9;"><span class="ar-t">🎬 مصور فيديو يرفع رابط الفيديو</span><span class="en-t" style="display:none">🎬 Videographer uploads video link</span></div>
+      <div class="fd-arrow" style="color:#d1d5db;">|</div>
+      <div class="fd-box yellow"><span class="ar-t">📡 بث مباشر يرفع الرابط → يظهر فوراً للعميل ⚡</span><span class="en-t" style="display:none">📡 Live uploads → instant to client ⚡</span></div>
+    </div>
+    <div class="fd-row" style="padding-left:50%;">
+      <div class="fd-arrow down">↓</div>
+    </div>
+    <div class="fd-row">
+      <div class="fd-box pink" style="flex:0.6;"><span class="ar-t">💍 إدارة الزواجات تراجع وتوافق</span><span class="en-t" style="display:none">💍 Wedding admin reviews & approves</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box green"><span class="ar-t">✅ الرابط يظهر للعميل</span><span class="en-t" style="display:none">✅ Link appears to client</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box green"><span class="ar-t">⭐ العميل يكتب تقييم</span><span class="en-t" style="display:none">⭐ Client writes review</span></div>
+    </div>
+    <div class="fd-row" style="padding-left:50%;">
+      <div class="fd-arrow down">↓</div>
+    </div>
+    <div class="fd-row">
+      <div class="fd-box yellow"><span class="ar-t">💰 مالية الزواجات تستلم طلب تحويل</span><span class="en-t" style="display:none">💰 Finance receives payment request</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box yellow"><span class="ar-t">ترفع إيصال التحويل</span><span class="en-t" style="display:none">Uploads transfer receipt</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box green"><span class="ar-t">✅ المصور يستلم الإشعار</span><span class="en-t" style="display:none">✅ Photographer notified</span></div>
+    </div>
+
+    <div class="fd-note"><span class="ar-t">⚠️ لو المصور لم يرفع الرابط — يظهر للعميل: "جاري الإبداع ⏳" بدل الرابط</span><span class="en-t" style="display:none">⚠️ If photographer hasn't uploaded — client sees: "Creative in progress ⏳"</span></div>
+  </div>
+
+  <!-- FLOW 1 EXAMPLE -->
+  <div class="example-box">
+    <div class="ex-title">📖 <span class="ar-t">مثال: زواج ناصر المحسن</span><span class="en-t" style="display:none">Example: Nasser Al-Mohsen Wedding</span></div>
+    <div class="ex-step"><div class="ex-num">1</div><div class="ex-text"><span class="actor wed">إدارة الزواجات</span> <span class="ar-t">تستلم حجز من ركاز: ناصر المحسن، قاعة أروما، 18 يوليو</span><span class="en-t" style="display:none">receives Rekaz booking: Nasser Al-Mohsen, Aroma Hall, July 18</span></div></div>
+    <div class="ex-step"><div class="ex-num">2</div><div class="ex-text"><span class="actor wed">إدارة الزواجات</span> <span class="ar-t">تسند: نورة (فوتو) + ناصر الحنايا (فيديو) + مزمل (بث مباشر)</span><span class="en-t" style="display:none">assigns: Noura (photo) + Nasser (video) + Muzzammil (live)</span></div></div>
+    <div class="ex-step"><div class="ex-num">3</div><div class="ex-text"><span class="actor photo">مزمل (بث)</span> <span class="ar-t">يرفع رابط البث → يظهر للعميل فوراً بدون موافقة ⚡</span><span class="en-t" style="display:none">uploads live link → appears to client instantly ⚡</span></div></div>
+    <div class="ex-step"><div class="ex-num">4</div><div class="ex-text"><span class="actor photo">نورة (فوتو)</span> <span class="ar-t">ترفع الخام خلال أسبوع، ثم ترفع رابط الصور المعدلة بعد 5 أيام</span><span class="en-t" style="display:none">uploads raw within 1 week, then edited photos after 5 days</span></div></div>
+    <div class="ex-step"><div class="ex-num">5</div><div class="ex-text"><span class="actor wed">إدارة الزواجات</span> <span class="ar-t">توافق على رابط نورة → يظهر للعميل</span><span class="en-t" style="display:none">approves Noura's link → appears to client</span></div></div>
+    <div class="ex-step"><div class="ex-num">6</div><div class="ex-text"><span class="actor client">العميل</span> <span class="ar-t">يدخل الرمز السري، يشوف الصور والبث، يكتب "شكراً نورة على التصوير الرائع ⭐⭐⭐⭐⭐"</span><span class="en-t" style="display:none">enters secret code, views photos & live, writes "Thank you Noura ⭐⭐⭐⭐⭐"</span></div></div>
+    <div class="ex-step"><div class="ex-num">7</div><div class="ex-text"><span class="actor fin">مالية الزواجات</span> <span class="ar-t">تحول المبالغ لنورة وناصر ومزمل وترفع الإيصالات</span><span class="en-t" style="display:none">transfers payments to all photographers & uploads receipts</span></div></div>
+  </div>
+
+  <!-- FLOW 2: Product Photo Request -->
+  <div class="flow-diagram">
+    <h4>📦 <span class="ar-t">طلب مصور المنتجات</span><span class="en-t" style="display:none">Product Photographer Request</span></h4>
+
+    <div class="fd-row">
+      <div class="fd-box"><span class="ar-t">📋 مدير مشاريع يضغط "طلب مصور منتجات"</span><span class="en-t" style="display:none">📋 Project manager clicks "Request product photographer"</span></div>
+    </div>
+    <div class="fd-row" style="justify-content:center;"><div class="fd-arrow down">↓</div></div>
+    <div class="fd-row">
+      <div class="fd-box teal"><span class="ar-t">📢 يروح تلقائياً لكل المصورين المسجلين بنوع "مصور منتجات"</span><span class="en-t" style="display:none">📢 Auto-sent to ALL photographers with "product photographer" type</span></div>
+    </div>
+    <div class="fd-row" style="justify-content:center;"><div class="fd-arrow down">↓</div></div>
+    <div class="fd-branch">
+      <div class="fd-branch-item" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">
+        <strong><span class="ar-t">✅ أول مصور يقبل</span><span class="en-t" style="display:none">✅ First to accept</span></strong><br>
+        <span class="ar-t" style="font-size:11px;">يأخذ الأوردر ويُضاف للمشروع</span><span class="en-t" style="display:none" style="font-size:11px;">Gets the job & added to project</span>
+      </div>
+      <div class="fd-branch-item" style="background:#f9fafb;border-color:#e5e7eb;color:#6b7280;">
+        <strong><span class="ar-t">🌟 الباقون</span><span class="en-t" style="display:none">🌟 Others</span></strong><br>
+        <span class="ar-t" style="font-size:11px;">يستلمون "خيرها بغيرها 🌟"</span><span class="en-t" style="display:none" style="font-size:11px;">Receive "better luck next time 🌟"</span>
+      </div>
+    </div>
+    <div class="fd-note">💡 <span class="ar-t">فقط المصورون الذين نوعهم "مصور منتجات" يشوفون الطلب — باقي الأنواع لا تصلهم طلبات.</span><span class="en-t" style="display:none">Only photographers with "product photographer" type see the request — other types receive no requests.</span></div>
+  </div>
+
+  <!-- FLOW 2 EXAMPLE -->
+  <div class="example-box">
+    <div class="ex-title">📖 <span class="ar-t">مثال: طلب تصوير منتجات لعميل greenO</span><span class="en-t" style="display:none">Example: Product shoot request for greenO client</span></div>
+    <div class="ex-step"><div class="ex-num">1</div><div class="ex-text"><span class="actor">مدير مشاريع</span> <span class="ar-t">يضغط "طلب مصور منتجات" لمشروع greenO، يحدد التاريخ والقيمة 350 ريال</span><span class="en-t" style="display:none">clicks "Request product photographer" for greenO project, sets date & value 350 SAR</span></div></div>
+    <div class="ex-step"><div class="ex-num">2</div><div class="ex-text"><span class="ar-t">يصل الطلب لـ</span><span class="en-t" style="display:none">Request sent to</span> <span class="actor photo">خالد</span> <span class="actor photo">فيصل</span> <span class="actor photo">سطام</span> <span class="ar-t">(المصورون المسجلون بنوع مصور منتجات)</span><span class="en-t" style="display:none">(all registered product photographers)</span></div></div>
+    <div class="ex-step"><div class="ex-num">3</div><div class="ex-text"><span class="actor photo">فيصل</span> <span class="ar-t">يقبل أولاً → يأخذ الأوردر</span><span class="en-t" style="display:none">accepts first → gets the job</span></div></div>
+    <div class="ex-step"><div class="ex-num">4</div><div class="ex-text"><span class="actor photo">خالد وسطام</span> <span class="ar-t">يستلمون إشعار "خيرها بغيرها 🌟"</span><span class="en-t" style="display:none">receive "better luck next time 🌟" notification</span></div></div>
+  </div>
+
+  <!-- FLOW 3: Client Tracking -->
+  <div class="flow-diagram">
+    <h4>🔍 <span class="ar-t">تتبع المشروع من العميل</span><span class="en-t" style="display:none">Client Project Tracking</span></h4>
+
+    <div class="fd-row">
+      <div class="fd-box green"><span class="ar-t">🔍 العميل يدخل الرمز السري</span><span class="en-t" style="display:none">🔍 Client enters secret code</span></div>
+      <div class="fd-arrow">←</div>
+      <div class="fd-box green"><span class="ar-t">يشوف حالة المشروع والروابط</span><span class="en-t" style="display:none">Views project status & links</span></div>
+    </div>
+    <div class="fd-row" style="justify-content:flex-end;"><div class="fd-arrow down">↓</div></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div class="fd-box" style="background:#e0f2fe;border-color:#bae6fd;color:#0369a1;flex-direction:column;gap:4px;">
+        <strong><span class="ar-t">📸 صور</span><span class="en-t" style="display:none">Photos</span></strong>
+        <div style="font-size:10px;"><span class="ar-t">معدلة + خام<br>بعد موافقة الإدارة</span><span class="en-t" style="display:none">Edited + Raw<br>After admin approval</span></div>
+      </div>
+      <div class="fd-box" style="background:#f3e8ff;border-color:#d8b4fe;color:#6d28d9;flex-direction:column;gap:4px;">
+        <strong><span class="ar-t">🎬 فيديو</span><span class="en-t" style="display:none">Video</span></strong>
+        <div style="font-size:10px;"><span class="ar-t">معدل + خام<br>بعد موافقة الإدارة</span><span class="en-t" style="display:none">Edited + Raw<br>After admin approval</span></div>
+      </div>
+      <div class="fd-box yellow" style="flex-direction:column;gap:4px;">
+        <strong><span class="ar-t">📡 بث مباشر</span><span class="en-t" style="display:none">Live Stream</span></strong>
+        <div style="font-size:10px;"><span class="ar-t">⚡ فوري بدون موافقة</span><span class="en-t" style="display:none">⚡ Instant, no approval</span></div>
+      </div>
+    </div>
+
+    <div class="fd-row">
+      <div class="fd-box gray"><span class="ar-t">⏳ لو ما رفع المصور بعد → "جاري الإبداع ⏳"</span><span class="en-t" style="display:none">⏳ If not uploaded yet → "Creative in progress ⏳"</span></div>
+    </div>
+    <div class="fd-row" style="justify-content:center;margin-top:8px;"><div class="fd-arrow down">↓</div></div>
+    <div class="fd-row">
+      <div class="fd-box green"><span class="ar-t">⭐ العميل يكتب تقييم ورسالة شكر → تصل للمصور كجرعة إيجابية</span><span class="en-t" style="display:none">⭐ Client writes rating & thank-you → arrives as positive boost to photographer</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA MODELS -->
+<section id="data">
+  <h2>🗄️ <span class="ar-t">نماذج البيانات</span><span class="en-t" style="display:none">Data Models</span></h2>
+
+  <h3>Project</h3>
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Description / الوصف</th></tr>
+    <tr><td><code>id</code></td><td>number</td><td><span class="ar-t">معرّف فريد</span><span class="en-t" style="display:none">Unique identifier</span></td></tr>
+    <tr><td><code>serial</code></td><td>string</td><td><span class="ar-t">رمز العميل السري (X7K-29QM-4R)</span><span class="en-t" style="display:none">Client secret code</span></td></tr>
+    <tr><td><code>name</code></td><td>string</td><td><span class="ar-t">اسم المشروع</span><span class="en-t" style="display:none">Project name</span></td></tr>
+    <tr><td><code>client</code></td><td>string</td><td><span class="ar-t">اسم العميل</span><span class="en-t" style="display:none">Client name</span></td></tr>
+    <tr><td><code>managerId</code></td><td>number</td><td><span class="ar-t">معرّف المدير</span><span class="en-t" style="display:none">Manager ID</span></td></tr>
+    <tr><td><code>start / end</code></td><td>date string</td><td><span class="ar-t">تاريخ البداية والنهاية</span><span class="en-t" style="display:none">Start/end dates</span></td></tr>
+    <tr><td><code>status</code></td><td>active | done</td><td><span class="ar-t">الحالة</span><span class="en-t" style="display:none">Status</span></td></tr>
+    <tr><td><code>roles</code></td><td>Role[]</td><td><span class="ar-t">فريق العمل</span><span class="en-t" style="display:none">Team members</span></td></tr>
+    <tr><td><code>type</code></td><td>field | social | wedding</td><td><span class="ar-t">نوع المشروع</span><span class="en-t" style="display:none">Project type</span></td></tr>
+  </table>
+
+  <h3>WeddingProject</h3>
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Description / الوصف</th></tr>
+    <tr><td><code>id / serial</code></td><td>number / string</td><td><span class="ar-t">معرّف + رمز العميل</span><span class="en-t" style="display:none">ID + client code</span></td></tr>
+    <tr><td><code>client</code></td><td>string</td><td><span class="ar-t">اسم العميل</span><span class="en-t" style="display:none">Client name</span></td></tr>
+    <tr><td><code>date / time</code></td><td>string</td><td><span class="ar-t">تاريخ ووقت الزواج</span><span class="en-t" style="display:none">Wedding date & time</span></td></tr>
+    <tr><td><code>venue</code></td><td>string</td><td><span class="ar-t">اسم القاعة</span><span class="en-t" style="display:none">Venue name</span></td></tr>
+    <tr><td><code>roles</code></td><td>Role[]</td><td><span class="ar-t">فريق التصوير</span><span class="en-t" style="display:none">Photography team</span></td></tr>
+    <tr><td><code>pendingLinks</code></td><td>Array</td><td><span class="ar-t">روابط بانتظار الموافقة</span><span class="en-t" style="display:none">Links pending approval</span></td></tr>
+    <tr><td><code>approvedLinks</code></td><td>Array</td><td><span class="ar-t">روابط معتمدة تظهر للعميل</span><span class="en-t" style="display:none">Approved links shown to client</span></td></tr>
+    <tr><td><code>rawLinks</code></td><td>Array</td><td><span class="ar-t">روابط الخام</span><span class="en-t" style="display:none">Raw file links</span></td></tr>
+    <tr><td><code>extraHour</code></td><td>boolean</td><td><span class="ar-t">ساعة إضافية</span><span class="en-t" style="display:none">Extra hour flag</span></td></tr>
+    <tr><td><code>source</code></td><td>wedding | rekaz</td><td><span class="ar-t">مصدر المشروع</span><span class="en-t" style="display:none">Project source</span></td></tr>
+  </table>
+
+  <h3>Role</h3>
+  <table>
+    <tr><th>Field</th><th>Description / الوصف</th></tr>
+    <tr><td><code>type</code></td><td><span class="ar-t">نوع التصوير</span><span class="en-t" style="display:none">Photography type</span></td></tr>
+    <tr><td><code>person</code></td><td><span class="ar-t">اسم المصور</span><span class="en-t" style="display:none">Photographer name</span></td></tr>
+    <tr><td><code>photographerId</code></td><td><span class="ar-t">معرّف المصور</span><span class="en-t" style="display:none">Photographer ID</span></td></tr>
+    <tr><td><code>value</code></td><td><span class="ar-t">القيمة المالية (ريال)</span><span class="en-t" style="display:none">Financial value (SAR)</span></td></tr>
+  </table>
+
+  <h3>UserPermissions</h3>
+  <table>
+    <tr><th>Field</th><th>Description / الوصف</th></tr>
+    <tr><td><code>defaultRole</code></td><td><span class="ar-t">الدور الأساسي</span><span class="en-t" style="display:none">Primary role</span></td></tr>
+    <tr><td><code>extraRoles</code></td><td><span class="ar-t">أدوار إضافية</span><span class="en-t" style="display:none">Additional roles [{role:'photographer'}]</span></td></tr>
+    <tr><td><code>active</code></td><td><span class="ar-t">تفعيل/تعطيل</span><span class="en-t" style="display:none">Enable/disable account</span></td></tr>
+    <tr><td><code>photoTypes</code></td><td><span class="ar-t">أنواع التصوير للمصور</span><span class="en-t" style="display:none">Photography types for photographer</span></td></tr>
+    <tr><td><code>features</code></td><td><code>{design, photoReq, stages, close, addProj}</code></td></tr>
+  </table>
+
+  <h3>Booking (Rekaz)</h3>
+  <table>
+    <tr><th>Field</th><th>Description / الوصف</th></tr>
+    <tr><td><code>rekaz_id</code></td><td><span class="ar-t">معرّف الحجز من ركاز</span><span class="en-t" style="display:none">Rekaz booking ID</span></td></tr>
+    <tr><td><code>client_name</code></td><td><span class="ar-t">اسم العميل</span><span class="en-t" style="display:none">Client name</span></td></tr>
+    <tr><td><code>phone</code></td><td><span class="ar-t">رقم الهاتف</span><span class="en-t" style="display:none">Phone number</span></td></tr>
+    <tr><td><code>date / time</code></td><td><span class="ar-t">التاريخ والوقت</span><span class="en-t" style="display:none">Date and time</span></td></tr>
+    <tr><td><code>service</code></td><td><span class="ar-t">الخدمة/الباقة</span><span class="en-t" style="display:none">Service/package</span></td></tr>
+    <tr><td><code>status</code></td><td><span class="ar-t">مؤكد / ملغي</span><span class="en-t" style="display:none">confirmed / cancelled</span></td></tr>
+    <tr><td><code>source</code></td><td>rekaz | manual</td></tr>
+  </table>
+</section>
+
+<!-- TECH -->
+<section id="tech">
+  <h2>🛠️ <span class="ar-t">التقنية</span><span class="en-t" style="display:none">Tech Stack</span></h2>
+
+  <h3><span class="ar-t">النسخة الحالية (Web)</span><span class="en-t" style="display:none">Current Version (Web)</span></h3>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="name">HTML/CSS/JS</div><div class="desc">Single Page App</div></div>
+    <div class="tech-card"><div class="name">localStorage</div><div class="desc"><span class="ar-t">تخزين محلي</span><span class="en-t" style="display:none">Local storage</span></div></div>
+    <div class="tech-card"><div class="name">Netlify</div><div class="desc"><span class="ar-t">استضافة + Functions</span><span class="en-t" style="display:none">Hosting + Functions</span></div></div>
+    <div class="tech-card"><div class="name">Supabase</div><div class="desc"><span class="ar-t">قاعدة بيانات ركاز</span><span class="en-t" style="display:none">Rekaz bookings DB</span></div></div>
+    <div class="tech-card"><div class="name">Alexandria</div><div class="desc">Google Fonts</div></div>
+    <div class="tech-card"><div class="name">Tabler Icons</div><div class="desc">Icon library</div></div>
+  </div>
+
+  <h3><span class="ar-t">التطبيق المطلوب (iOS)</span><span class="en-t" style="display:none">Required App (iOS)</span></h3>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="name">React Native</div><div class="desc"><span class="ar-t">كلا المنصتين</span><span class="en-t" style="display:none">iOS Native</span></div></div>
+    <div class="tech-card"><div class="name">Supabase / PostgreSQL</div><div class="desc"><span class="ar-t">قاعدة بيانات مركزية</span><span class="en-t" style="display:none">Central database</span></div></div>
+    <div class="tech-card"><div class="name">JWT Auth</div><div class="desc"><span class="ar-t">مصادقة آمنة</span><span class="en-t" style="display:none">Secure authentication</span></div></div>
+    <div class="tech-card"><div class="name">Firebase FCM</div><div class="desc">Push Notifications</div></div>
+    <div class="tech-card"><div class="name">Rekaz Webhook</div><div class="desc"><span class="ar-t">حجوزات تلقائية</span><span class="en-t" style="display:none">Auto bookings</span></div></div>
+    <div class="tech-card"><div class="name">GPS / Location</div><div class="desc"><span class="ar-t">نظام الحضور</span><span class="en-t" style="display:none">Attendance system</span></div></div>
+  </div>
+
+  <h3>Supabase Credentials</h3>
+  <table>
+    <tr><th>Key</th><th>Value</th></tr>
+    <tr><td>Project URL</td><td><code>https://jdmhbwtqipvaestgczwh.supabase.co</code></td></tr>
+    <tr><td>Publishable Key</td><td><code>sb_publishable_J6uiyrlfPGNAXXHXNsEiGw_KBpGr7eP</code></td></tr>
+    <tr><td>Table</td><td><code>bookings</code></td></tr>
+    <tr><td>Rekaz Tenant ID</td><td><code>3a149404-00e5-d566-d05a-0f069cac732b</code></td></tr>
+    <tr><td>Rekaz API Key</td><td><code>f2dea0dcaae64da6bf2068e2798465c6</code></td></tr>
+    <tr><td>Rekaz Base URL</td><td><code>https://platform.rekaz.io/api/public</code></td></tr>
+  </table>
+
+  <h3>localStorage Keys <span class="ar-t">(النسخة الحالية)</span><span class="en-t" style="display:none">(Current Version)</span></h3>
+  <table>
+    <tr><th>Key</th><th>Data / البيانات</th></tr>
+    <tr><td><code>sumou_projects</code></td><td><span class="ar-t">المشاريع</span><span class="en-t" style="display:none">Projects</span></td></tr>
+    <tr><td><code>sumou_wedding_projects</code></td><td><span class="ar-t">مشاريع الزواجات</span><span class="en-t" style="display:none">Wedding projects</span></td></tr>
+    <tr><td><code>sumou_notifications</code></td><td><span class="ar-t">الإشعارات</span><span class="en-t" style="display:none">Notifications</span></td></tr>
+    <tr><td><code>sumou_wedding_notifs</code></td><td><span class="ar-t">إشعارات الزواجات</span><span class="en-t" style="display:none">Wedding notifications</span></td></tr>
+    <tr><td><code>sumou_photo_requests</code></td><td><span class="ar-t">طلبات المصورين</span><span class="en-t" style="display:none">Photo requests</span></td></tr>
+    <tr><td><code>sumou_permissions</code></td><td><span class="ar-t">صلاحيات المستخدمين</span><span class="en-t" style="display:none">User permissions</span></td></tr>
+    <tr><td><code>sumou_rekaz_bookings</code></td><td><span class="ar-t">حجوزات ركاز</span><span class="en-t" style="display:none">Rekaz bookings</span></td></tr>
+    <tr><td><code>sumou_reviews</code></td><td><span class="ar-t">تقييمات العملاء</span><span class="en-t" style="display:none">Client reviews</span></td></tr>
+    <tr><td><code>sumou_attendance</code></td><td><span class="ar-t">سجلات الحضور</span><span class="en-t" style="display:none">Attendance records</span></td></tr>
+    <tr><td><code>sumou_design_requests</code></td><td><span class="ar-t">طلبات التصميم</span><span class="en-t" style="display:none">Design requests</span></td></tr>
+  </table>
+</section>
+
+<!-- SCREENS -->
+<section id="screens">
+  <h2>📱 <span class="ar-t">الشاشات الرئيسية</span><span class="en-t" style="display:none">Main Screens</span></h2>
+
+  <h3><span class="ar-t">شاشة الدخول</span><span class="en-t" style="display:none">Login Screens</span></h3>
+  <div class="screen-grid">
+    <div class="screen-card"><div class="emoji">🔐</div><h4><span class="ar-t">البوابة</span><span class="en-t" style="display:none">Portal</span></h4><p><span class="ar-t">دخول سمو | تتبع مشروع</span><span class="en-t" style="display:none">Staff Login | Track Project</span></p></div>
+    <div class="screen-card"><div class="emoji">👤</div><h4><span class="ar-t">دخول موحد</span><span class="en-t" style="display:none">Unified Login</span></h4><p><span class="ar-t">يوزر + باسورد</span><span class="en-t" style="display:none">Username + Password</span></p></div>
+    <div class="screen-card"><div class="emoji">🎭</div><h4><span class="ar-t">اختيار الدور</span><span class="en-t" style="display:none">Role Selection</span></h4><p><span class="ar-t">للمستخدمين متعددي الأدوار</span><span class="en-t" style="display:none">For multi-role users</span></p></div>
+    <div class="screen-card"><div class="emoji">🔍</div><h4><span class="ar-t">تتبع مشروع</span><span class="en-t" style="display:none">Track Project</span></h4><p><span class="ar-t">رمز سري → حالة + روابط + تقييم</span><span class="en-t" style="display:none">Secret code → Status + Links + Rating</span></p></div>
+  </div>
+
+  <h3><span class="ar-t">شاشات المصور ومدير المشاريع</span><span class="en-t" style="display:none">Photographer & Manager Screens</span></h3>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:10px;"><span class="ar-t">نفس القائمة الجانبية للمصور ومدير المشاريع</span><span class="en-t" style="display:none">Same sidebar for both photographer and project manager</span></p>
+  <div class="screen-grid">
+    <div class="screen-card"><div class="emoji">🏠</div><h4>١ — <span class="ar-t">الرئيسية</span><span class="en-t" style="display:none">Home</span></h4><p><span class="ar-t">إعلانات + ملخص</span><span class="en-t" style="display:none">Announcements + Summary</span></p></div>
+    <div class="screen-card"><div class="emoji">👤</div><h4>٢ — <span class="ar-t">صفحتي</span><span class="en-t" style="display:none">My Profile</span></h4><p><span class="ar-t">إحصائيات + ستريك + جرعة إيجابية</span><span class="en-t" style="display:none">Stats + Streak + Boost</span></p></div>
+    <div class="screen-card"><div class="emoji">📅</div><h4>٣ — <span class="ar-t">تقويمي</span><span class="en-t" style="display:none">My Calendar</span></h4><p><span class="ar-t">مشاريع + أيام خاصة</span><span class="en-t" style="display:none">Projects + Personal Days</span></p></div>
+    <div class="screen-card"><div class="emoji">📁</div><h4>٤ — <span class="ar-t">مشاريعي</span><span class="en-t" style="display:none">My Projects</span></h4><p><span class="ar-t">النشطة + خطوات المشروع</span><span class="en-t" style="display:none">Active + Project stages</span></p></div>
+    <div class="screen-card"><div class="emoji">📥</div><h4>٥ — <span class="ar-t">الطلبات</span><span class="en-t" style="display:none">Requests</span></h4><p><span class="ar-t">طلبات + مدفوعات + جرعة إيجابية</span><span class="en-t" style="display:none">Requests + Payments + Boost</span></p></div>
+    <div class="screen-card"><div class="emoji">✅</div><h4>٦ — <span class="ar-t">المنجزة</span><span class="en-t" style="display:none">Done</span></h4><p><span class="ar-t">المشاريع المكتملة</span><span class="en-t" style="display:none">Completed projects</span></p></div>
+    <div class="screen-card"><div class="emoji">🔒</div><h4>٧ — <span class="ar-t">الأيام الخاصة</span><span class="en-t" style="display:none">Special Days</span></h4><p><span class="ar-t">إجازات + سفر + أيام خاصة</span><span class="en-t" style="display:none">Leave + Travel + Special Days</span></p></div>
+  </div>
+
+  <h3><span class="ar-t">شاشات إدارة الزواجات</span><span class="en-t" style="display:none">Wedding Admin Screens</span></h3>
+  <div class="screen-grid">
+    <div class="screen-card"><div class="emoji">📊</div><h4><span class="ar-t">الرئيسية</span><span class="en-t" style="display:none">Home</span></h4><p><span class="ar-t">إحصائيات + قادمة</span><span class="en-t" style="display:none">Stats + Upcoming</span></p></div>
+    <div class="screen-card"><div class="emoji">📥</div><h4><span class="ar-t">الطلبات</span><span class="en-t" style="display:none">Requests</span></h4><p><span class="ar-t">حجوزات ركاز + إنهاء</span><span class="en-t" style="display:none">Rekaz bookings + Closures</span></p></div>
+    <div class="screen-card"><div class="emoji">💍</div><h4><span class="ar-t">المشاريع</span><span class="en-t" style="display:none">Projects</span></h4><p><span class="ar-t">النشطة</span><span class="en-t" style="display:none">Active</span></p></div>
+    <div class="screen-card"><div class="emoji">✅</div><h4><span class="ar-t">المنجزة</span><span class="en-t" style="display:none">Done</span></h4><p><span class="ar-t">الزواجات المكتملة</span><span class="en-t" style="display:none">Completed weddings</span></p></div>
+    <div class="screen-card"><div class="emoji">📅</div><h4><span class="ar-t">الكلندر</span><span class="en-t" style="display:none">Calendar</span></h4><p><span class="ar-t">تقويم الزواجات</span><span class="en-t" style="display:none">Wedding calendar</span></p></div>
+  </div>
+</section>
+
+<!-- NOTES -->
+<section id="notes">
+  <h2>📝 <span class="ar-t">ملاحظات للمطور</span><span class="en-t" style="display:none">Developer Notes</span></h2>
+
+  <h3><span class="ar-t">الهوية البصرية</span><span class="en-t" style="display:none">Visual Identity</span></h3>
+  <table>
+    <tr><th><span class="ar-t">العنصر</span><span class="en-t" style="display:none">Element</span></th><th><span class="ar-t">القيمة</span><span class="en-t" style="display:none">Value</span></th></tr>
+    <tr><td>Gunmetal (<span class="ar-t">خلفية</span><span class="en-t" style="display:none">Background</span>)</td><td><span class="color-swatch" style="background:#152127;"></span> <code>#152127</code></td></tr>
+    <tr><td>Deep Teal (<span class="ar-t">رئيسي</span><span class="en-t" style="display:none">Primary</span>)</td><td><span class="color-swatch" style="background:#215C66;"></span> <code>#215C66</code></td></tr>
+    <tr><td>Yellow Green (Accent)</td><td><span class="color-swatch" style="background:#A7CF5B;"></span> <code>#A7CF5B</code></td></tr>
+    <tr><td>Coral Red (<span class="ar-t">تحذير</span><span class="en-t" style="display:none">Warning</span>)</td><td><span class="color-swatch" style="background:#F0524B;"></span> <code>#F0524B</code></td></tr>
+    <tr><td><span class="ar-t">الخط / Font</span></td><td>Alexandria (Google Fonts)</td></tr>
+    <tr><td><span class="ar-t">الاتجاه / Direction</span></td><td>RTL (Arabic primary)</td></tr>
+  </table>
+
+  <h3><span class="ar-t">أولويات التطوير</span><span class="en-t" style="display:none">Development Priorities</span></h3>
+  <table>
+    <tr><th><span class="ar-t">الأولوية</span><span class="en-t" style="display:none">Priority</span></th><th><span class="ar-t">الميزة</span><span class="en-t" style="display:none">Feature</span></th><th><span class="ar-t">ملاحظة</span><span class="en-t" style="display:none">Note</span></th></tr>
+    <tr><td class="prio-high"><span class="ar-t">عالية</span><span class="en-t" style="display:none">High</span></td><td><span class="ar-t">نظام المصادقة</span><span class="en-t" style="display:none">Authentication</span></td><td>JWT — <span class="ar-t">استبدال اليوزر الثابت</span><span class="en-t" style="display:none">Replace static credentials</span></td></tr>
+    <tr><td class="prio-high"><span class="ar-t">عالية</span><span class="en-t" style="display:none">High</span></td><td><span class="ar-t">قاعدة بيانات مركزية</span><span class="en-t" style="display:none">Central Database</span></td><td>Supabase — <span class="ar-t">بدل localStorage</span><span class="en-t" style="display:none">Replace localStorage</span></td></tr>
+    <tr><td class="prio-high"><span class="ar-t">عالية</span><span class="en-t" style="display:none">High</span></td><td>Push Notifications</td><td>Firebase FCM</td></tr>
+    <tr><td class="prio-med"><span class="ar-t">متوسطة</span><span class="en-t" style="display:none">Medium</span></td><td>Rekaz Webhook</td><td><span class="ar-t">استقبال الحجوزات تلقائياً</span><span class="en-t" style="display:none">Auto-receive bookings</span></td></tr>
+    <tr><td class="prio-med"><span class="ar-t">متوسطة</span><span class="en-t" style="display:none">Medium</span></td><td>GPS Attendance</td><td><span class="ar-t">نطاق 3 كم من المكتب</span><span class="en-t" style="display:none">3km radius from office</span></td></tr>
+    <tr><td class="prio-med"><span class="ar-t">متوسطة</span><span class="en-t" style="display:none">Medium</span></td><td><span class="ar-t">تذكيرات تلقائية</span><span class="en-t" style="display:none">Auto Reminders</span></td><td>Cron job — <span class="ar-t">مواعيد التسليم</span><span class="en-t" style="display:none">Delivery deadlines</span></td></tr>
+  </table>
+
+  <h3><span class="ar-t">نقاط مهمة</span><span class="en-t" style="display:none">Important Notes</span></h3>
+  <div class="bilingual">
+    <div class="ar">
+      <ul>
+        <li>البث المباشر يتخطى موافقة إدارة الزواجات</li>
+        <li>أول من يقبل طلب المصور يأخذ الأوردر</li>
+        <li>الرمز السري يُولَّد تلقائياً (مثال: X7K-29QM-4R)</li>
+        <li>تقييم العميل سري — للمصور فقط</li>
+        <li>الحضور: GPS نطاق 3 كم — إحداثيات: 24.8233587, 46.7469418</li>
+        <li>مهلة الخام: 7 أيام · الصور: 5 أيام · الفيديو: 10 أيام</li>
+      </ul>
+    </div>
+    <div class="en">
+      <ul>
+        <li>Live stream bypasses wedding admin approval</li>
+        <li>First photographer to accept gets the job</li>
+        <li>Client code auto-generated (e.g. X7K-29QM-4R)</li>
+        <li>Client rating is private — photographer only</li>
+        <li>Attendance GPS: 3km radius — coords: 24.8233587, 46.7469418</li>
+        <li>Raw deadline: 7 days · Photos: 5 days · Video: 10 days</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note"><span class="ar-t">النسخة الحالية (Web) تعمل بـ localStorage ولا تتزامن بين أجهزة مختلفة. التطبيق المطلوب يحتاج backend مركزي لحل هذه المشكلة.</span><span class="en-t" style="display:none">The current version (Web) uses localStorage and does not sync across devices. The native app requires a central backend to solve this.</span></div>
+
+  <h3><span class="ar-t">تسلسل التطوير المقترح</span><span class="en-t" style="display:none">Suggested Development Sequence</span></h3>
+  <ol>
+    <li><span class="ar-t">إعداد Backend (Supabase + JWT Auth)</span><span class="en-t" style="display:none">Setup Backend (Supabase + JWT Auth)</span></li>
+    <li><span class="ar-t">ترحيل جداول البيانات</span><span class="en-t" style="display:none">Migrate data tables</span></li>
+    <li><span class="ar-t">بناء الشاشات الأساسية (دخول، مشاريع، مصور)</span><span class="en-t" style="display:none">Build core screens (login, projects, photographer)</span></li>
+    <li><span class="ar-t">ربط Webhook ركاز</span><span class="en-t" style="display:none">Connect Rekaz Webhook</span></li>
+    <li>Push Notifications (Firebase FCM)</li>
+    <li><span class="ar-t">نظام الحضور بالـ GPS</span><span class="en-t" style="display:none">GPS Attendance System</span></li>
+    <li><span class="ar-t">صفحة المصور الشخصية والستريك</span><span class="en-t" style="display:none">Photographer profile & streak</span></li>
+    <li><span class="ar-t">نظام التقييمات والجرعة الإيجابية</span><span class="en-t" style="display:none">Ratings & positive boost system</span></li>
+    <li><span class="ar-t">اختبار ونشر على App Store</span><span class="en-t" style="display:none">Test & publish to App Store</span></li>
+  </ol>
+</section>
+
+</div>
+
+<section id="users">
+  <h2>👥 <span class="ar-t">قائمة المستخدمين والصلاحيات</span><span class="en-t" style="display:none">Users & Permissions</span></h2>
+
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:16px;">
+    💡 <span class="ar-t">الخانات القابلة للتعديل أدناه يمكن تعبئتها ثم طباعة الصفحة كـ PDF وإرسالها للمبرمج.</span>
+    <span class="en-t" style="display:none">The editable fields below can be filled then printed as PDF and sent to the developer.</span>
+  </div>
+
+  <!-- MANAGERS -->
+  <div class="u-section-title">📋 <span class="ar-t">مديرو المشاريع</span><span class="en-t" style="display:none">Project Managers</span> <span class="u-count">7</span></div>
+  <div class="u-grid">
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">طس</div><div class="u-info"><div class="u-name">طلال السعدون</div><div class="u-creds">talal.saadoun · Talal@2025</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span><span class="ub ub-adm">دخول الإدارة</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">رد</div><div class="u-info"><div class="u-name">ريم أبو دهش</div><div class="u-creds">reem.abudahish · Reem@2025</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">مع</div><div class="u-info"><div class="u-name">ميس عاشور</div><div class="u-creds">mays.ashour · Mays@2025</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">مخ</div><div class="u-info"><div class="u-name">مصعب الخالدي</div><div class="u-creds">musab.khalidi · Musab@photo25</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">أم</div><div class="u-info"><div class="u-name">احمد المانع</div><div class="u-creds">ahmed.almanee · Ahmed@2025</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">عم</div><div class="u-info"><div class="u-name">عبدالرحمن الملهي</div><div class="u-creds">abdulrahman.m · Abdulr@2025</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-mgr"><div class="u-av u-av-teal">زع</div><div class="u-info"><div class="u-name">زيد عاشور</div><div class="u-creds">zaid.ashour · Zaid@2025</div><div class="u-badges"><span class="ub ub-mgr">مدير مشاريع</span></div><div class="u-edit-label"><span class="ar-t">تعديل الصلاحيات:</span><span class="en-t" style="display:none">Edit permissions:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+  </div>
+
+  <!-- PHOTOGRAPHERS -->
+  <div class="u-section-title" style="margin-top:24px;">📷 <span class="ar-t">المصورون</span><span class="en-t" style="display:none">Photographers</span> <span class="u-count">41</span></div>
+  <div class="u-grid" id="u-photographers-grid"></div>
+
+  <!-- OTHER ROLES -->
+  <div class="u-section-title" style="margin-top:24px;">🎭 <span class="ar-t">أدوار أخرى</span><span class="en-t" style="display:none">Other Roles</span> <span class="u-count">5</span></div>
+  <div class="u-grid">
+    <div class="u-card u-other"><div class="u-av u-av-pink">مص</div><div class="u-info"><div class="u-name">المصمم</div><div class="u-creds">designer.sumou · Design@2025</div><div class="u-badges"><span class="ub ub-des">مصمم</span></div><div class="u-edit-label"><span class="ar-t">تعديل:</span><span class="en-t" style="display:none">Edit:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-other"><div class="u-av u-av-gold">مس</div><div class="u-info"><div class="u-name">مالية سمو</div><div class="u-creds">finance.sumou · Finance@2025</div><div class="u-badges"><span class="ub ub-fin">مالية سمو</span></div><div class="u-edit-label"><span class="ar-t">تعديل:</span><span class="en-t" style="display:none">Edit:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-other"><div class="u-av u-av-pink">زو</div><div class="u-info"><div class="u-name">إدارة الزواجات</div><div class="u-creds">wedding.admin · Wedding@2025</div><div class="u-badges"><span class="ub ub-wed">إدارة الزواجات</span></div><div class="u-edit-label"><span class="ar-t">تعديل:</span><span class="en-t" style="display:none">Edit:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-other"><div class="u-av u-av-gold">مز</div><div class="u-info"><div class="u-name">مالية الزواجات</div><div class="u-creds">wedding.finance · WedFin@2025</div><div class="u-badges"><span class="ub ub-wed">مالية الزواجات</span></div><div class="u-edit-label"><span class="ar-t">تعديل:</span><span class="en-t" style="display:none">Edit:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+    <div class="u-card u-other"><div class="u-av u-av-teal">تش</div><div class="u-info"><div class="u-name">التصوير الشخصي</div><div class="u-creds">personal.sumou · Personal@2025</div><div class="u-badges"><span class="ub ub-pers">التصوير الشخصي</span></div><div class="u-edit-label"><span class="ar-t">تعديل:</span><span class="en-t" style="display:none">Edit:</span></div><div class="u-editable" contenteditable="true" data-placeholder="..."></div></div></div>
+  </div>
+</section>
+
+
+</div>
+
+<div style="background:#152127;color:rgba(255,255,255,.4);text-align:center;padding:18px;font-size:12px;margin-top:40px;">
+  سمو الإبداع للإنتاج المرئي · Sumou Creative for Visual Production — Technical Documentation v1.0 — 2026
+</div>
+
+<script>
+let currentLang='ar';
+function setLang(lang){
+  currentLang=lang;
+  document.querySelectorAll('.lang-btn').forEach(function(b){b.classList.toggle('active',b.textContent.trim()===(lang==='ar'?'العربية':'English'));});
+  document.querySelectorAll('.ar-t').forEach(function(el){el.style.display=lang==='ar'?'':'none';});
+  document.querySelectorAll('.en-t').forEach(function(el){el.style.display=lang==='en'?'':'none';});
+  document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+  document.documentElement.lang=lang;
+}
+
+// Active nav
+const sections=document.querySelectorAll('section[id]');
+const navLinks=document.querySelectorAll('nav a');
+window.addEventListener('scroll',function(){
+  let current='';
+  sections.forEach(function(s){if(window.scrollY>=s.offsetTop-100) current=s.id;});
+  navLinks.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+current);});
+});
+
+// Users Section - Photographers Grid
+(function(){
+const photographers=[
+  {id:1,name:'نورة الحنايا',initials:'نح',username:'noura.hanaya',password:'Noura@1101'},
+  {id:2,name:'وعد العطاس',initials:'وع',username:'waad.attas',password:'Waad@1102'},
+  {id:3,name:'ندى الساير',initials:'نس',username:'nada.sayer',password:'Nada@1103'},
+  {id:4,name:'رغد العطاس',initials:'رع',username:'raghad.attas',password:'Raghad@1104'},
+  {id:5,name:'ندى عمر',initials:'نو',username:'nada.omar',password:'NadaO@1105'},
+  {id:6,name:'فاطمة العطاس',initials:'فع',username:'fatima.attas',password:'Fatima@1106'},
+  {id:7,name:'ذكرى عمر',initials:'ذع',username:'thikra.omar',password:'Thikra@1107'},
+  {id:8,name:'هبه عاشور',initials:'هع',username:'heba.ashour',password:'Heba@1108'},
+  {id:9,name:'سارة',initials:'سر',username:'sara.sumou',password:'Sara@1109'},
+  {id:10,name:'لين عاشور',initials:'لع',username:'leen.ashour',password:'Leen@1110'},
+  {id:11,name:'ريحان خان',initials:'رخ',username:'rehan.khan',password:'Rehan@1111'},
+  {id:12,name:'عبدالرحمن الملهي',initials:'عم',username:'abdulrahman.malhi',password:'AbdM@1112'},
+  {id:13,name:'خالد الكثيري',initials:'خك',username:'khalid.kathiri',password:'Khalid@1113'},
+  {id:14,name:'احمد العزاني',initials:'أع',username:'ahmed.azani',password:'AhmedA@1114'},
+  {id:15,name:'مصعب الخالدي',initials:'مخ',username:'musab.khalidi',password:'Musab@1115'},
+  {id:16,name:'موفق',initials:'مف',username:'muwafaq.sumou',password:'Muwafaq@1116'},
+  {id:17,name:'نضرة السبيعي',initials:'نب',username:'nudra.subai',password:'Nudra@1117'},
+  {id:18,name:'اماني بابقي',initials:'أب',username:'amani.babqi',password:'Amani@1118'},
+  {id:19,name:'عبدالاله الحنايا',initials:'عح',username:'abdulilah.hanaya',password:'AbdIlah@1119'},
+  {id:20,name:'عبدالرحمن الهويمل',initials:'عه',username:'abdulrahman.h',password:'AbdH@1120'},
+  {id:21,name:'زيد عاشور',initials:'زع',username:'zaid.ashour2',password:'Zaid@1121'},
+  {id:22,name:'ناصر الحنايا',initials:'نح',username:'naser.hanaya',password:'Naser@1122'},
+  {id:23,name:'عبدالعزيز الهويمل',initials:'عز',username:'abdulaziz.h',password:'AbdAziz@1123'},
+  {id:24,name:'عبدالرحمن الهشبول',initials:'عش',username:'abdulrahman.hash',password:'AbdHash@1124'},
+  {id:25,name:'فيصل الغامدي',initials:'فغ',username:'faisal.ghamdi',password:'Faisal@1125'},
+  {id:26,name:'مزمل الشيخ',initials:'مش',username:'muzammil.sheikh',password:'Muzam@1126'},
+  {id:27,name:'عارف',initials:'عر',username:'arif.sumou',password:'Arif@1127'},
+  {id:28,name:'طلال السعدون',initials:'طس',username:'talal.saadoun2',password:'Talal@1128'},
+  {id:29,name:'نواف الهويمل',initials:'نه',username:'nawaf.h',password:'Nawaf@1129'},
+  {id:30,name:'عبدالعزيز الفايد',initials:'عف',username:'abdulaziz.fayed',password:'AbdFayed@1130'},
+  {id:31,name:'سطام الدوسري',initials:'سد',username:'sattam.dosari',password:'Sattam@1131'},
+  {id:32,name:'محمد الجفير',initials:'مج',username:'mohammed.jufair',password:'MohamJ@1132'},
+  {id:33,name:'عبدالله الداوود',initials:'عد',username:'abdulla.dawood',password:'Abdulla@1133'},
+  {id:34,name:'عبدالرحمن الرشيد',initials:'عر',username:'abdulrahman.r',password:'AbdR@1134'},
+  {id:35,name:'يزيد اللويمي',initials:'يل',username:'yazid.luwaimi',password:'Yazid@1135'},
+  {id:36,name:'عبدالرحمن الحنايا',initials:'عن',username:'abdulrahman.han',password:'AbdHan@1136'},
+  {id:37,name:'احمد المانع',initials:'أن',username:'ahmed.almanee2',password:'AhmedM@1137'},
+  {id:38,name:'حسن الهويمل',initials:'حه',username:'hasan.h',password:'Hasan@1138'},
+  {id:39,name:'عبدالكريم المطرودي',initials:'عط',username:'abdulkarim.m',password:'AbdKarim@1139'},
+  {id:40,name:'عبدالمحسن العيسى',initials:'عي',username:'abdulmohsen.e',password:'AbdMoh@1140'},
+  {id:41,name:'فيصل آل طالب',initials:'فط',username:'faisal.aaltaLib',password:'FaisalT@1141'},
+];
+const colors=['u-av-teal','u-av-green','u-av-pink','u-av-red','u-av-gold'];
+const grid=document.getElementById('u-photographers-grid');
+if(!grid) return;
+photographers.forEach(function(p,i){
+  const c=colors[i%colors.length];
+  const div=document.createElement('div');
+  div.className='u-card u-photo';
+  div.innerHTML='<div class="u-av '+c+'">'+p.initials+'</div>'
+    +'<div class="u-info">'
+    +'<div class="u-name"><span class="u-num">'+p.id+'</span>'+p.name+'</div>'
+    +'<div class="u-creds">'+p.username+' · '+p.password+'</div>'
+    +'<div class="u-badges"><span class="ub ub-photo">مصور</span></div>'
+    +'<div class="u-edit-label"><span class="ar-t">أنواع التصوير والصلاحيات:</span><span class="en-t" style="display:none">Photo types & permissions:</span></div>'
+    +'<div class="u-editable" contenteditable="true" data-placeholder="مثال: فوتو · فيديو · درون..."></div>'
+    +'</div>';
+  grid.appendChild(div);
+});
+})();
+
+</script>
+</body>
+</html>

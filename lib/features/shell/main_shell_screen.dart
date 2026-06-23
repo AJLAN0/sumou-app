@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
+import '../admin/permissions_screen.dart';
+import '../admin/reports_placeholder_screen.dart';
+import '../admin/users_screen.dart';
 import '../auth/providers/auth_controller.dart';
 import '../dashboard/admin_dashboard_screen.dart';
 import '../dashboard/manager_home_screen.dart';
@@ -53,6 +56,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       body = const MoreMenuScreen();
     } else if (current.label == RoleNavConfig.profileLabel) {
       body = const ProfileView();
+    } else if (current.label == RoleNavConfig.usersLabel) {
+      body = const UsersScreen();
+    } else if (current.label == RoleNavConfig.permissionsLabel) {
+      body = const PermissionsScreen();
+    } else if (current.label == RoleNavConfig.reportsLabel) {
+      body = const ReportsPlaceholderScreen();
     } else if (index == 0) {
       // The first tab is each role's home / dashboard.
       body = _homeFor(role);

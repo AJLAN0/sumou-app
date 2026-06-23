@@ -24,6 +24,11 @@ class RoleNavConfig {
   /// Label used to detect the profile tab (renders the profile view).
   static const String profileLabel = 'صفحتي';
 
+  /// Admin tab labels (used to route to the admin screens).
+  static const String usersLabel = 'المستخدمين';
+  static const String permissionsLabel = 'الصلاحيات';
+  static const String reportsLabel = 'التقارير';
+
   static List<NavItem> forRole(RoleType role) => switch (role) {
     RoleType.manager => const [
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
@@ -41,9 +46,9 @@ class RoleNavConfig {
     ],
     RoleType.admin => const [
       NavItem(label: 'لوحة التحكم', icon: Icons.dashboard_outlined),
-      NavItem(label: 'المستخدمين', icon: Icons.group_outlined),
-      NavItem(label: 'الصلاحيات', icon: Icons.shield_outlined),
-      NavItem(label: 'التقارير', icon: Icons.bar_chart),
+      NavItem(label: usersLabel, icon: Icons.group_outlined),
+      NavItem(label: permissionsLabel, icon: Icons.shield_outlined),
+      NavItem(label: reportsLabel, icon: Icons.bar_chart),
       NavItem(label: moreLabel, icon: Icons.more_horiz),
     ],
     // ----- placeholder configs (later sprints) -----
@@ -57,7 +62,7 @@ class RoleNavConfig {
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
       NavItem(label: 'طلبات التحويل', icon: Icons.payments_outlined),
       NavItem(label: 'المشاريع المحولة', icon: Icons.check_circle_outline),
-      NavItem(label: 'التقارير', icon: Icons.bar_chart),
+      NavItem(label: reportsLabel, icon: Icons.bar_chart),
       NavItem(label: 'صفحتي', icon: Icons.person_outline),
     ],
     RoleType.weddingAdmin => const [
@@ -77,7 +82,7 @@ class RoleNavConfig {
       NavItem(label: 'تسجيل الحضور', icon: Icons.access_time),
       NavItem(label: 'سجلاتي', icon: Icons.calendar_today_outlined),
       NavItem(label: 'الجداول', icon: Icons.event_note_outlined),
-      NavItem(label: 'التقارير', icon: Icons.bar_chart),
+      NavItem(label: reportsLabel, icon: Icons.bar_chart),
     ],
     RoleType.personalPhoto => const [
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),

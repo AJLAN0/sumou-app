@@ -64,6 +64,35 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState();
   }
 
+  /// Change the signed-in user's password via the (mock) repository.
+  /// Returns true on success; on failure sets [AuthState.errorMessage].
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _auth.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on AuthException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: _messageFor(e.reason),
+      );
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'حدث خطأ غير متوقع، حاول مرة أخرى',
+      );
+      return false;
+    }
+  }
+
   /// Dismiss the current error message.
   void clearError() => state = state.copyWith(errorMessage: null);
 

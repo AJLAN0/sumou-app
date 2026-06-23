@@ -8,6 +8,7 @@ import '../dashboard/admin_dashboard_screen.dart';
 import '../dashboard/manager_home_screen.dart';
 import '../dashboard/photographer_home_screen.dart';
 import '../dashboard/role_placeholder_home.dart';
+import '../profile/profile_view.dart';
 import 'more_menu_screen.dart';
 import 'nav_item.dart';
 import 'role_based_bottom_nav.dart';
@@ -48,6 +49,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final Widget body;
     if (current.label == RoleNavConfig.moreLabel) {
       body = const MoreMenuScreen();
+    } else if (current.label == RoleNavConfig.profileLabel) {
+      body = const ProfileView();
     } else if (index == 0) {
       // The first tab is each role's home / dashboard.
       body = _homeFor(role);

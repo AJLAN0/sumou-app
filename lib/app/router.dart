@@ -9,6 +9,8 @@ import '../features/auth/screens/entry_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/role_selection_screen.dart';
 import '../features/auth/screens/splash_screen.dart';
+import '../features/profile/change_password_screen.dart';
+import '../features/profile/profile_screen.dart';
 import '../features/shell/main_shell_screen.dart';
 
 /// Centralized route paths. Use these constants instead of string literals.
@@ -125,17 +127,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.profile,
-        builder:
-            (context, state) =>
-                const RoutePlaceholder(title: 'صفحتي', path: AppRoutes.profile),
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.changePassword,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'تغيير كلمة المرور',
-              path: AppRoutes.changePassword,
-            ),
+        builder: (context, state) => const ChangePasswordScreen(),
       ),
     ],
   );

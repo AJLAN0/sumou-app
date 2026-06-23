@@ -26,9 +26,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.watch(
-      authControllerProvider.select((s) => s.activeRole),
-    );
+    final role = ref.watch(authControllerProvider.select((s) => s.activeRole));
 
     // Should not happen on a role-home route (redirect guards it), but stay
     // safe if the session is cleared while the shell is mounted.
@@ -43,9 +41,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final current = items[index];
     final accent = RoleModel.of(role).color;
 
-    final Widget body = current.label == RoleNavConfig.moreLabel
-        ? const MoreMenuScreen()
-        : TabPlaceholderScreen(title: current.label, icon: current.icon);
+    final Widget body =
+        current.label == RoleNavConfig.moreLabel
+            ? const MoreMenuScreen()
+            : TabPlaceholderScreen(title: current.label, icon: current.icon);
 
     return SumouScaffold(
       appBar: SumouAppBar(title: current.label),

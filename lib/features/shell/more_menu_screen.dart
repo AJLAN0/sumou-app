@@ -20,10 +20,7 @@ class MoreMenuScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         const _MoreItem(icon: Icons.person_outline, label: 'صفحتي'),
         const SizedBox(height: 12),
-        const _MoreItem(
-          icon: Icons.notifications_outlined,
-          label: 'الإشعارات',
-        ),
+        const _MoreItem(icon: Icons.notifications_outlined, label: 'الإشعارات'),
         const SizedBox(height: 12),
         const _MoreItem(icon: Icons.settings_outlined, label: 'الإعدادات'),
         const SizedBox(height: 12),
@@ -61,10 +58,7 @@ class _MoreItem extends StatelessWidget {
           Icon(icon, color: tint, size: 22),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.body.copyWith(color: tint),
-            ),
+            child: Text(label, style: AppTextStyles.body.copyWith(color: tint)),
           ),
           const Icon(Icons.chevron_left, color: AppColors.textMuted),
         ],

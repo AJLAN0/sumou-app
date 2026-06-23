@@ -22,8 +22,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('manager home shows dashboard stats and quick actions',
-      (tester) async {
+  testWidgets('manager home shows dashboard stats and quick actions', (
+    tester,
+  ) async {
     await pumpAs(tester, 'manager');
     expect(find.text('مشاريع نشطة'), findsOneWidget);
     expect(find.text('طلبات إنهاء'), findsOneWidget);

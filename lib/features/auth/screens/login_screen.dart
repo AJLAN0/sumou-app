@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../data/repositories/mock/mock_users.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../providers/auth_controller.dart';
@@ -34,6 +36,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref
         .read(authControllerProvider.notifier)
         .login(username: _username.text.trim(), password: _password.text);
+  }
+
+  /// Dev-only shortcut: fill the fields with a mock account and log in.
+  void _quickLogin(String username) {
+    FocusScope.of(context).unfocus();
+    _username.text = username;
+    _password.text = MockUsers.devPassword;
+    ref
+        .read(authControllerProvider.notifier)
+        .login(username: username, password: MockUsers.devPassword);
   }
 
   @override
@@ -84,11 +96,70 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             loading: auth.isLoading,
             onPressed: auth.isLoading ? null : _submit,
           ),
+          if (kDebugMode) ...[
+            const SizedBox(height: 28),
+            const Divider(color: AppColors.border),
+            const SizedBox(height: 12),
+            Text(
+              'دخول سريع (تطوير فقط)',
+              style: AppTextStyles.label.copyWith(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final account in _devAccounts)
+                  SumouButton(
+                    label: account.label,
+                    icon: account.icon,
+                    variant: SumouButtonVariant.secondary,
+                    fullWidth: false,
+                    onPressed:
+                        auth.isLoading
+                            ? null
+                            : () => _quickLogin(account.username),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
+
+/// A mock account exposed as a dev quick-login shortcut.
+class _DevAccount {
+  const _DevAccount({
+    required this.username,
+    required this.label,
+    required this.icon,
+  });
+
+  final String username;
+  final String label;
+  final IconData icon;
+}
+
+const List<_DevAccount> _devAccounts = [
+  _DevAccount(username: 'manager', label: 'مدير', icon: Icons.work_outline),
+  _DevAccount(
+    username: 'photographer',
+    label: 'مصور',
+    icon: Icons.camera_alt_outlined,
+  ),
+  _DevAccount(
+    username: 'admin',
+    label: 'الإدارة',
+    icon: Icons.shield_outlined,
+  ),
+  _DevAccount(
+    username: 'multi',
+    label: 'متعدد الأدوار',
+    icon: Icons.groups_outlined,
+  ),
+];
 
 class _ErrorBox extends StatelessWidget {
   const _ErrorBox({required this.message});

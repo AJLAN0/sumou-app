@@ -47,9 +47,10 @@ Future<bool> showSumouConfirmSheet(
               const SizedBox(height: 20),
               SumouButton(
                 label: confirmLabel,
-                variant: destructive
-                    ? SumouButtonVariant.danger
-                    : SumouButtonVariant.primary,
+                variant:
+                    destructive
+                        ? SumouButtonVariant.danger
+                        : SumouButtonVariant.primary,
                 onPressed: () => Navigator.of(sheetContext).pop(true),
               ),
               const SizedBox(height: 10),

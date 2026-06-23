@@ -71,9 +71,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   }
 
   Widget _homeFor(RoleType role) => switch (role) {
-        RoleType.manager => const ManagerHomeScreen(),
-        RoleType.photographer => const PhotographerHomeScreen(),
-        RoleType.admin => const AdminDashboardScreen(),
-        _ => RolePlaceholderHome(role: role),
-      };
+    RoleType.manager => const ManagerHomeScreen(),
+    RoleType.photographer => const PhotographerHomeScreen(),
+    RoleType.admin => const AdminDashboardScreen(),
+    _ => RolePlaceholderHome(role: role),
+  };
 }

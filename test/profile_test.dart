@@ -66,16 +66,16 @@ void main() {
     expect(find.text('يرجى تعبئة جميع الحقول'), findsOneWidget);
   });
 
-  testWidgets('change password succeeds and returns to profile',
-      (tester) async {
+  testWidgets('change password succeeds and returns to profile', (
+    tester,
+  ) async {
     await pumpAs(tester, 'photographer');
     await openProfile(tester);
 
     await tester.tap(find.text('تغيير كلمة المرور'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-        find.byType(TextField).at(0), MockUsers.devPassword);
+    await tester.enterText(find.byType(TextField).at(0), MockUsers.devPassword);
     await tester.enterText(find.byType(TextField).at(1), 'newpass123');
     await tester.enterText(find.byType(TextField).at(2), 'newpass123');
     await tester.tap(find.text('حفظ'));

@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/models/role_type.dart';
-import '../dev/route_placeholder.dart';
 import '../features/auth/providers/auth_controller.dart';
 import '../features/auth/screens/entry_screen.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/role_selection_screen.dart';
 import '../features/auth/screens/splash_screen.dart';
+import '../features/client_tracking/client_project_result_screen.dart';
+import '../features/client_tracking/track_project_screen.dart';
 import '../features/profile/change_password_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/shell/main_shell_screen.dart';
@@ -99,19 +100,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.track,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'تتبع مشروع',
-              path: AppRoutes.track,
-            ),
+        builder: (context, state) => const TrackProjectScreen(),
       ),
       GoRoute(
         path: AppRoutes.trackResult,
-        builder:
-            (context, state) => const RoutePlaceholder(
-              title: 'حالة المشروع',
-              path: AppRoutes.trackResult,
-            ),
+        builder: (context, state) => const ClientProjectResultScreen(),
       ),
       GoRoute(
         path: AppRoutes.managerHome,

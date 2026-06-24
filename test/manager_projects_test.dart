@@ -49,11 +49,11 @@ void main() {
     expect(find.text('تصوير ميداني — مهرجان الرياض'), findsNothing);
   });
 
-  testWidgets('tapping a card shows the coming-soon snackbar', (tester) async {
+  testWidgets('tapping a card opens project details', (tester) async {
     await openProjects(tester);
     await tester.tap(find.text('تصوير ميداني — مهرجان الرياض'));
-    await tester.pump(); // start snackbar animation
-    expect(find.text('تفاصيل المشروع قريباً'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 5)); // flush snackbar timer
+    await tester.pumpAndSettle();
+    expect(find.text('تفاصيل المشروع'), findsOneWidget); // app bar
+    expect(find.text('مراحل المشروع'), findsOneWidget);
   });
 }

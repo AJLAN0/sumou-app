@@ -12,6 +12,7 @@ import '../features/client_tracking/client_project_result_screen.dart';
 import '../features/client_tracking/track_project_screen.dart';
 import '../features/profile/change_password_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/projects/project_details_screen.dart';
 import '../features/shell/main_shell_screen.dart';
 
 /// Centralized route paths. Use these constants instead of string literals.
@@ -25,6 +26,8 @@ class AppRoutes {
   static const String track = '/track';
   static const String trackResult = '/track/result';
   static const String managerHome = '/manager/home';
+  static const String projectDetails = '/manager/projects/:id';
+  static String projectDetailsPath(String id) => '/manager/projects/$id';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
   static const String profile = '/profile';
@@ -117,6 +120,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.adminHome,
         builder: (context, state) => const MainShellScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.projectDetails,
+        builder: (context, state) =>
+            ProjectDetailsScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.profile,

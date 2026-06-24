@@ -6,21 +6,21 @@ import '../../../theme/app_text_styles.dart';
 
 /// Arabic label for a feature permission.
 String featureLabelAr(AppFeature feature) => switch (feature) {
-      AppFeature.canAddProject => 'إضافة مشروع',
-      AppFeature.canEditProject => 'تعديل مشروع',
-      AppFeature.canAssignPhotographers => 'إسناد مصورين',
-      AppFeature.canRequestPhotographer => 'طلب مصور',
-      AppFeature.canRequestDesign => 'طلب تصميم',
-      AppFeature.canUpdateStages => 'تحديث المراحل',
-      AppFeature.canRequestClosure => 'طلب إغلاق',
-      AppFeature.canApproveClosure => 'اعتماد الإغلاق',
-      AppFeature.canManageUsers => 'إدارة المستخدمين',
-      AppFeature.canManagePermissions => 'إدارة الصلاحيات',
-      AppFeature.canViewReports => 'عرض التقارير',
-      AppFeature.canManageAttendance => 'إدارة الحضور',
-      AppFeature.canManageWeddingProjects => 'إدارة الزواجات',
-      AppFeature.canManageFinance => 'إدارة المالية',
-    };
+  AppFeature.canAddProject => 'إضافة مشروع',
+  AppFeature.canEditProject => 'تعديل مشروع',
+  AppFeature.canAssignPhotographers => 'إسناد مصورين',
+  AppFeature.canRequestPhotographer => 'طلب مصور',
+  AppFeature.canRequestDesign => 'طلب تصميم',
+  AppFeature.canUpdateStages => 'تحديث المراحل',
+  AppFeature.canRequestClosure => 'طلب إغلاق',
+  AppFeature.canApproveClosure => 'اعتماد الإغلاق',
+  AppFeature.canManageUsers => 'إدارة المستخدمين',
+  AppFeature.canManagePermissions => 'إدارة الصلاحيات',
+  AppFeature.canViewReports => 'عرض التقارير',
+  AppFeature.canManageAttendance => 'إدارة الحضور',
+  AppFeature.canManageWeddingProjects => 'إدارة الزواجات',
+  AppFeature.canManageFinance => 'إدارة المالية',
+};
 
 /// Small colored role chip (icon + Arabic name).
 class AdminRoleChip extends StatelessWidget {
@@ -31,11 +31,7 @@ class AdminRoleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final model = RoleModel.of(role);
-    return _Pill(
-      color: model.color,
-      icon: model.icon,
-      label: model.nameAr,
-    );
+    return _Pill(color: model.color, icon: model.icon, label: model.nameAr);
   }
 }
 

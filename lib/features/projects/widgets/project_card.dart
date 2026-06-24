@@ -55,10 +55,7 @@ class ProjectCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(
-                  project.clientName,
-                  style: AppTextStyles.bodyMuted,
-                ),
+                child: Text(project.clientName, style: AppTextStyles.bodyMuted),
               ),
               Text(
                 project.serial,

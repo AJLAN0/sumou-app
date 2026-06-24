@@ -45,9 +45,8 @@ class _PermissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roleModel = RoleModel.of(user.defaultRole);
-    final enabled = AppFeature.values
-        .where((f) => user.permissions.has(f))
-        .toList();
+    final enabled =
+        AppFeature.values.where((f) => user.permissions.has(f)).toList();
 
     return SumouCard(
       child: Column(
@@ -84,9 +83,7 @@ class _PermissionCard extends StatelessWidget {
           const SizedBox(height: 14),
           _Group(
             title: 'الأدوار',
-            children: [
-              for (final role in user.roles) AdminRoleChip(role),
-            ],
+            children: [for (final role in user.roles) AdminRoleChip(role)],
           ),
           if (user.photoTypes.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -103,7 +100,8 @@ class _PermissionCard extends StatelessWidget {
             title: 'الصلاحيات',
             emptyLabel: 'لا توجد صلاحيات مفعّلة',
             children: [
-              for (final feature in enabled) AdminTextChip(featureLabelAr(feature)),
+              for (final feature in enabled)
+                AdminTextChip(featureLabelAr(feature)),
             ],
           ),
         ],
@@ -113,11 +111,7 @@ class _PermissionCard extends StatelessWidget {
 }
 
 class _Group extends StatelessWidget {
-  const _Group({
-    required this.title,
-    required this.children,
-    this.emptyLabel,
-  });
+  const _Group({required this.title, required this.children, this.emptyLabel});
 
   final String title;
   final List<Widget> children;
@@ -131,10 +125,7 @@ class _Group extends StatelessWidget {
         Text(title, style: AppTextStyles.label),
         const SizedBox(height: 8),
         if (children.isEmpty)
-          Text(
-            emptyLabel ?? '—',
-            style: AppTextStyles.bodyMuted,
-          )
+          Text(emptyLabel ?? '—', style: AppTextStyles.bodyMuted)
         else
           Wrap(spacing: 8, runSpacing: 8, children: children),
       ],

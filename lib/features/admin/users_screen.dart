@@ -25,7 +25,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
   bool _matches(UserModel user) {
     final q = _query.trim().toLowerCase();
-    final matchesQuery = q.isEmpty ||
+    final matchesQuery =
+        q.isEmpty ||
         user.fullName.toLowerCase().contains(q) ||
         user.username.toLowerCase().contains(q);
     final matchesFilter = switch (_filter) {
@@ -73,9 +74,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         Expanded(
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(
-              child: Text('تعذّر تحميل المستخدمين'),
-            ),
+            error:
+                (_, __) => const Center(child: Text('تعذّر تحميل المستخدمين')),
             data: (users) {
               final filtered = users.where(_matches).toList();
               if (filtered.isEmpty) {
@@ -118,18 +118,16 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,
           ),
         ),
-        child: Text(
-          label,
-          style: AppTextStyles.label.copyWith(color: color),
-        ),
+        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
       ),
     );
   }
@@ -143,8 +141,7 @@ class _UserCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roleModel = RoleModel.of(user.defaultRole);
-    final extraRoles =
-        user.roles.where((r) => r != user.defaultRole).toList();
+    final extraRoles = user.roles.where((r) => r != user.defaultRole).toList();
 
     return SumouCard(
       child: Column(
@@ -190,10 +187,7 @@ class _UserCard extends StatelessWidget {
           ),
           if (extraRoles.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(
-              '+${extraRoles.length} دور إضافي',
-              style: AppTextStyles.label,
-            ),
+            Text('+${extraRoles.length} دور إضافي', style: AppTextStyles.label),
           ],
         ],
       ),

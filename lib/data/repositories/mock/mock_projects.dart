@@ -31,11 +31,12 @@ class MockProjects {
           projectId: projectId,
           title: titles[i],
           order: i + 1,
-          status: allDone
-              ? ProjectStageStatus.done
-              : (i + 1 < currentOrder
-                    ? ProjectStageStatus.done
-                    : (i + 1 == currentOrder
+          status:
+              allDone
+                  ? ProjectStageStatus.done
+                  : (i + 1 < currentOrder
+                      ? ProjectStageStatus.done
+                      : (i + 1 == currentOrder
                           ? ProjectStageStatus.current
                           : ProjectStageStatus.pending)),
         ),

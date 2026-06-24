@@ -24,3 +24,7 @@ final permissionRepositoryProvider = Provider<PermissionRepository>(
 final trackingRepositoryProvider = Provider<TrackingRepository>(
   (ref) => MockTrackingRepository(),
 );
+
+final projectRepositoryProvider = Provider<ProjectRepository>(
+  (ref) => MockProjectRepository(),
+);

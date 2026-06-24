@@ -22,9 +22,10 @@ enum ProjectType {
   bool get isThreeStage => !isSevenStage;
 
   /// Default stage titles for a fresh project of this type.
-  List<String> get defaultStageTitles => isSevenStage
-      ? ProjectStageTitles.sevenStage
-      : ProjectStageTitles.threeStage;
+  List<String> get defaultStageTitles =>
+      isSevenStage
+          ? ProjectStageTitles.sevenStage
+          : ProjectStageTitles.threeStage;
 
   static ProjectType? fromKey(String key) {
     for (final t in ProjectType.values) {

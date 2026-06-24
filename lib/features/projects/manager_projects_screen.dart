@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
@@ -54,11 +56,8 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
         inTeam;
   }
 
-  void _openDetails() {
-    // Project details screen arrives in the next step.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تفاصيل المشروع قريباً')),
-    );
+  void _openDetails(String id) {
+    context.push(AppRoutes.projectDetailsPath(id));
   }
 
   @override
@@ -118,8 +117,10 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
               return ListView.separated(
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) =>
-                    ProjectCard(project: filtered[i], onTap: _openDetails),
+                itemBuilder: (_, i) => ProjectCard(
+                  project: filtered[i],
+                  onTap: () => _openDetails(filtered[i].id),
+                ),
               );
             },
           ),

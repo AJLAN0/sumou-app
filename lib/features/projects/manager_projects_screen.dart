@@ -56,9 +56,9 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
 
   void _openDetails() {
     // Project details screen arrives in the next step.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تفاصيل المشروع قريباً')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('تفاصيل المشروع قريباً')));
   }
 
   @override
@@ -93,14 +93,10 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
         Expanded(
           child: projectsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(
-              child: Text('تعذّر تحميل المشاريع'),
-            ),
+            error: (_, __) => const Center(child: Text('تعذّر تحميل المشاريع')),
             data: (projects) {
-              final filtered = projects
-                  .where(_matchesQuery)
-                  .where(_filter.matches)
-                  .toList();
+              final filtered =
+                  projects.where(_matchesQuery).where(_filter.matches).toList();
               if (projects.isEmpty) {
                 return const SumouEmptyState(
                   title: 'لا توجد مشاريع',
@@ -118,8 +114,9 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
               return ListView.separated(
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) =>
-                    ProjectCard(project: filtered[i], onTap: _openDetails),
+                itemBuilder:
+                    (_, i) =>
+                        ProjectCard(project: filtered[i], onTap: _openDetails),
               );
             },
           ),
@@ -149,9 +146,10 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

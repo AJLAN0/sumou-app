@@ -8,6 +8,7 @@ export 'sumou_button.dart';
 export 'sumou_card.dart';
 export 'sumou_confirm_sheet.dart';
 export 'sumou_empty_state.dart';
+export 'sumou_error_box.dart';
 export 'sumou_scaffold.dart';
 export 'sumou_section_header.dart';
 export 'sumou_stat_card.dart';

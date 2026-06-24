@@ -115,43 +115,13 @@ class _TrackProjectScreenState extends ConsumerState<TrackProjectScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 14),
-            _ErrorBox(message: _error!),
+            SumouErrorBox(message: _error!),
           ],
           const SizedBox(height: 24),
           SumouButton(
             label: 'تتبع',
             loading: _loading,
             onPressed: _loading ? null : _track,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorBox extends StatelessWidget {
-  const _ErrorBox({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.body.copyWith(color: AppColors.error),
-            ),
           ),
         ],
       ),

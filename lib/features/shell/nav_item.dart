@@ -24,6 +24,9 @@ class RoleNavConfig {
   /// Label used to detect the profile tab (renders the profile view).
   static const String profileLabel = 'صفحتي';
 
+  /// Manager projects tab.
+  static const String projectsLabel = 'المشاريع';
+
   /// Admin tab labels (used to route to the admin screens).
   static const String usersLabel = 'المستخدمين';
   static const String permissionsLabel = 'الصلاحيات';
@@ -32,7 +35,7 @@ class RoleNavConfig {
   static List<NavItem> forRole(RoleType role) => switch (role) {
     RoleType.manager => const [
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
-      NavItem(label: 'المشاريع', icon: Icons.work_outline),
+      NavItem(label: projectsLabel, icon: Icons.work_outline),
       NavItem(label: 'الطلبات', icon: Icons.inbox_outlined),
       NavItem(label: 'الفريق', icon: Icons.group_outlined),
       NavItem(label: moreLabel, icon: Icons.more_horiz),

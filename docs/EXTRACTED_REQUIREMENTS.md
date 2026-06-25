@@ -8,6 +8,16 @@
 > This document captures **what the system must do**. Scope sequencing lives in
 > `SPRINT_PLAN.md`; UI translation rules live in `MOBILE_UX_TRANSFORMATION.md`;
 > the build task list lives in `IMPLEMENTATION_CHECKLIST.md`.
+>
+> ⛔ **Permanent Out of Scope (overrides this document):** the **finance**
+> module/transfer/payment/reports, **Rekaz** configuration/integration, and
+> **notifications** (logic, in-app, push, FCM, `NotificationRepository`
+> implementation) are **permanently out of scope** for all sprints unless the
+> project owner explicitly requests them. Where this document describes those
+> features, related models, or notification side-effects (e.g. closure →
+> notification, approval → finance payment, `NotificationModel` "Sprint 2"),
+> treat them as **documented-but-not-to-be-built**. See the **Permanent Out of
+> Scope** section in `CLAUDE.md` (authoritative).
 
 ---
 

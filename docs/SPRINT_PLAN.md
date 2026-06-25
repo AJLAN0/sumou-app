@@ -92,31 +92,51 @@
 - **Mock-data backbone:** in-memory mock repositories implement the repository
   interfaces; UI never calls a backend directly.
 - **Repository interfaces stable:** `AuthRepository`, `UserRepository`,
-  `ProjectRepository`, `PermissionRepository`, `NotificationRepository`,
-  `TrackingRepository` defined in Sprint 1, reused in Sprint 2.
+  `ProjectRepository`, `PermissionRepository`, `TrackingRepository` defined in
+  Sprint 1, reused in Sprint 2. `NotificationRepository`'s interface may stay
+  declared, but it gets **no implementation** (notifications are permanently out
+  of scope).
 - **Supabase-ready, not Supabase-bound:** keep schema notes for the listed
   tables; do not wire live Supabase in these two sprints unless trivial.
 
 ---
 
+## Permanently out of scope (do NOT implement)
+
+These are **permanently out of scope** for all current and future sprints —
+**not** "for later." Do not implement, wire, or schedule them unless the project
+owner explicitly requests them. (See the **Permanent Out of Scope** section in
+`CLAUDE.md`, which is authoritative.) Existing nav entries/stub screens for
+these may remain **only** as inert branded placeholders.
+
+- **Finance module / finance feature logic.**
+- **Finance transfer / payment flow** (payment requests, receipts, transfers).
+- **Finance reports.**
+- **Rekaz configuration** and **Rekaz integration** (API key never in the app).
+- **Notifications** — notification logic, in-app notifications, **push
+  notifications**, **FCM**.
+- **`NotificationRepository` implementation** (no working/mock impl, no
+  notifications UI).
+
 ## Out of scope / Placeholder for later
 
-These are **explicitly deferred**. Provide navigation entry points and stub
-screens where the nav demands it, but **do not implement the logic now**:
+These are **deferred** (may return in a later sprint). Provide navigation entry
+points and stub screens where the nav demands it, but **do not implement the
+logic now**:
 
-- Rekaz integration (and its API key handling — backend only, later).
-- Full wedding system (assignment → upload → approval → finance).
-- Push notifications (Firebase Cloud Messaging).
+- Full wedding system (assignment → upload → approval). *(Its finance leg is
+  permanently out of scope per the section above.)*
 - GPS attendance / check-in.
-- Finance transfer flow (payment requests, receipts).
-- Advanced reports.
+- Advanced reports. *(Finance reports are permanently out of scope.)*
 - Advanced calendar (full month grid / scheduling).
 - Full file uploads (Supabase Storage).
 - App Store / Play Store deployment.
 - Full client delivery-link approval flow.
 - Photographer broadcast-request realtime fan-out (model now, flow later).
-- Designer, finance, wedding_admin, wedding_finance, attendance, personal_photo
-  feature logic (placeholders with correct nav only).
+- Designer, wedding_admin, attendance, personal_photo feature logic
+  (placeholders with correct nav only).
+- `finance`, `wedding_finance` roles: **placeholder nav only** — their feature
+  logic is permanently out of scope (finance).
 
 ---
 

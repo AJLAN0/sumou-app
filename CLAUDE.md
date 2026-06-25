@@ -21,6 +21,26 @@ interface** (English may be prepared, but Arabic comes first).
 - Build and reuse **design-system components** (`Sumou*`); don't reinvent
   widgets per screen.
 
+## Permanent Out of Scope
+The following are **permanently out of scope** for all current and future
+sprints. **Do not implement, wire, or plan them** unless the project owner
+**explicitly** requests them later. This decision **overrides** anything in the
+spec, sprint plan, checklist, reference HTML, or extracted requirements.
+
+- **Finance module** — any finance feature logic.
+- **Finance transfer / payment flow** — payment requests, receipts, transfers.
+- **Finance reports.**
+- **Rekaz configuration** and **Rekaz integration** (including its API key
+  handling — never in the app).
+- **Notifications** of any kind — notification logic, in-app notifications,
+  **push notifications**, **FCM**.
+- **`NotificationRepository` implementation** (the interface may remain defined,
+  but provide **no** working/mock implementation and **no** UI driven by it).
+
+Allowed only as **inert placeholders**: existing finance/Rekaz/notifications
+nav entries or stub screens may stay, but **only** as simple branded
+placeholders (no logic). Do not add new ones, and do not expand existing ones.
+
 ## Security
 - **Never hardcode secrets or API keys.** Use environment configuration.
 - Demo credentials from the HTML are mock-only, never production.

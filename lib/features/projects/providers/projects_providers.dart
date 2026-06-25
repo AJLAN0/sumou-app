@@ -113,3 +113,40 @@ final pendingClosureForProjectProvider =
   }
   return null;
 });
+
+/// All closure requests (any status) for the signed-in manager's projects,
+/// joined with the project — used by the manager requests hub for counts.
+final managerAllClosureRequestsProvider =
+    FutureProvider<List<ClosureRequestView>>((ref) async {
+  final user = ref.watch(authControllerProvider).currentUser;
+  if (user == null) return const <ClosureRequestView>[];
+  final repo = ref.read(projectRepositoryProvider);
+  final requests = await repo.getClosureRequests();
+  final myProjects = await repo.getProjectsForManager(user.id);
+  final byId = {for (final p in myProjects) p.id: p};
+  final result = <ClosureRequestView>[];
+  for (final r in requests) {
+    final project = byId[r.projectId];
+    if (project != null) result.add((request: r, project: project));
+  }
+  return result;
+});
+
+/// Closure requests submitted by the signed-in photographer (any status),
+/// joined with the project — used by the photographer requests screen.
+final photographerClosureRequestsProvider =
+    FutureProvider<List<ClosureRequestView>>((ref) async {
+  final user = ref.watch(authControllerProvider).currentUser;
+  if (user == null) return const <ClosureRequestView>[];
+  final repo = ref.read(projectRepositoryProvider);
+  final requests = await repo.getClosureRequests();
+  final projects = await repo.getProjects();
+  final byId = {for (final p in projects) p.id: p};
+  final result = <ClosureRequestView>[];
+  for (final r in requests) {
+    if (r.submittedBy != user.id) continue;
+    final project = byId[r.projectId];
+    if (project != null) result.add((request: r, project: project));
+  }
+  return result;
+});

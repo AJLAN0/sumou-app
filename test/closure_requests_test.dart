@@ -10,7 +10,7 @@ import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
 void main() {
-  // Logs in as the manager and opens the "الطلبات" (closure requests) tab.
+  // Logs in as the manager, opens the "الطلبات" hub, then the closure inbox.
   Future<void> openRequests(WidgetTester tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -24,6 +24,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('الطلبات'));
+    await tester.pumpAndSettle();
+    // The hub links to the closure inbox.
+    await tester.tap(find.text('طلبات الإغلاق'));
     await tester.pumpAndSettle();
   }
 

@@ -122,6 +122,10 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
     ref.invalidate(projectByIdProvider(widget.project.id));
     ref.invalidate(managerProjectsProvider);
     ref.invalidate(photographerProjectsProvider);
+    ref.invalidate(pendingClosureForProjectProvider(widget.project.id));
+    ref.invalidate(managerClosureRequestsProvider);
+    ref.invalidate(managerAllClosureRequestsProvider);
+    ref.invalidate(photographerClosureRequestsProvider);
     if (!mounted) return;
     if (request == null) {
       setState(() => _saving = false);

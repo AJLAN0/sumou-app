@@ -53,7 +53,7 @@ class RoleNavConfig {
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
       NavItem(label: myProjectsLabel, icon: Icons.work_outline),
       NavItem(label: calendarLabel, icon: Icons.calendar_today_outlined),
-      NavItem(label: 'الطلبات', icon: Icons.inbox_outlined),
+      NavItem(label: requestsLabel, icon: Icons.inbox_outlined),
       NavItem(label: 'صفحتي', icon: Icons.person_outline),
     ],
     RoleType.admin => const [

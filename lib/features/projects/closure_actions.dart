@@ -11,6 +11,8 @@ import 'providers/projects_providers.dart';
 /// Refresh everything that reflects a closure decision.
 void _invalidateClosure(WidgetRef ref, String projectId) {
   ref.invalidate(managerClosureRequestsProvider);
+  ref.invalidate(managerAllClosureRequestsProvider);
+  ref.invalidate(photographerClosureRequestsProvider);
   ref.invalidate(pendingClosureForProjectProvider(projectId));
   ref.invalidate(managerProjectsProvider);
   ref.invalidate(photographerProjectsProvider);

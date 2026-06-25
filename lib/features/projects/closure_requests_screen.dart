@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
@@ -7,6 +8,27 @@ import '../auth/providers/auth_controller.dart';
 import 'closure_actions.dart';
 import 'providers/projects_providers.dart';
 import 'widgets/closure_request_card.dart';
+
+/// Full-page wrapper (own scaffold) so the closure inbox can be pushed as a
+/// route from the manager requests hub. The manager shell tab embeds the
+/// requests hub instead.
+class ClosureRequestsPage extends StatelessWidget {
+  const ClosureRequestsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SumouScaffold(
+      appBar: SumouAppBar(
+        title: 'طلبات الإغلاق',
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: const ClosureRequestsScreen(),
+    );
+  }
+}
 
 /// Manager "الطلبات" tab: pending closure requests to review (approve/reject).
 /// Cards, not tables. Mock-backed; actions gated by canApproveClosure.

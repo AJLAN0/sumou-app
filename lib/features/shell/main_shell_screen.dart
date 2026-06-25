@@ -12,6 +12,7 @@ import '../dashboard/manager_home_screen.dart';
 import '../dashboard/photographer_home_screen.dart';
 import '../dashboard/role_placeholder_home.dart';
 import '../profile/profile_view.dart';
+import '../projects/closure_requests_screen.dart';
 import '../projects/manager_projects_screen.dart';
 import '../projects/photographer_my_projects_screen.dart';
 import 'more_menu_screen.dart';
@@ -66,6 +67,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       body = const ManagerProjectsScreen();
     } else if (current.label == RoleNavConfig.myProjectsLabel) {
       body = const PhotographerMyProjectsScreen();
+    } else if (current.label == RoleNavConfig.requestsLabel &&
+        role == RoleType.manager) {
+      // Only the manager's requests tab is the closure-review inbox.
+      body = const ClosureRequestsScreen();
     } else if (index == 0) {
       // The first tab is each role's home / dashboard.
       body = _homeFor(role);

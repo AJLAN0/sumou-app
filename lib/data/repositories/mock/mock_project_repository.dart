@@ -209,6 +209,64 @@ class MockProjectRepository implements ProjectRepository {
     return request;
   }
 
+  @override
+  Future<ClosureRequestModel?> approveClosureRequest(String requestId) async {
+    final rIndex = _closureRequests.indexWhere((r) => r.id == requestId);
+    if (rIndex < 0) return null;
+    final request = _closureRequests[rIndex];
+    if (!request.isPending) return null;
+    final now = DateTime.now();
+    final updated = request.copyWith(
+      status: ClosureRequestStatus.approved,
+      reviewedAt: now,
+    );
+    _closureRequests[rIndex] = updated;
+
+    final pIndex = _projects.indexWhere((p) => p.id == request.projectId);
+    if (pIndex >= 0) {
+      final project = _projects[pIndex];
+      // Project delivered: complete it and mark every stage done.
+      final stages = [
+        for (final s in project.stages)
+          s.copyWith(status: ProjectStageStatus.done, updatedAt: now),
+      ];
+      _projects[pIndex] = project.copyWith(
+        status: ProjectStatus.completed,
+        stages: stages,
+        updatedAt: now,
+      );
+    }
+    return updated;
+  }
+
+  @override
+  Future<ClosureRequestModel?> rejectClosureRequest(
+    String requestId,
+    String reason,
+  ) async {
+    final rIndex = _closureRequests.indexWhere((r) => r.id == requestId);
+    if (rIndex < 0) return null;
+    final request = _closureRequests[rIndex];
+    if (!request.isPending) return null;
+    final now = DateTime.now();
+    final updated = request.copyWith(
+      status: ClosureRequestStatus.rejected,
+      rejectReason: reason,
+      reviewedAt: now,
+    );
+    _closureRequests[rIndex] = updated;
+
+    final pIndex = _projects.indexWhere((p) => p.id == request.projectId);
+    if (pIndex >= 0) {
+      // Closure declined: the project goes back to active.
+      _projects[pIndex] = _projects[pIndex].copyWith(
+        status: ProjectStatus.active,
+        updatedAt: now,
+      );
+    }
+    return updated;
+  }
+
   /// Re-key team roles to belong to [projectId] with stable, ordered ids.
   static List<ProjectTeamRole> _rekeyRoles(
     String projectId,

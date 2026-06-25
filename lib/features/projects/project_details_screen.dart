@@ -8,7 +8,9 @@ import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
+import 'closure_actions.dart';
 import 'providers/projects_providers.dart';
+import 'widgets/closure_request_card.dart';
 import 'widgets/project_card.dart';
 import 'widgets/stage_timeline.dart';
 
@@ -78,6 +80,12 @@ class _Details extends ConsumerWidget {
         isAssigned;
     final canAssign =
         user?.hasPermission(AppFeature.canAssignPhotographers) ?? false;
+    // Closure review (approve/reject) for managers with the permission.
+    final canApproveClosure =
+        user?.hasPermission(AppFeature.canApproveClosure) ?? false;
+    final pendingClosureAsync = ref.watch(
+      pendingClosureForProjectProvider(project.id),
+    );
 
     return ListView(
       children: [
@@ -110,6 +118,33 @@ class _Details extends ConsumerWidget {
           const SumouCard(
             child: Text('لا توجد ملاحظات', style: AppTextStyles.bodyMuted),
           ),
+        if (canApproveClosure && project.hasPendingClosure) ...[
+          const SizedBox(height: 24),
+          const SumouSectionHeader(title: 'طلب الإغلاق'),
+          const SizedBox(height: 12),
+          pendingClosureAsync.when(
+            loading: () => const SumouCard(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const SumouCard(
+              child: Text('تعذّر تحميل الطلب', style: AppTextStyles.bodyMuted),
+            ),
+            data: (request) => request == null
+                ? const SumouCard(
+                    child: Text(
+                      'لا يوجد طلب إغلاق',
+                      style: AppTextStyles.bodyMuted,
+                    ),
+                  )
+                : ClosureRequestCard(
+                    request: request,
+                    clientName: project.clientName,
+                    onApprove: () =>
+                        approveClosureFlow(context, ref, request),
+                    onReject: () => rejectClosureFlow(context, ref, request),
+                  ),
+          ),
+        ],
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'الإجراءات'),
         const SizedBox(height: 12),

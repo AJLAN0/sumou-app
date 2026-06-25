@@ -30,6 +30,9 @@ class RoleNavConfig {
   /// Photographer "my projects" tab.
   static const String myProjectsLabel = 'مشاريعي';
 
+  /// Manager closure-requests tab.
+  static const String requestsLabel = 'الطلبات';
+
   /// Admin tab labels (used to route to the admin screens).
   static const String usersLabel = 'المستخدمين';
   static const String permissionsLabel = 'الصلاحيات';
@@ -39,7 +42,7 @@ class RoleNavConfig {
     RoleType.manager => const [
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
       NavItem(label: projectsLabel, icon: Icons.work_outline),
-      NavItem(label: 'الطلبات', icon: Icons.inbox_outlined),
+      NavItem(label: requestsLabel, icon: Icons.inbox_outlined),
       NavItem(label: 'الفريق', icon: Icons.group_outlined),
       NavItem(label: moreLabel, icon: Icons.more_horiz),
     ],

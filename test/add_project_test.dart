@@ -105,18 +105,21 @@ void main() {
     expect(managed.any((p) => p.id == project.id), isTrue);
   });
 
-  test('createProject keeps the seed data isolated between instances', () async {
-    final a = MockProjectRepository();
-    await a.createProject(
-      name: 'x',
-      clientName: 'y',
-      managerId: 'u-manager',
-      type: ProjectType.social,
-      startDate: DateTime(2026, 7, 1),
-      endDate: DateTime(2026, 7, 2),
-    );
-    final b = MockProjectRepository();
-    // A fresh repository must not see the project added to another instance.
-    expect((await b.getProjects()).length, MockProjects.projects.length);
-  });
+  test(
+    'createProject keeps the seed data isolated between instances',
+    () async {
+      final a = MockProjectRepository();
+      await a.createProject(
+        name: 'x',
+        clientName: 'y',
+        managerId: 'u-manager',
+        type: ProjectType.social,
+        startDate: DateTime(2026, 7, 1),
+        endDate: DateTime(2026, 7, 2),
+      );
+      final b = MockProjectRepository();
+      // A fresh repository must not see the project added to another instance.
+      expect((await b.getProjects()).length, MockProjects.projects.length);
+    },
+  );
 }

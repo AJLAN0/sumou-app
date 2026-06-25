@@ -98,9 +98,7 @@ class MockProjectRepository implements ProjectRepository {
           order: i + 1,
           // The first stage is current on a fresh project; the rest pending.
           status:
-              i == 0
-                  ? ProjectStageStatus.current
-                  : ProjectStageStatus.pending,
+              i == 0 ? ProjectStageStatus.current : ProjectStageStatus.pending,
         ),
     ];
     final project = ProjectModel(

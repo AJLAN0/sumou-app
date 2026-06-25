@@ -50,8 +50,7 @@ class AssignPhotographersScreen extends ConsumerWidget {
       ),
       body: projectAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذّر تحميل المشروع')),
+        error: (_, __) => const Center(child: Text('تعذّر تحميل المشروع')),
         data: (project) {
           if (project == null) {
             return const SumouEmptyState(
@@ -127,8 +126,7 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
 
   String _keyFor(_AssignDraft d) => d.userId ?? 'name:${d.personName}';
 
-  bool _isSelected(String userId) =>
-      _selected.any((d) => d.userId == userId);
+  bool _isSelected(String userId) => _selected.any((d) => d.userId == userId);
 
   void _toggle(UserModel user) {
     final index = _selected.indexWhere((d) => d.userId == user.id);
@@ -140,9 +138,10 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
         final draft = _AssignDraft(
           userId: user.id,
           personName: user.fullName,
-          photoType: user.photoTypes.isNotEmpty
-              ? user.photoTypes.first
-              : _kPhotoTypes.first,
+          photoType:
+              user.photoTypes.isNotEmpty
+                  ? user.photoTypes.first
+                  : _kPhotoTypes.first,
         );
         _selected.add(draft);
         _feeControllers[_keyFor(draft)] = TextEditingController();
@@ -213,12 +212,12 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
                 const SizedBox(height: 20),
                 _SelectedTeam(
                   selected: _selected,
-                  onTypeChanged: (draft, type) =>
-                      setState(() => draft.photoType = type),
-                  feeControllerFor: (draft) =>
-                      _feeControllers[_keyFor(draft)]!,
-                  onFeeChanged: (draft, raw) =>
-                      draft.value = num.tryParse(raw.trim()) ?? 0,
+                  onTypeChanged:
+                      (draft, type) => setState(() => draft.photoType = type),
+                  feeControllerFor: (draft) => _feeControllers[_keyFor(draft)]!,
+                  onFeeChanged:
+                      (draft, raw) =>
+                          draft.value = num.tryParse(raw.trim()) ?? 0,
                   onRemove: _removeAt,
                 ),
                 const SizedBox(height: 20),
@@ -231,14 +230,16 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
                 ),
                 const SizedBox(height: 12),
                 photographersAsync.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => Text(
-                    'تعذّر تحميل المصورين',
-                    style: AppTextStyles.bodyMuted,
-                  ),
+                  loading:
+                      () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  error:
+                      (_, __) => Text(
+                        'تعذّر تحميل المصورين',
+                        style: AppTextStyles.bodyMuted,
+                      ),
                   data: (photographers) {
                     final counts =
                         countsAsync.asData?.value ?? const <String, int>{};
@@ -257,11 +258,7 @@ class _AssignBodyState extends ConsumerState<_AssignBody> {
             ),
           ),
         ),
-        _SaveBar(
-          count: _selected.length,
-          saving: _saving,
-          onSave: _save,
-        ),
+        _SaveBar(count: _selected.length, saving: _saving, onSave: _save),
       ],
     );
   }
@@ -401,10 +398,7 @@ class _SelectedMemberCard extends StatelessWidget {
               _Avatar(initials: UserModel.initialsFrom(draft.personName)),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  draft.personName,
-                  style: AppTextStyles.titleMedium,
-                ),
+                child: Text(draft.personName, style: AppTextStyles.titleMedium),
               ),
               IconButton(
                 icon: const Icon(Icons.close, color: AppColors.error),
@@ -474,19 +468,20 @@ class _AvailableList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Photo-type filter options derived from the candidates' specialties.
-    final types = <String>{
-      for (final u in photographers) ...u.photoTypes,
-    }.toList();
+    final types =
+        <String>{for (final u in photographers) ...u.photoTypes}.toList();
 
     final q = query.trim().toLowerCase();
-    final filtered = photographers.where((u) {
-      final matchesQuery = q.isEmpty ||
-          u.fullName.toLowerCase().contains(q) ||
-          u.username.toLowerCase().contains(q);
-      final matchesType =
-          typeFilter == null || u.photoTypes.contains(typeFilter);
-      return matchesQuery && matchesType;
-    }).toList();
+    final filtered =
+        photographers.where((u) {
+          final matchesQuery =
+              q.isEmpty ||
+              u.fullName.toLowerCase().contains(q) ||
+              u.username.toLowerCase().contains(q);
+          final matchesType =
+              typeFilter == null || u.photoTypes.contains(typeFilter);
+          return matchesQuery && matchesType;
+        }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,9 +568,7 @@ class _PhotographerCard extends StatelessWidget {
                 ),
               ),
               Icon(
-                selected
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
                 color: selected ? AppColors.accentGreen : AppColors.textMuted,
               ),
             ],
@@ -714,9 +707,10 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,
@@ -748,9 +742,10 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

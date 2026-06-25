@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
+import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
@@ -28,12 +29,16 @@ void main() {
     await tester.tap(find.text(projectName));
     await tester.pumpAndSettle();
 
+    final updateStage = find.widgetWithText(SumouButton, 'تحديث المرحلة');
+    final detailsScroll = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
-      find.text('تحديث المرحلة'),
-      300,
-      scrollable: find.byType(Scrollable).first,
+      updateStage,
+      500,
+      scrollable: detailsScroll,
     );
-    await tester.tap(find.text('تحديث المرحلة'));
+    await tester.drag(detailsScroll, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    await tester.tap(updateStage);
     await tester.pumpAndSettle();
   }
 
@@ -55,7 +60,7 @@ void main() {
     // Move the current stage to the final one, then save.
     await tester.tap(find.text('3. تم التسليم'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('حفظ المرحلة'));
+    await tester.tap(find.widgetWithText(SumouButton, 'حفظ المرحلة'));
     await tester.pumpAndSettle();
 
     // Back on the details screen with the new progress (2 of 3 done).

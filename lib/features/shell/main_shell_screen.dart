@@ -71,9 +71,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       body = const PhotographerMyProjectsScreen();
     } else if (current.label == RoleNavConfig.requestsLabel) {
       // Manager → requests hub; photographer → their submitted requests.
-      body = role == RoleType.manager
-          ? const ManagerRequestsScreen()
-          : const PhotographerRequestsScreen();
+      body =
+          role == RoleType.manager
+              ? const ManagerRequestsScreen()
+              : const PhotographerRequestsScreen();
     } else if (current.label == RoleNavConfig.calendarLabel) {
       body = const SmartCalendarScreen();
     } else if (index == 0) {

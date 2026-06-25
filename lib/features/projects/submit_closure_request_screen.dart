@@ -133,6 +133,8 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
       );
       return;
     }
+    await ref.read(projectByIdProvider(widget.project.id).future);
+    if (!mounted) return;
     context.pop();
     messenger.showSnackBar(
       const SnackBar(content: Text('تم إرسال طلب الإغلاق')),

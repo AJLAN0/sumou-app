@@ -38,9 +38,10 @@ class ClosureRequestsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final canApprove =
-        ref.watch(authControllerProvider).currentUser?.hasPermission(
-              AppFeature.canApproveClosure,
-            ) ??
+        ref
+            .watch(authControllerProvider)
+            .currentUser
+            ?.hasPermission(AppFeature.canApproveClosure) ??
         false;
     final requestsAsync = ref.watch(managerClosureRequestsProvider);
 
@@ -63,12 +64,14 @@ class ClosureRequestsScreen extends ConsumerWidget {
             return ClosureRequestCard(
               request: view.request,
               clientName: view.project.clientName,
-              onApprove: canApprove
-                  ? () => approveClosureFlow(context, ref, view.request)
-                  : null,
-              onReject: canApprove
-                  ? () => rejectClosureFlow(context, ref, view.request)
-                  : null,
+              onApprove:
+                  canApprove
+                      ? () => approveClosureFlow(context, ref, view.request)
+                      : null,
+              onReject:
+                  canApprove
+                      ? () => rejectClosureFlow(context, ref, view.request)
+                      : null,
             );
           },
         );

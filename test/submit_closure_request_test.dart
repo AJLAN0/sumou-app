@@ -6,8 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
+import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'package:sumou_app/features/projects/submit_closure_request_screen.dart';
 
 void main() {
   // Logs in as the photographer, opens a project, opens the closure screen.
@@ -25,15 +27,24 @@ void main() {
 
     await tester.tap(find.text('مشاريعي'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text(projectName),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text(projectName));
     await tester.pumpAndSettle();
 
+    final closureButton = find.widgetWithText(SumouButton, 'طلب إغلاق');
+    final detailsScroll = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
-      find.text('طلب إغلاق'),
-      300,
-      scrollable: find.byType(Scrollable).first,
+      closureButton,
+      500,
+      scrollable: detailsScroll,
     );
-    await tester.tap(find.text('طلب إغلاق'));
+    await tester.drag(detailsScroll, const Offset(0, -100));
+    await tester.pumpAndSettle();
+    await tester.tap(closureButton);
     await tester.pumpAndSettle();
   }
 
@@ -45,7 +56,7 @@ void main() {
 
   testWidgets('requires a delivery link', (tester) async {
     await openClosure(tester, 'تصوير ميداني — مهرجان الرياض');
-    await tester.tap(find.text('إرسال طلب الإغلاق'));
+    await tester.tap(find.widgetWithText(SumouButton, 'إرسال طلب الإغلاق'));
     await tester.pumpAndSettle();
     expect(find.text('الرجاء إدخال رابط التسليم'), findsOneWidget);
   });
@@ -55,14 +66,23 @@ void main() {
   ) async {
     await openClosure(tester, 'تصوير ميداني — مهرجان الرياض');
     await tester.enterText(
-      find.byType(TextField).first,
+      find
+          .descendant(
+            of: find.byType(SubmitClosureRequestScreen),
+            matching: find.byType(TextFormField),
+          )
+          .first,
       'https://delivery.test/p1',
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('إرسال طلب الإغلاق'));
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(SumouButton, 'إرسال طلب الإغلاق'));
     await tester.pumpAndSettle();
 
-    // Back on details, the project now shows the pending-approval chip.
+    // Back on details — scroll to the summary chip (list keeps its scroll position).
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 500));
+    await tester.pumpAndSettle();
     expect(find.text('تفاصيل المشروع'), findsOneWidget);
     expect(find.text('بانتظار الموافقة'), findsWidgets);
   });

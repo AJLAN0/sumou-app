@@ -123,26 +123,34 @@ class _Details extends ConsumerWidget {
           const SumouSectionHeader(title: 'طلب الإغلاق'),
           const SizedBox(height: 12),
           pendingClosureAsync.when(
-            loading: () => const SumouCard(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => const SumouCard(
-              child: Text('تعذّر تحميل الطلب', style: AppTextStyles.bodyMuted),
-            ),
-            data: (request) => request == null
-                ? const SumouCard(
-                    child: Text(
-                      'لا يوجد طلب إغلاق',
-                      style: AppTextStyles.bodyMuted,
-                    ),
-                  )
-                : ClosureRequestCard(
-                    request: request,
-                    clientName: project.clientName,
-                    onApprove: () =>
-                        approveClosureFlow(context, ref, request),
-                    onReject: () => rejectClosureFlow(context, ref, request),
+            loading:
+                () => const SumouCard(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            error:
+                (_, __) => const SumouCard(
+                  child: Text(
+                    'تعذّر تحميل الطلب',
+                    style: AppTextStyles.bodyMuted,
                   ),
+                ),
+            data:
+                (request) =>
+                    request == null
+                        ? const SumouCard(
+                          child: Text(
+                            'لا يوجد طلب إغلاق',
+                            style: AppTextStyles.bodyMuted,
+                          ),
+                        )
+                        : ClosureRequestCard(
+                          request: request,
+                          clientName: project.clientName,
+                          onApprove:
+                              () => approveClosureFlow(context, ref, request),
+                          onReject:
+                              () => rejectClosureFlow(context, ref, request),
+                        ),
           ),
         ],
         const SizedBox(height: 24),

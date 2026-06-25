@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
+import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
@@ -58,13 +59,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Try to confirm with no reason.
-    await tester.tap(find.text('تأكيد الرفض'));
+    await tester.tap(find.widgetWithText(SumouButton, 'تأكيد الرفض'));
     await tester.pumpAndSettle();
     expect(find.text('الرجاء إدخال سبب الرفض'), findsOneWidget);
 
     // Enter a reason and confirm.
-    await tester.enterText(find.byType(TextField), 'الجودة غير كافية');
-    await tester.tap(find.text('تأكيد الرفض'));
+    await tester.enterText(find.byType(TextFormField), 'الجودة غير كافية');
+    await tester.tap(find.widgetWithText(SumouButton, 'تأكيد الرفض'));
     await tester.pumpAndSettle();
 
     expect(find.text('لا توجد طلبات إغلاق'), findsOneWidget);

@@ -127,8 +127,8 @@ class _Details extends ConsumerWidget {
             label: 'إسناد مصور',
             variant: SumouButtonVariant.secondary,
             icon: Icons.person_add_alt,
-            onPressed: () =>
-                context.push(AppRoutes.projectAssignPath(project.id)),
+            onPressed:
+                () => context.push(AppRoutes.projectAssignPath(project.id)),
           ),
           const SizedBox(height: 10),
         ],

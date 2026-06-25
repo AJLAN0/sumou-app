@@ -43,8 +43,9 @@ final photographerCandidatesProvider = FutureProvider<List<UserModel>>((
 ///
 /// Used to show a simple متاح/مشغول/ممتلئ status on the assign screen. This is
 /// not an enforcement gate — assignment is never blocked in Sprint 2.
-final photographerActiveCountsProvider =
-    FutureProvider<Map<String, int>>((ref) async {
+final photographerActiveCountsProvider = FutureProvider<Map<String, int>>((
+  ref,
+) async {
   final projects = await ref.watch(projectRepositoryProvider).getProjects();
   final counts = <String, int>{};
   for (final p in projects) {

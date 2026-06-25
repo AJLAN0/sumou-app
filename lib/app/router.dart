@@ -136,8 +136,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // conflict with the details route.
       GoRoute(
         path: AppRoutes.projectAssign,
-        builder: (context, state) =>
-            AssignPhotographersScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) => AssignPhotographersScreen(
+              projectId: state.pathParameters['id']!,
+            ),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

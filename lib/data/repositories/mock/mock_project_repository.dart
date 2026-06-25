@@ -103,19 +103,6 @@ class MockProjectRepository implements ProjectRepository {
                   : ProjectStageStatus.pending,
         ),
     ];
-    // Re-key any incoming team roles to this project's id.
-    final roles = [
-      for (var i = 0; i < teamRoles.length; i++)
-        ProjectTeamRole(
-          id: '$id-r${i + 1}',
-          projectId: id,
-          type: teamRoles[i].type,
-          personName: teamRoles[i].personName,
-          userId: teamRoles[i].userId,
-          value: teamRoles[i].value,
-          date: teamRoles[i].date,
-        ),
-    ];
     final project = ProjectModel(
       id: id,
       serial: serial ?? ProjectSerial.generate(type),
@@ -128,11 +115,44 @@ class MockProjectRepository implements ProjectRepository {
       startDate: startDate,
       endDate: endDate,
       notes: notes,
-      teamRoles: roles,
+      // Re-key any incoming team roles to this project's id.
+      teamRoles: _rekeyRoles(id, teamRoles),
       stages: stages,
       createdAt: DateTime.now(),
     );
     _projects.add(project);
     return project;
   }
+
+  @override
+  Future<ProjectModel?> assignTeamRoles(
+    String projectId,
+    List<ProjectTeamRole> teamRoles,
+  ) async {
+    final index = _projects.indexWhere((p) => p.id == projectId);
+    if (index < 0) return null;
+    final updated = _projects[index].copyWith(
+      teamRoles: _rekeyRoles(projectId, teamRoles),
+      updatedAt: DateTime.now(),
+    );
+    _projects[index] = updated;
+    return updated;
+  }
+
+  /// Re-key team roles to belong to [projectId] with stable, ordered ids.
+  static List<ProjectTeamRole> _rekeyRoles(
+    String projectId,
+    List<ProjectTeamRole> roles,
+  ) => [
+    for (var i = 0; i < roles.length; i++)
+      ProjectTeamRole(
+        id: '$projectId-r${i + 1}',
+        projectId: projectId,
+        type: roles[i].type,
+        personName: roles[i].personName,
+        userId: roles[i].userId,
+        value: roles[i].value,
+        date: roles[i].date,
+      ),
+  ];
 }

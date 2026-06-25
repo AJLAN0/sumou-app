@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
@@ -132,7 +133,8 @@ class _Details extends ConsumerWidget {
             label: 'إسناد مصور',
             variant: SumouButtonVariant.secondary,
             icon: Icons.person_add_alt,
-            onPressed: () => _comingSoon(context),
+            onPressed: () =>
+                context.push(AppRoutes.projectAssignPath(project.id)),
           ),
           const SizedBox(height: 10),
         ],

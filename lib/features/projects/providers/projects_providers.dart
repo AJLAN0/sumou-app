@@ -38,3 +38,20 @@ final photographerCandidatesProvider = FutureProvider<List<UserModel>>((
   final users = await ref.watch(assignableUsersProvider.future);
   return users.where((u) => u.hasRole(RoleType.photographer)).toList();
 });
+
+/// Active-project count per assigned user id (UI-only capacity signal).
+///
+/// Used to show a simple متاح/مشغول/ممتلئ status on the assign screen. This is
+/// not an enforcement gate — assignment is never blocked in Sprint 2.
+final photographerActiveCountsProvider =
+    FutureProvider<Map<String, int>>((ref) async {
+  final projects = await ref.watch(projectRepositoryProvider).getProjects();
+  final counts = <String, int>{};
+  for (final p in projects) {
+    if (!p.isActive) continue;
+    for (final id in p.assignedPhotographers) {
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+  }
+  return counts;
+});

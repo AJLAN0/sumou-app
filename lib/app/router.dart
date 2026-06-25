@@ -13,6 +13,7 @@ import '../features/client_tracking/track_project_screen.dart';
 import '../features/profile/change_password_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/projects/add_project_screen.dart';
+import '../features/projects/assign_photographers_screen.dart';
 import '../features/projects/project_details_screen.dart';
 import '../features/shell/main_shell_screen.dart';
 
@@ -30,6 +31,8 @@ class AppRoutes {
   static const String addProject = '/manager/projects/add';
   static const String projectDetails = '/manager/projects/:id';
   static String projectDetailsPath(String id) => '/manager/projects/$id';
+  static const String projectAssign = '/manager/projects/:id/assign';
+  static String projectAssignPath(String id) => '/manager/projects/$id/assign';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
   static const String profile = '/profile';
@@ -128,6 +131,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.addProject,
         builder: (context, state) => const AddProjectScreen(),
+      ),
+      // The `/:id/assign` segment is more specific than `/:id`, so no ordering
+      // conflict with the details route.
+      GoRoute(
+        path: AppRoutes.projectAssign,
+        builder: (context, state) =>
+            AssignPhotographersScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

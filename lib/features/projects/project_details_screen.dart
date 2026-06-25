@@ -10,6 +10,7 @@ import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
 import 'providers/projects_providers.dart';
 import 'widgets/project_card.dart';
+import 'widgets/stage_timeline.dart';
 
 String _date(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
@@ -64,8 +65,13 @@ class _Details extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).currentUser;
+    // Stage updates: needs the permission, and for a photographer also requires
+    // being assigned to this project (a manager can update any project).
+    final isManager = user?.hasRole(RoleType.manager) ?? false;
+    final isAssigned = project.isAssignedTo(user?.id ?? '');
     final canUpdateStages =
-        user?.hasPermission(AppFeature.canUpdateStages) ?? false;
+        (user?.hasPermission(AppFeature.canUpdateStages) ?? false) &&
+        (isManager || isAssigned);
     final canRequestClosure =
         user?.hasPermission(AppFeature.canRequestClosure) ?? false;
     final canAssign =
@@ -78,7 +84,7 @@ class _Details extends ConsumerWidget {
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'مراحل المشروع'),
         const SizedBox(height: 12),
-        _StageProgress(project: project),
+        StageTimeline(stages: project.stages),
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'الفريق'),
         const SizedBox(height: 12),
@@ -109,7 +115,8 @@ class _Details extends ConsumerWidget {
           SumouButton(
             label: 'تحديث المرحلة',
             icon: Icons.update,
-            onPressed: () => _comingSoon(context),
+            onPressed: () =>
+                context.push(AppRoutes.projectStagePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],

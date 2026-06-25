@@ -137,6 +137,39 @@ class MockProjectRepository implements ProjectRepository {
     return updated;
   }
 
+  @override
+  Future<ProjectModel?> updateProjectStage(
+    String projectId,
+    String stageId, {
+    String? notes,
+    String? updatedBy,
+  }) async {
+    final index = _projects.indexWhere((p) => p.id == projectId);
+    if (index < 0) return null;
+    final project = _projects[index];
+    final target = project.stages.where((s) => s.id == stageId).toList();
+    if (target.isEmpty) return null;
+    final targetOrder = target.first.order;
+    final now = DateTime.now();
+    final newStages = [
+      for (final s in project.stages)
+        if (s.order < targetOrder)
+          s.copyWith(status: ProjectStageStatus.done)
+        else if (s.order == targetOrder)
+          s.copyWith(
+            status: ProjectStageStatus.current,
+            notes: notes,
+            updatedBy: updatedBy,
+            updatedAt: now,
+          )
+        else
+          s.copyWith(status: ProjectStageStatus.pending),
+    ];
+    final updated = project.copyWith(stages: newStages, updatedAt: now);
+    _projects[index] = updated;
+    return updated;
+  }
+
   /// Re-key team roles to belong to [projectId] with stable, ordered ids.
   static List<ProjectTeamRole> _rekeyRoles(
     String projectId,

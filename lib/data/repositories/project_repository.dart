@@ -49,4 +49,15 @@ abstract interface class ProjectRepository {
     String projectId,
     List<ProjectTeamRole> teamRoles,
   );
+
+  /// Set the project's current stage to [stageId]: earlier stages become done,
+  /// the target becomes current, later stages pending. Optional [notes] and
+  /// [updatedBy] are recorded on the target stage. Returns the updated project,
+  /// or null when the project or stage is unknown. Mock-backed in Sprint 2.
+  Future<ProjectModel?> updateProjectStage(
+    String projectId,
+    String stageId, {
+    String? notes,
+    String? updatedBy,
+  });
 }

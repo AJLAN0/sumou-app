@@ -13,6 +13,7 @@ import '../dashboard/photographer_home_screen.dart';
 import '../dashboard/role_placeholder_home.dart';
 import '../profile/profile_view.dart';
 import '../projects/manager_projects_screen.dart';
+import '../projects/photographer_my_projects_screen.dart';
 import 'more_menu_screen.dart';
 import 'nav_item.dart';
 import 'role_based_bottom_nav.dart';
@@ -63,6 +64,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       body = const ReportsPlaceholderScreen();
     } else if (current.label == RoleNavConfig.projectsLabel) {
       body = const ManagerProjectsScreen();
+    } else if (current.label == RoleNavConfig.myProjectsLabel) {
+      body = const PhotographerMyProjectsScreen();
     } else if (index == 0) {
       // The first tab is each role's home / dashboard.
       body = _homeFor(role);

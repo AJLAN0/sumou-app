@@ -21,10 +21,19 @@ String _date(DateTime d) =>
 
 /// Mobile project card used in project lists (no desktop tables).
 class ProjectCard extends StatelessWidget {
-  const ProjectCard({super.key, required this.project, this.onTap});
+  const ProjectCard({
+    super.key,
+    required this.project,
+    this.onTap,
+    this.roleLabel,
+  });
 
   final ProjectModel project;
   final VoidCallback? onTap;
+
+  /// When set, shows the viewer's own role/photo type on this project (used by
+  /// the photographer "my projects" list). Null hides the chip.
+  final String? roleLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +92,20 @@ class ProjectCard extends StatelessWidget {
               ),
             ],
           ),
+          if (roleLabel != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.camera_alt_outlined,
+                  size: 13,
+                  color: AppColors.textMuted,
+                ),
+                const SizedBox(width: 4),
+                Text('دوري: $roleLabel', style: AppTextStyles.label),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

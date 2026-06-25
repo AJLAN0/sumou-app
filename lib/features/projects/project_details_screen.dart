@@ -10,6 +10,7 @@ import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
 import 'providers/projects_providers.dart';
 import 'widgets/project_card.dart';
+import 'widgets/stage_timeline.dart';
 
 String _date(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
@@ -65,8 +66,13 @@ class _Details extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).currentUser;
+    // Stage updates: needs the permission, and for a photographer also requires
+    // being assigned to this project (a manager can update any project).
+    final isManager = user?.hasRole(RoleType.manager) ?? false;
+    final isAssigned = project.isAssignedTo(user?.id ?? '');
     final canUpdateStages =
-        user?.hasPermission(AppFeature.canUpdateStages) ?? false;
+        (user?.hasPermission(AppFeature.canUpdateStages) ?? false) &&
+        (isManager || isAssigned);
     final canRequestClosure =
         user?.hasPermission(AppFeature.canRequestClosure) ?? false;
     final canAssign =
@@ -79,7 +85,7 @@ class _Details extends ConsumerWidget {
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'مراحل المشروع'),
         const SizedBox(height: 12),
-        _StageProgress(project: project),
+        StageTimeline(stages: project.stages),
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'الفريق'),
         const SizedBox(height: 12),
@@ -115,7 +121,8 @@ class _Details extends ConsumerWidget {
           SumouButton(
             label: 'تحديث المرحلة',
             icon: Icons.update,
-            onPressed: () => _comingSoon(context),
+            onPressed: () =>
+                context.push(AppRoutes.projectStagePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],
@@ -215,97 +222,6 @@ class _Line extends StatelessWidget {
               style: AppTextStyles.body.copyWith(color: valueColor),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StageProgress extends StatelessWidget {
-  const _StageProgress({required this.project});
-
-  final ProjectModel project;
-
-  @override
-  Widget build(BuildContext context) {
-    final percent = project.stageProgressPercent;
-    final current = project.currentStage?.title;
-
-    return SumouCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  current == null ? 'لا توجد مراحل' : 'المرحلة الحالية: $current',
-                  style: AppTextStyles.body,
-                ),
-              ),
-              Text(
-                '$percent%',
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.accentGreen,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: percent / 100,
-              minHeight: 5,
-              backgroundColor: AppColors.surfaceSecondary,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppColors.accentGreen,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          for (final stage in project.stages) _StageRow(stage: stage),
-        ],
-      ),
-    );
-  }
-}
-
-class _StageRow extends StatelessWidget {
-  const _StageRow({required this.stage});
-
-  final ProjectStageModel stage;
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color color, IconData icon) = switch (stage.status) {
-      ProjectStageStatus.done => (AppColors.accentGreen, Icons.check_circle),
-      ProjectStageStatus.current => (
-        AppColors.projectTeal,
-        Icons.radio_button_checked,
-      ),
-      ProjectStageStatus.pending => (
-        AppColors.textMuted,
-        Icons.radio_button_unchecked,
-      ),
-    };
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${stage.order}. ${stage.title}',
-              style: AppTextStyles.body.copyWith(
-                color: stage.isPending ? AppColors.textMuted : null,
-              ),
-            ),
-          ),
-          Text(stage.status.nameAr, style: AppTextStyles.label.copyWith(color: color)),
         ],
       ),
     );

@@ -66,9 +66,9 @@ Future<void> rejectClosureFlow(
 
 /// Bottom sheet collecting a required rejection reason. Returns the reason, or
 /// null when cancelled/dismissed.
-Future<String?> _showRejectReasonSheet(BuildContext context) {
+Future<String?> _showRejectReasonSheet(BuildContext context) async {
   final controller = TextEditingController();
-  return showModalBottomSheet<String>(
+  final result = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surface,
@@ -135,4 +135,6 @@ Future<String?> _showRejectReasonSheet(BuildContext context) {
       );
     },
   );
+  controller.dispose();
+  return result;
 }

@@ -60,4 +60,17 @@ abstract interface class ProjectRepository {
     String? notes,
     String? updatedBy,
   });
+
+  /// Submit a closure request for [projectId] and move the project to
+  /// pendingClosure. Returns the created (pending) request, or null when the
+  /// project is unknown or already has a pending request. Mock-backed in
+  /// Sprint 2 (no file upload — [reportFileUrl] is plain text).
+  Future<ClosureRequestModel?> submitClosureRequest({
+    required String projectId,
+    required String submittedBy,
+    required String submittedByName,
+    String? deliveryLink,
+    String? reportFileUrl,
+    String? notes,
+  });
 }

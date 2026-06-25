@@ -72,8 +72,10 @@ class _Details extends ConsumerWidget {
     final canUpdateStages =
         (user?.hasPermission(AppFeature.canUpdateStages) ?? false) &&
         (isManager || isAssigned);
+    // Closure requests: needs the permission and being assigned to the project.
     final canRequestClosure =
-        user?.hasPermission(AppFeature.canRequestClosure) ?? false;
+        (user?.hasPermission(AppFeature.canRequestClosure) ?? false) &&
+        isAssigned;
     final canAssign =
         user?.hasPermission(AppFeature.canAssignPhotographers) ?? false;
 
@@ -125,7 +127,8 @@ class _Details extends ConsumerWidget {
             label: 'طلب إغلاق',
             variant: SumouButtonVariant.secondary,
             icon: Icons.check_circle_outline,
-            onPressed: () => _comingSoon(context),
+            onPressed: () =>
+                context.push(AppRoutes.projectClosurePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],

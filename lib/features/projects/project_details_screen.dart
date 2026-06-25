@@ -117,8 +117,8 @@ class _Details extends ConsumerWidget {
           SumouButton(
             label: 'تحديث المرحلة',
             icon: Icons.update,
-            onPressed: () =>
-                context.push(AppRoutes.projectStagePath(project.id)),
+            onPressed:
+                () => context.push(AppRoutes.projectStagePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],
@@ -127,8 +127,8 @@ class _Details extends ConsumerWidget {
             label: 'طلب إغلاق',
             variant: SumouButtonVariant.secondary,
             icon: Icons.check_circle_outline,
-            onPressed: () =>
-                context.push(AppRoutes.projectClosurePath(project.id)),
+            onPressed:
+                () => context.push(AppRoutes.projectClosurePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],

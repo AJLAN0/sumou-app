@@ -37,8 +37,7 @@ class SubmitClosureRequestScreen extends ConsumerWidget {
       ),
       body: projectAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذّر تحميل المشروع')),
+        error: (_, __) => const Center(child: Text('تعذّر تحميل المشروع')),
         data: (project) {
           if (project == null) {
             return const SumouEmptyState(
@@ -150,10 +149,7 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
               children: [
                 _ProjectSummary(project: widget.project, role: _myRole),
                 const SizedBox(height: 20),
-                if (alreadyPending)
-                  const _PendingNotice()
-                else
-                  _buildForm(),
+                if (alreadyPending) const _PendingNotice() else _buildForm(),
               ],
             ),
           ),
@@ -343,7 +339,11 @@ class _PendingNotice extends StatelessWidget {
 }
 
 class _ReviewLine extends StatelessWidget {
-  const _ReviewLine({required this.label, required this.value, this.valueColor});
+  const _ReviewLine({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   final String label;
   final String value;

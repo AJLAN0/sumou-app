@@ -87,9 +87,12 @@ void main() {
     expect(reloaded!.currentStage?.order, 2);
   });
 
-  test('updateProjectStage returns null for unknown project or stage', () async {
-    final repo = MockProjectRepository();
-    expect(await repo.updateProjectStage('nope', 'p-1-s1'), isNull);
-    expect(await repo.updateProjectStage('p-1', 'no-such-stage'), isNull);
-  });
+  test(
+    'updateProjectStage returns null for unknown project or stage',
+    () async {
+      final repo = MockProjectRepository();
+      expect(await repo.updateProjectStage('nope', 'p-1-s1'), isNull);
+      expect(await repo.updateProjectStage('p-1', 'no-such-stage'), isNull);
+    },
+  );
 }

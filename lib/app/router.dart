@@ -150,13 +150,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.projectStage,
-        builder: (context, state) =>
-            UpdateProjectStageScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) => UpdateProjectStageScreen(
+              projectId: state.pathParameters['id']!,
+            ),
       ),
       GoRoute(
         path: AppRoutes.projectClosure,
-        builder: (context, state) =>
-            SubmitClosureRequestScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) => SubmitClosureRequestScreen(
+              projectId: state.pathParameters['id']!,
+            ),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

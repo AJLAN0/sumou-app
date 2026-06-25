@@ -76,28 +76,30 @@ void main() {
     expect(find.text('إرسال طلب الإغلاق'), findsNothing);
   });
 
-  test('submitClosureRequest creates a pending request and updates project',
-      () async {
-    final repo = MockProjectRepository();
-    final before = (await repo.getClosureRequests()).length;
+  test(
+    'submitClosureRequest creates a pending request and updates project',
+    () async {
+      final repo = MockProjectRepository();
+      final before = (await repo.getClosureRequests()).length;
 
-    final request = await repo.submitClosureRequest(
-      projectId: 'p-1',
-      submittedBy: 'u-photographer',
-      submittedByName: 'نورة الحنايا',
-      deliveryLink: 'https://delivery.test/p1',
-      notes: 'تم التسليم',
-    );
+      final request = await repo.submitClosureRequest(
+        projectId: 'p-1',
+        submittedBy: 'u-photographer',
+        submittedByName: 'نورة الحنايا',
+        deliveryLink: 'https://delivery.test/p1',
+        notes: 'تم التسليم',
+      );
 
-    expect(request, isNotNull);
-    expect(request!.status, ClosureRequestStatus.pending);
-    expect(request.deliveryLink, 'https://delivery.test/p1');
-    expect((await repo.getClosureRequests()).length, before + 1);
+      expect(request, isNotNull);
+      expect(request!.status, ClosureRequestStatus.pending);
+      expect(request.deliveryLink, 'https://delivery.test/p1');
+      expect((await repo.getClosureRequests()).length, before + 1);
 
-    final project = await repo.getProjectById('p-1');
-    expect(project!.status, ProjectStatus.pendingClosure);
-    expect(project.hasPendingClosure, isTrue);
-  });
+      final project = await repo.getProjectById('p-1');
+      expect(project!.status, ProjectStatus.pendingClosure);
+      expect(project.hasPendingClosure, isTrue);
+    },
+  );
 
   test('submitClosureRequest blocks a duplicate pending request', () async {
     final repo = MockProjectRepository();

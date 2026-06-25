@@ -165,7 +165,8 @@ class _TimelineRow extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (stage.notes != null && stage.notes!.trim().isNotEmpty) ...[
+                  if (stage.notes != null &&
+                      stage.notes!.trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(stage.notes!, style: AppTextStyles.bodyMuted),
                   ],

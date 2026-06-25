@@ -12,6 +12,7 @@ import '../features/client_tracking/client_project_result_screen.dart';
 import '../features/client_tracking/track_project_screen.dart';
 import '../features/profile/change_password_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/projects/add_project_screen.dart';
 import '../features/projects/project_details_screen.dart';
 import '../features/shell/main_shell_screen.dart';
 
@@ -26,6 +27,7 @@ class AppRoutes {
   static const String track = '/track';
   static const String trackResult = '/track/result';
   static const String managerHome = '/manager/home';
+  static const String addProject = '/manager/projects/add';
   static const String projectDetails = '/manager/projects/:id';
   static String projectDetailsPath(String id) => '/manager/projects/$id';
   static const String photographerHome = '/photographer/home';
@@ -120,6 +122,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.adminHome,
         builder: (context, state) => const MainShellScreen(),
+      ),
+      // Declared before the `:id` route so the literal `add` segment isn't
+      // captured as a project id.
+      GoRoute(
+        path: AppRoutes.addProject,
+        builder: (context, state) => const AddProjectScreen(),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

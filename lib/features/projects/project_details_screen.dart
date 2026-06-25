@@ -34,8 +34,7 @@ class ProjectDetailsScreen extends ConsumerWidget {
       ),
       body: projectAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذّر تحميل المشروع')),
+        error: (_, __) => const Center(child: Text('تعذّر تحميل المشروع')),
         data: (project) {
           if (project == null) {
             return const SumouEmptyState(
@@ -56,9 +55,9 @@ class _Details extends ConsumerWidget {
   final ProjectModel project;
 
   void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('هذه الميزة قريباً')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('هذه الميزة قريباً')));
   }
 
   @override
@@ -97,15 +96,10 @@ class _Details extends ConsumerWidget {
         const SumouSectionHeader(title: 'الملاحظات'),
         const SizedBox(height: 12),
         if (project.notes != null && project.notes!.trim().isNotEmpty)
-          SumouCard(
-            child: Text(project.notes!, style: AppTextStyles.body),
-          )
+          SumouCard(child: Text(project.notes!, style: AppTextStyles.body))
         else
           const SumouCard(
-            child: Text(
-              'لا توجد ملاحظات',
-              style: AppTextStyles.bodyMuted,
-            ),
+            child: Text('لا توجد ملاحظات', style: AppTextStyles.bodyMuted),
           ),
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'الإجراءات'),
@@ -238,7 +232,9 @@ class _StageProgress extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  current == null ? 'لا توجد مراحل' : 'المرحلة الحالية: $current',
+                  current == null
+                      ? 'لا توجد مراحل'
+                      : 'المرحلة الحالية: $current',
                   style: AppTextStyles.body,
                 ),
               ),
@@ -303,7 +299,10 @@ class _StageRow extends StatelessWidget {
               ),
             ),
           ),
-          Text(stage.status.nameAr, style: AppTextStyles.label.copyWith(color: color)),
+          Text(
+            stage.status.nameAr,
+            style: AppTextStyles.label.copyWith(color: color),
+          ),
         ],
       ),
     );

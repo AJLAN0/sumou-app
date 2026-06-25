@@ -190,8 +190,7 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
 
   Future<void> _pickDate({required bool isStart}) async {
     final now = DateTime.now();
-    final initial =
-        (isStart ? _startDate : _endDate) ?? _startDate ?? now;
+    final initial = (isStart ? _startDate : _endDate) ?? _startDate ?? now;
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -289,8 +288,7 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                         final u = users[i];
                         final selected = u.id == selectedId;
                         return SumouCard(
-                          borderColor:
-                              selected ? AppColors.accentGreen : null,
+                          borderColor: selected ? AppColors.accentGreen : null,
                           onTap: () => Navigator.of(sheetContext).pop(u),
                           child: Row(
                             children: [
@@ -298,8 +296,7 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       u.fullName,
@@ -455,10 +452,9 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
         const _StepHeader(title: 'مدير المشروع'),
         managersAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => Text(
-            'تعذّر تحميل المدراء',
-            style: AppTextStyles.bodyMuted,
-          ),
+          error:
+              (_, __) =>
+                  Text('تعذّر تحميل المدراء', style: AppTextStyles.bodyMuted),
           data: (managers) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,9 +473,10 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                       Expanded(
                         child: Text(
                           _managerName ?? 'اختر مدير المشروع',
-                          style: _managerName == null
-                              ? AppTextStyles.bodyMuted
-                              : AppTextStyles.titleMedium,
+                          style:
+                              _managerName == null
+                                  ? AppTextStyles.bodyMuted
+                                  : AppTextStyles.titleMedium,
                         ),
                       ),
                       const Icon(
@@ -520,8 +517,8 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
           for (var i = 0; i < _team.length; i++) ...[
             _TeamMemberEditor(
               member: _team[i],
-              onTypeChanged: (type) =>
-                  setState(() => _team[i].photoType = type),
+              onTypeChanged:
+                  (type) => setState(() => _team[i].photoType = type),
               onRemove: () => setState(() => _team.removeAt(i)),
             ),
             const SizedBox(height: 10),
@@ -529,16 +526,16 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
         const SizedBox(height: 6),
         photographersAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => Text(
-            'تعذّر تحميل المصورين',
-            style: AppTextStyles.bodyMuted,
-          ),
-          data: (photographers) => SumouButton(
-            label: 'إضافة عضو للفريق',
-            variant: SumouButtonVariant.secondary,
-            icon: Icons.person_add_alt,
-            onPressed: () => _addTeamMember(photographers),
-          ),
+          error:
+              (_, __) =>
+                  Text('تعذّر تحميل المصورين', style: AppTextStyles.bodyMuted),
+          data:
+              (photographers) => SumouButton(
+                label: 'إضافة عضو للفريق',
+                variant: SumouButtonVariant.secondary,
+                icon: Icons.person_add_alt,
+                onPressed: () => _addTeamMember(photographers),
+              ),
         ),
       ],
     );
@@ -567,15 +564,15 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
               _ReviewLine(label: 'النوع', value: _type?.nameAr ?? '—'),
               _ReviewLine(
                 label: 'الفترة',
-                value:
-                    '${_fmtDate(_startDate)} ← ${_fmtDate(_endDate)}',
+                value: '${_fmtDate(_startDate)} ← ${_fmtDate(_endDate)}',
               ),
               _ReviewLine(label: 'المدير', value: _managerName ?? '—'),
               _ReviewLine(
                 label: 'الفريق',
-                value: _team.isEmpty
-                    ? 'لا يوجد'
-                    : _team.map((m) => m.personName).join('، '),
+                value:
+                    _team.isEmpty
+                        ? 'لا يوجد'
+                        : _team.map((m) => m.personName).join('، '),
               ),
               if (_notesController.text.trim().isNotEmpty)
                 _ReviewLine(
@@ -613,10 +610,7 @@ class _StepIndicator extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'الخطوة ${step + 1} من $total',
-                style: AppTextStyles.label,
-              ),
+              Text('الخطوة ${step + 1} من $total', style: AppTextStyles.label),
               Text(_kStepTitles[step], style: AppTextStyles.label),
             ],
           ),
@@ -674,14 +668,15 @@ class _BottomBar extends StatelessWidget {
               const SizedBox(width: 12),
             ],
             Expanded(
-              child: isLastStep
-                  ? SumouButton(
-                      label: 'حفظ المشروع',
-                      icon: Icons.check,
-                      loading: saving,
-                      onPressed: saving ? null : onSave,
-                    )
-                  : SumouButton(label: 'التالي', onPressed: onNext),
+              child:
+                  isLastStep
+                      ? SumouButton(
+                        label: 'حفظ المشروع',
+                        icon: Icons.check,
+                        loading: saving,
+                        onPressed: saving ? null : onSave,
+                      )
+                      : SumouButton(label: 'التالي', onPressed: onNext),
             ),
           ],
         ),
@@ -759,9 +754,10 @@ class _ChoiceChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,
@@ -774,7 +770,11 @@ class _ChoiceChip extends StatelessWidget {
 }
 
 class _DateField extends StatelessWidget {
-  const _DateField({required this.label, required this.value, required this.onTap});
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
 
   final String label;
   final DateTime? value;
@@ -800,9 +800,10 @@ class _DateField extends StatelessWidget {
               Expanded(
                 child: Text(
                   value == null ? 'اختر التاريخ' : _fmtDate(value),
-                  style: value == null
-                      ? AppTextStyles.bodyMuted
-                      : AppTextStyles.body,
+                  style:
+                      value == null
+                          ? AppTextStyles.bodyMuted
+                          : AppTextStyles.body,
                 ),
               ),
               const Icon(Icons.chevron_left, color: AppColors.textMuted),
@@ -887,10 +888,7 @@ class _ReviewLine extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 96,
-            child: Text(label, style: AppTextStyles.label),
-          ),
+          SizedBox(width: 96, child: Text(label, style: AppTextStyles.label)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

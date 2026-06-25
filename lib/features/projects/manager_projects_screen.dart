@@ -123,10 +123,11 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
               return ListView.separated(
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => ProjectCard(
-                  project: filtered[i],
-                  onTap: () => _openDetails(filtered[i].id),
-                ),
+                itemBuilder:
+                    (_, i) => ProjectCard(
+                      project: filtered[i],
+                      onTap: () => _openDetails(filtered[i].id),
+                    ),
               );
             },
           ),

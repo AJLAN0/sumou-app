@@ -131,8 +131,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.projectDetails,
-        builder: (context, state) =>
-            ProjectDetailsScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) =>
+                ProjectDetailsScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.profile,

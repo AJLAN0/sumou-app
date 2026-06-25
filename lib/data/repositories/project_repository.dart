@@ -73,4 +73,17 @@ abstract interface class ProjectRepository {
     String? reportFileUrl,
     String? notes,
   });
+
+  /// Approve a pending closure request: marks it approved, completes the
+  /// project, and marks all its stages done. Returns the updated request, or
+  /// null when the request is unknown or not pending. Mock-backed.
+  Future<ClosureRequestModel?> approveClosureRequest(String requestId);
+
+  /// Reject a pending closure request with [reason]: marks it rejected and
+  /// returns the project to active. Returns the updated request, or null when
+  /// the request is unknown or not pending. Mock-backed.
+  Future<ClosureRequestModel?> rejectClosureRequest(
+    String requestId,
+    String reason,
+  );
 }

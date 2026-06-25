@@ -1,3 +1,11 @@
+> ⛔ **Permanent Out of Scope (overrides this spec):** the **finance**
+> module/transfer/payment/reports, **Rekaz** configuration/integration, and
+> **notifications** (logic, in-app, push, FCM, `NotificationRepository`
+> implementation) are **permanently out of scope** for all sprints unless the
+> project owner explicitly requests them. Wherever this spec describes those
+> features or side-effects, they are **documented-but-not-to-be-built**. The
+> **Permanent Out of Scope** section in `CLAUDE.md` is authoritative.
+
 You are Claude code acting as a senior Flutter mobile architect and product-focused UI/UX engineer.
 
 I have an existing full HTML/JavaScript prototype for the Sumou Creative internal management system. The HTML file contains the full business logic, roles, permissions, user flows, page structure, brand identity, colors, Arabic RTL behavior, and current web experience.

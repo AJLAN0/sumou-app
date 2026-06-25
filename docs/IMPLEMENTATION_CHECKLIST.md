@@ -4,7 +4,29 @@
 > **Sprint 2** only; later modules appear at the end as **placeholders**.
 > No Flutter code is written yet — this is the build map.
 
-Legend: `[ ]` todo · `[~]` placeholder/stub only (later) · 🔒 = security gate.
+Legend: `[ ]` todo · `[~]` placeholder/stub only (later) · `[⛔]` **do not
+implement** (permanently out of scope) · 🔒 = security gate.
+
+---
+
+## ⛔ Permanent Out of Scope — DO NOT IMPLEMENT
+
+The following are **permanently out of scope** for all sprints and must **not**
+be implemented, wired, or scheduled unless the project owner explicitly requests
+them. This overrides every item below. (Authoritative: the **Permanent Out of
+Scope** section in `CLAUDE.md`.)
+
+- [⛔] Finance module / finance feature logic.
+- [⛔] Finance transfer / payment flow (payment requests, receipts, transfers).
+- [⛔] Finance reports.
+- [⛔] Rekaz configuration.
+- [⛔] Rekaz integration (API key never in the app).
+- [⛔] Notifications — notification logic, in-app notifications, push, FCM.
+- [⛔] `NotificationRepository` implementation (interface may stay declared; no
+  working/mock impl and no notifications UI).
+
+Existing finance/Rekaz/notifications nav entries or stub screens may remain
+**only** as inert branded placeholders.
 
 ---
 
@@ -70,7 +92,9 @@ Legend: `[ ]` todo · `[~]` placeholder/stub only (later) · 🔒 = security gat
 - [ ] `UserRepository` (+ mock).
 - [ ] `ProjectRepository` (+ mock).
 - [ ] `PermissionRepository` (+ mock).
-- [ ] `NotificationRepository` (+ mock).
+- [⛔] `NotificationRepository` implementation — **do not implement** (interface
+      may stay declared; no mock/working impl). Notifications are permanently
+      out of scope.
 - [ ] `TrackingRepository` (+ mock).
 - [ ] 🔒 UI never calls a backend directly — only through repositories.
 - [~] Supabase implementations (later) for tables listed in
@@ -154,13 +178,16 @@ Legend: `[ ]` todo · `[~]` placeholder/stub only (later) · 🔒 = security gat
 
 ### Closure lifecycle
 - [ ] SubmitClosureRequestScreen (report file placeholder + delivery link →
-      creates pending closure request notification).
+      creates pending closure request). *(No notification side-effect —
+      notifications are permanently out of scope.)*
 - [ ] ManagerRequestsScreen + ClosureRequestsScreen (list pending requests).
 - [ ] Approve closure → project `done` (bottom sheet, green).
 - [ ] Reject closure → reason captured, project stays `active` (bottom sheet,
       red).
-- [ ] NotificationsScreen (basic list).
-- [~] Auto payment-request generation to finance on approval (later).
+- [⛔] NotificationsScreen (basic list) — **do not implement** (notifications
+      permanently out of scope).
+- [⛔] Auto payment-request generation to finance on approval — **do not
+      implement** (finance permanently out of scope).
 
 ---
 
@@ -180,12 +207,15 @@ Legend: `[ ]` todo · `[~]` placeholder/stub only (later) · 🔒 = security gat
 
 Provide nav entry + stub screen only:
 
-- [~] Rekaz integration (backend-only key handling).
-- [~] Full wedding system (assign → upload → approve → finance).
-- [~] Push notifications (FCM).
+- [⛔] Rekaz integration / configuration — **permanently out of scope** (not
+      "later"). API key never in the app.
+- [⛔] Push notifications (FCM) — **permanently out of scope**.
+- [⛔] Finance transfer flow (payment requests, receipts) — **permanently out of
+      scope**.
+- [~] Full wedding system (assign → upload → approve). *(Its finance leg is
+      permanently out of scope.)*
 - [~] GPS attendance / check-in.
-- [~] Finance transfer flow (payment requests, receipts).
-- [~] Advanced reports.
+- [~] Advanced reports. *(Finance reports are permanently out of scope.)*
 - [~] Advanced calendar.
 - [~] Full file uploads (Supabase Storage).
 - [~] App Store / Play Store deployment.

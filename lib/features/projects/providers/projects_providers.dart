@@ -1,10 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_model.dart';
 import '../../../core/models/role_type.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/providers/repository_providers.dart';
 import '../../auth/providers/auth_controller.dart';
+
+/// A pending closure request paired with its project (for the manager review
+/// list). Records keep the join lightweight without a dedicated view model.
+typedef ClosureRequestView = ({ClosureRequestModel request, ProjectModel project});
 
 /// Projects owned by the currently signed-in manager (mock-backed, read-only).
 final managerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
@@ -21,6 +26,19 @@ final photographerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
   return ref
       .read(projectRepositoryProvider)
       .getProjectsForPhotographer(user.id);
+});
+
+/// Role-scoped projects for the smart calendar / schedule view: the manager's
+/// projects, the photographer's assigned projects, or empty for other roles.
+final calendarProjectsProvider = FutureProvider<List<ProjectModel>>((ref) async {
+  final role = ref.watch(authControllerProvider).activeRole;
+  if (role == RoleType.manager) {
+    return ref.watch(managerProjectsProvider.future);
+  }
+  if (role == RoleType.photographer) {
+    return ref.watch(photographerProjectsProvider.future);
+  }
+  return const <ProjectModel>[];
 });
 
 /// A single project by id (mock-backed, read-only). Null when not found.
@@ -65,4 +83,70 @@ final photographerActiveCountsProvider = FutureProvider<Map<String, int>>((
     }
   }
   return counts;
+});
+
+/// Pending closure requests for the signed-in manager's projects, each joined
+/// with its project (mock-backed). Empty when signed out or not a manager.
+final managerClosureRequestsProvider =
+    FutureProvider<List<ClosureRequestView>>((ref) async {
+  final user = ref.watch(authControllerProvider).currentUser;
+  if (user == null) return const <ClosureRequestView>[];
+  final repo = ref.read(projectRepositoryProvider);
+  final requests = await repo.getClosureRequests();
+  final myProjects = await repo.getProjectsForManager(user.id);
+  final byId = {for (final p in myProjects) p.id: p};
+  final result = <ClosureRequestView>[];
+  for (final r in requests) {
+    if (!r.isPending) continue;
+    final project = byId[r.projectId];
+    if (project != null) result.add((request: r, project: project));
+  }
+  return result;
+});
+
+/// The pending closure request for a single project, or null when none.
+final pendingClosureForProjectProvider =
+    FutureProvider.family<ClosureRequestModel?, String>((ref, projectId) async {
+  final requests = await ref.read(projectRepositoryProvider).getClosureRequests();
+  for (final r in requests) {
+    if (r.projectId == projectId && r.isPending) return r;
+  }
+  return null;
+});
+
+/// All closure requests (any status) for the signed-in manager's projects,
+/// joined with the project — used by the manager requests hub for counts.
+final managerAllClosureRequestsProvider =
+    FutureProvider<List<ClosureRequestView>>((ref) async {
+  final user = ref.watch(authControllerProvider).currentUser;
+  if (user == null) return const <ClosureRequestView>[];
+  final repo = ref.read(projectRepositoryProvider);
+  final requests = await repo.getClosureRequests();
+  final myProjects = await repo.getProjectsForManager(user.id);
+  final byId = {for (final p in myProjects) p.id: p};
+  final result = <ClosureRequestView>[];
+  for (final r in requests) {
+    final project = byId[r.projectId];
+    if (project != null) result.add((request: r, project: project));
+  }
+  return result;
+});
+
+/// Closure requests submitted by the signed-in photographer (any status),
+/// joined with the project — used by the photographer requests screen.
+final photographerClosureRequestsProvider =
+    FutureProvider<List<ClosureRequestView>>((ref) async {
+  final user = ref.watch(authControllerProvider).currentUser;
+  if (user == null) return const <ClosureRequestView>[];
+  final repo = ref.read(projectRepositoryProvider);
+  final requests = await repo.getClosureRequests();
+  final projects = await repo.getProjects();
+  final byId = {for (final p in projects) p.id: p};
+  final result = <ClosureRequestView>[];
+  for (final r in requests) {
+    if (r.submittedBy != user.id) continue;
+    final project = byId[r.projectId];
+    if (project != null) result.add((request: r, project: project));
+  }
+  return result;
 });

@@ -33,6 +33,12 @@ class MoreMenuScreen extends ConsumerWidget {
       children: [
         const SizedBox(height: 8),
         _MoreItem(
+          icon: Icons.calendar_month_outlined,
+          label: 'التقويم',
+          onTap: () => context.push(AppRoutes.calendar),
+        ),
+        const SizedBox(height: 12),
+        _MoreItem(
           icon: Icons.person_outline,
           label: 'صفحتي',
           onTap: () => context.push(AppRoutes.profile),

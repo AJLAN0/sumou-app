@@ -13,6 +13,16 @@ final managerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
   return ref.read(projectRepositoryProvider).getProjectsForManager(user.id);
 });
 
+/// Projects the currently signed-in photographer is assigned to (mock-backed,
+/// read-only). Empty when signed out.
+final photographerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
+  final user = ref.watch(authControllerProvider).currentUser;
+  if (user == null) return Future.value(const <ProjectModel>[]);
+  return ref
+      .read(projectRepositoryProvider)
+      .getProjectsForPhotographer(user.id);
+});
+
 /// A single project by id (mock-backed, read-only). Null when not found.
 final projectByIdProvider = FutureProvider.family<ProjectModel?, String>(
   (ref, id) => ref.read(projectRepositoryProvider).getProjectById(id),

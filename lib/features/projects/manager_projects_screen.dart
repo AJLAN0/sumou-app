@@ -60,12 +60,22 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
     context.push(AppRoutes.projectDetailsPath(id));
   }
 
+  void _openAddProject() {
+    context.push(AppRoutes.addProject);
+  }
+
   @override
   Widget build(BuildContext context) {
     final projectsAsync = ref.watch(managerProjectsProvider);
 
     return Column(
       children: [
+        SumouButton(
+          label: 'مشروع جديد',
+          icon: Icons.add,
+          onPressed: _openAddProject,
+        ),
+        const SizedBox(height: 12),
         SumouTextField(
           hint: 'بحث باسم المشروع أو العميل أو المصور',
           prefixIcon: Icons.search,

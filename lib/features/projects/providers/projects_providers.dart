@@ -28,6 +28,19 @@ final photographerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
       .getProjectsForPhotographer(user.id);
 });
 
+/// Role-scoped projects for the smart calendar / schedule view: the manager's
+/// projects, the photographer's assigned projects, or empty for other roles.
+final calendarProjectsProvider = FutureProvider<List<ProjectModel>>((ref) async {
+  final role = ref.watch(authControllerProvider).activeRole;
+  if (role == RoleType.manager) {
+    return ref.watch(managerProjectsProvider.future);
+  }
+  if (role == RoleType.photographer) {
+    return ref.watch(photographerProjectsProvider.future);
+  }
+  return const <ProjectModel>[];
+});
+
 /// A single project by id (mock-backed, read-only). Null when not found.
 final projectByIdProvider = FutureProvider.family<ProjectModel?, String>(
   (ref, id) => ref.read(projectRepositoryProvider).getProjectById(id),

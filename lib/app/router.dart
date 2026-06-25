@@ -15,6 +15,7 @@ import '../features/profile/profile_screen.dart';
 import '../features/projects/add_project_screen.dart';
 import '../features/projects/assign_photographers_screen.dart';
 import '../features/projects/project_details_screen.dart';
+import '../features/projects/smart_calendar_screen.dart';
 import '../features/projects/submit_closure_request_screen.dart';
 import '../features/projects/update_project_stage_screen.dart';
 import '../features/shell/main_shell_screen.dart';
@@ -42,6 +43,7 @@ class AppRoutes {
       '/manager/projects/$id/closure';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
+  static const String calendar = '/calendar';
   static const String profile = '/profile';
   static const String changePassword = '/settings/change-password';
 }
@@ -163,6 +165,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder:
             (context, state) =>
                 ProjectDetailsScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.calendar,
+        builder: (context, state) => const CalendarPage(),
       ),
       GoRoute(
         path: AppRoutes.profile,

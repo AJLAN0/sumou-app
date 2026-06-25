@@ -26,6 +26,7 @@ class ProjectCard extends StatelessWidget {
     required this.project,
     this.onTap,
     this.roleLabel,
+    this.actionLabel,
   });
 
   final ProjectModel project;
@@ -34,6 +35,10 @@ class ProjectCard extends StatelessWidget {
   /// When set, shows the viewer's own role/photo type on this project (used by
   /// the photographer "my projects" list). Null hides the chip.
   final String? roleLabel;
+
+  /// When set, shows a smart "next action" hint pill (used by the calendar day
+  /// list). Null hides it. Tapping the card still opens details via [onTap].
+  final String? actionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +146,41 @@ class ProjectCard extends StatelessWidget {
             const SizedBox(height: 12),
             _TeamSummary(roles: project.teamRoles),
           ],
+          if (actionLabel != null) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: _ActionPill(label: actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.accentGreen.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.bolt, size: 14, color: AppColors.accentGreen),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTextStyles.label.copyWith(color: AppColors.accentGreen),
+          ),
         ],
       ),
     );

@@ -23,6 +23,7 @@ class ClosureRequestModel {
     required this.createdAt,
     this.reportFileUrl,
     this.deliveryLink,
+    this.notes,
     this.status = ClosureRequestStatus.pending,
     this.rejectReason,
     this.reviewedAt,
@@ -39,6 +40,9 @@ class ClosureRequestModel {
 
   final String? reportFileUrl;
   final String? deliveryLink;
+
+  /// Optional free-text note from the submitter.
+  final String? notes;
   final ClosureRequestStatus status;
   final String? rejectReason;
   final DateTime? reviewedAt;
@@ -61,6 +65,7 @@ class ClosureRequestModel {
       createdAt: createdAt,
       reportFileUrl: reportFileUrl,
       deliveryLink: deliveryLink,
+      notes: notes,
       status: status ?? this.status,
       rejectReason: rejectReason ?? this.rejectReason,
       reviewedAt: reviewedAt ?? this.reviewedAt,

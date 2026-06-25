@@ -15,6 +15,7 @@ import '../features/profile/profile_screen.dart';
 import '../features/projects/add_project_screen.dart';
 import '../features/projects/assign_photographers_screen.dart';
 import '../features/projects/project_details_screen.dart';
+import '../features/projects/submit_closure_request_screen.dart';
 import '../features/projects/update_project_stage_screen.dart';
 import '../features/shell/main_shell_screen.dart';
 
@@ -36,6 +37,9 @@ class AppRoutes {
   static String projectAssignPath(String id) => '/manager/projects/$id/assign';
   static const String projectStage = '/manager/projects/:id/stage';
   static String projectStagePath(String id) => '/manager/projects/$id/stage';
+  static const String projectClosure = '/manager/projects/:id/closure';
+  static String projectClosurePath(String id) =>
+      '/manager/projects/$id/closure';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
   static const String profile = '/profile';
@@ -148,6 +152,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.projectStage,
         builder: (context, state) =>
             UpdateProjectStageScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.projectClosure,
+        builder: (context, state) =>
+            SubmitClosureRequestScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

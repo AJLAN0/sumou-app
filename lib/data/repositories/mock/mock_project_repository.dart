@@ -170,6 +170,45 @@ class MockProjectRepository implements ProjectRepository {
     return updated;
   }
 
+  @override
+  Future<ClosureRequestModel?> submitClosureRequest({
+    required String projectId,
+    required String submittedBy,
+    required String submittedByName,
+    String? deliveryLink,
+    String? reportFileUrl,
+    String? notes,
+  }) async {
+    final index = _projects.indexWhere((p) => p.id == projectId);
+    if (index < 0) return null;
+    // One pending request at a time per project.
+    final hasPending = _closureRequests.any(
+      (r) => r.projectId == projectId && r.isPending,
+    );
+    if (hasPending) return null;
+
+    final project = _projects[index];
+    final now = DateTime.now();
+    final request = ClosureRequestModel(
+      id: 'cr-${now.millisecondsSinceEpoch}',
+      projectId: projectId,
+      projectName: project.name,
+      submittedBy: submittedBy,
+      submittedByName: submittedByName,
+      createdAt: now,
+      deliveryLink: deliveryLink,
+      reportFileUrl: reportFileUrl,
+      notes: notes,
+      status: ClosureRequestStatus.pending,
+    );
+    _closureRequests.add(request);
+    _projects[index] = project.copyWith(
+      status: ProjectStatus.pendingClosure,
+      updatedAt: now,
+    );
+    return request;
+  }
+
   /// Re-key team roles to belong to [projectId] with stable, ordered ids.
   static List<ProjectTeamRole> _rekeyRoles(
     String projectId,

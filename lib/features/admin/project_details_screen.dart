@@ -57,12 +57,6 @@ class _Body extends ConsumerWidget {
 
   final ProjectModel project;
 
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('هذه الميزة قريباً')),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usersById = {
@@ -175,14 +169,16 @@ class _Body extends ConsumerWidget {
         const SizedBox(height: 10),
         _ActionCard(
           icon: Icons.swap_horiz,
-          label: 'تغيير المدير - قريبًا',
-          onTap: () => _comingSoon(context),
+          label: 'تغيير المدير',
+          onTap: () =>
+              context.push(AppRoutes.adminProjectTeamPath(project.id)),
         ),
         const SizedBox(height: 10),
         _ActionCard(
           icon: Icons.group_outlined,
-          label: 'تعديل الفريق - قريبًا',
-          onTap: () => _comingSoon(context),
+          label: 'تعديل الفريق',
+          onTap: () =>
+              context.push(AppRoutes.adminProjectTeamPath(project.id)),
         ),
         const SizedBox(height: 10),
         _ActionCard(

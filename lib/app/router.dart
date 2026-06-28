@@ -6,6 +6,7 @@ import '../core/models/role_type.dart';
 import '../features/admin/all_projects_screen.dart';
 import '../features/admin/edit_project_screen.dart';
 import '../features/admin/project_details_screen.dart';
+import '../features/admin/project_team_screen.dart';
 import '../features/admin/role_management_screen.dart';
 import '../features/auth/providers/auth_controller.dart';
 import '../features/auth/screens/entry_screen.dart';
@@ -56,6 +57,8 @@ class AppRoutes {
   static String adminProjectDetailsPath(String id) => '/admin/projects/$id';
   static const String adminProjectEdit = '/admin/projects/:id/edit';
   static String adminProjectEditPath(String id) => '/admin/projects/$id/edit';
+  static const String adminProjectTeam = '/admin/projects/:id/team';
+  static String adminProjectTeamPath(String id) => '/admin/projects/$id/team';
   static const String profile = '/profile';
   static const String changePassword = '/settings/change-password';
 }
@@ -203,6 +206,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.adminProjectEdit,
         builder: (context, state) =>
             AdminEditProjectScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.adminProjectTeam,
+        builder: (context, state) =>
+            AdminProjectTeamScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.adminProjectDetails,

@@ -64,6 +64,14 @@ abstract interface class ProjectRepository {
     String? notes,
   });
 
+  /// Reassign a project to a different manager. Returns the updated project, or
+  /// null when [projectId] is unknown. Mock-backed in Sprint 5.
+  Future<ProjectModel?> setProjectManager(
+    String projectId, {
+    required String managerId,
+    String? managerName,
+  });
+
   /// Set the project's current stage to [stageId]: earlier stages become done,
   /// the target becomes current, later stages pending. Optional [notes] and
   /// [updatedBy] are recorded on the target stage. Returns the updated project,

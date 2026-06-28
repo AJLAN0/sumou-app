@@ -147,12 +147,13 @@ final allProjectsProvider = FutureProvider<List<ProjectModel>>(
 /// Used by the admin read-only project details.
 final closureRequestForProjectProvider =
     FutureProvider.family<ClosureRequestModel?, String>((ref, projectId) async {
-  final requests =
-      await ref.read(projectRepositoryProvider).getClosureRequests();
-  final matching = requests.where((r) => r.projectId == projectId).toList()
-    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  return matching.isEmpty ? null : matching.first;
-});
+      final requests =
+          await ref.read(projectRepositoryProvider).getClosureRequests();
+      final matching =
+          requests.where((r) => r.projectId == projectId).toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return matching.isEmpty ? null : matching.first;
+    });
 
 /// All closure requests in the system (any status). Used by the admin overview.
 final allClosureRequestsProvider = FutureProvider<List<ClosureRequestModel>>(

@@ -206,13 +206,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // The `/:id/edit` segment is more specific than `/:id`, so no conflict.
       GoRoute(
         path: AppRoutes.adminProjectEdit,
-        builder: (context, state) =>
-            AdminEditProjectScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) =>
+                AdminEditProjectScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.adminProjectTeam,
-        builder: (context, state) =>
-            AdminProjectTeamScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) =>
+                AdminProjectTeamScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.adminStages,
@@ -220,8 +222,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.adminProjectDetails,
-        builder: (context, state) =>
-            AdminProjectDetailsScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) => AdminProjectDetailsScreen(
+              projectId: state.pathParameters['id']!,
+            ),
       ),
       GoRoute(
         path: AppRoutes.profile,

@@ -65,19 +65,22 @@ void main() {
     expect(find.text('إدارة الفريق'), findsOneWidget);
   });
 
-  test('closureRequestForProjectProvider returns the project request', () async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    // p-4 has a seeded closure request; p-1 has none.
-    final req = await container.read(
-      closureRequestForProjectProvider('p-4').future,
-    );
-    expect(req, isNotNull);
-    expect(req!.projectId, 'p-4');
+  test(
+    'closureRequestForProjectProvider returns the project request',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      // p-4 has a seeded closure request; p-1 has none.
+      final req = await container.read(
+        closureRequestForProjectProvider('p-4').future,
+      );
+      expect(req, isNotNull);
+      expect(req!.projectId, 'p-4');
 
-    final none = await container.read(
-      closureRequestForProjectProvider('p-1').future,
-    );
-    expect(none, isNull);
-  });
+      final none = await container.read(
+        closureRequestForProjectProvider('p-1').future,
+      );
+      expect(none, isNull);
+    },
+  );
 }

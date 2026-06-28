@@ -149,6 +149,7 @@ class _EditBodyState extends ConsumerState<_EditBody> {
       );
       if (!ok) return;
     }
+    if (!mounted) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -178,9 +179,7 @@ class _EditBodyState extends ConsumerState<_EditBody> {
       return;
     }
     navigator.pop();
-    messenger.showSnackBar(
-      const SnackBar(content: Text('تم حفظ التغييرات')),
-    );
+    messenger.showSnackBar(const SnackBar(content: Text('تم حفظ التغييرات')));
   }
 
   @override
@@ -319,9 +318,10 @@ class _ChoiceChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

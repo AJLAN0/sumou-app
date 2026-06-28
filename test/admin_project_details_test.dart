@@ -44,26 +44,25 @@ void main() {
     expect(find.text('مراقبة المشروع'), findsOneWidget); // app bar
     expect(find.text('المدير: سعد المطيري'), findsWidgets);
 
-    // The admin action placeholders are present (scroll to them).
+    // The admin action cards are present (scroll to them).
     await tester.scrollUntilVisible(
-      find.text('تعديل المشروع - قريبًا'),
+      find.text('تعديل بيانات المشروع'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('تعديل المشروع - قريبًا'), findsOneWidget);
+    expect(find.text('تعديل بيانات المشروع'), findsOneWidget);
   });
 
-  testWidgets('edit placeholder shows a coming-soon snackbar', (tester) async {
+  testWidgets('team action opens team management', (tester) async {
     await openAdminDetails(tester, 'تصوير ميداني — مهرجان الرياض');
     await tester.scrollUntilVisible(
-      find.text('تغيير المدير - قريبًا'),
+      find.text('تعديل الفريق'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('تغيير المدير - قريبًا'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.text('هذه الميزة قريباً'), findsOneWidget);
+    await tester.tap(find.text('تعديل الفريق'));
+    await tester.pumpAndSettle();
+    expect(find.text('إدارة الفريق'), findsOneWidget);
   });
 
   test('closureRequestForProjectProvider returns the project request', () async {

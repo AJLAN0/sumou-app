@@ -184,9 +184,7 @@ class _Body extends ConsumerWidget {
         _ActionCard(
           icon: Icons.timeline_outlined,
           label: 'مراقبة المراحل',
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('المراحل معروضة في الأعلى')),
-          ),
+          onTap: () => context.push(AppRoutes.adminStages),
         ),
         const SizedBox(height: 24),
       ],

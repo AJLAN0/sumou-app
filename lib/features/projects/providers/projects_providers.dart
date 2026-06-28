@@ -143,6 +143,17 @@ final allProjectsProvider = FutureProvider<List<ProjectModel>>(
   (ref) => ref.read(projectRepositoryProvider).getProjects(),
 );
 
+/// The closure request for a project (any status), most recent first, or null.
+/// Used by the admin read-only project details.
+final closureRequestForProjectProvider =
+    FutureProvider.family<ClosureRequestModel?, String>((ref, projectId) async {
+  final requests =
+      await ref.read(projectRepositoryProvider).getClosureRequests();
+  final matching = requests.where((r) => r.projectId == projectId).toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  return matching.isEmpty ? null : matching.first;
+});
+
 /// All closure requests in the system (any status). Used by the admin overview.
 final allClosureRequestsProvider = FutureProvider<List<ClosureRequestModel>>(
   (ref) => ref.read(projectRepositoryProvider).getClosureRequests(),

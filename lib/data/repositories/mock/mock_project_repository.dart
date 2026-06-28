@@ -171,6 +171,50 @@ class MockProjectRepository implements ProjectRepository {
   }
 
   @override
+  Future<ProjectModel?> updateProjectBasics(
+    String projectId, {
+    required String name,
+    required String clientName,
+    required ProjectType type,
+    required ProjectStatus status,
+    required DateTime startDate,
+    required DateTime endDate,
+    String? notes,
+  }) async {
+    final index = _projects.indexWhere((p) => p.id == projectId);
+    if (index < 0) return null;
+    final updated = _projects[index].copyWith(
+      name: name,
+      clientName: clientName,
+      type: type,
+      status: status,
+      startDate: startDate,
+      endDate: endDate,
+      notes: notes,
+      updatedAt: DateTime.now(),
+    );
+    _projects[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<ProjectModel?> setProjectManager(
+    String projectId, {
+    required String managerId,
+    String? managerName,
+  }) async {
+    final index = _projects.indexWhere((p) => p.id == projectId);
+    if (index < 0) return null;
+    final updated = _projects[index].copyWith(
+      managerId: managerId,
+      managerName: managerName,
+      updatedAt: DateTime.now(),
+    );
+    _projects[index] = updated;
+    return updated;
+  }
+
+  @override
   Future<ClosureRequestModel?> submitClosureRequest({
     required String projectId,
     required String submittedBy,

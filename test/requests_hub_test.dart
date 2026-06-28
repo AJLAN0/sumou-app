@@ -1,6 +1,5 @@
 // Tests for the Sprint 3 requests hub (manager + photographer).
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

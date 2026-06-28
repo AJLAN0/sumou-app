@@ -128,7 +128,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
               final f = _UserFilter.values[i];
-              return _FilterChip(
+              return AdminFilterChip(
                 label: f.label,
                 selected: _filter == f,
                 onTap: () => setState(() => _filter = f),
@@ -167,40 +167,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.accentGreen : AppColors.border,
-          ),
-        ),
-        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
-      ),
-    );
-  }
-}
-
 class _UserCard extends StatelessWidget {
   const _UserCard({required this.user, this.onTap});
 
@@ -219,7 +185,10 @@ class _UserCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _Avatar(initials: user.avatarInitials, color: roleModel.color),
+              AdminAvatar(
+                initials: user.avatarInitials,
+                color: roleModel.color,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -291,7 +260,7 @@ class _UserDetailSheet extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _Avatar(
+                  AdminAvatar(
                     initials: user.avatarInitials,
                     color: roleModel.color,
                   ),
@@ -372,26 +341,3 @@ class _UserDetailSheet extends StatelessWidget {
   }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials, required this.color});
-
-  final String initials;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 48,
-      height: 48,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-      ),
-      child: Text(
-        initials,
-        style: AppTextStyles.body.copyWith(color: color),
-      ),
-    );
-  }
-}

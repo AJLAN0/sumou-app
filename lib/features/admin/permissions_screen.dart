@@ -149,7 +149,7 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
               final f = _PermFilter.values[i];
-              return _FilterChip(
+              return AdminFilterChip(
                 label: f.label,
                 selected: _filter == f,
                 onTap: () => setState(() => _filter = f),
@@ -209,18 +209,10 @@ class _PermissionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: roleModel.color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  user.avatarInitials,
-                  style: AppTextStyles.body.copyWith(color: roleModel.color),
-                ),
+              AdminAvatar(
+                initials: user.avatarInitials,
+                color: roleModel.color,
+                size: 44,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -482,36 +474,3 @@ class _PermSwitch extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.accentGreen : AppColors.border,
-          ),
-        ),
-        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
-      ),
-    );
-  }
-}

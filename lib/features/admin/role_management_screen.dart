@@ -82,14 +82,14 @@ class _AdminRoleManagementScreenState
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    _FilterChip(
+                    AdminFilterChip(
                       label: 'الكل',
                       selected: _roleFilter == null,
                       onTap: () => setState(() => _roleFilter = null),
                     ),
                     for (final r in present) ...[
                       const SizedBox(width: 8),
-                      _FilterChip(
+                      AdminFilterChip(
                         label: r.nameAr,
                         selected: _roleFilter == r,
                         onTap: () => setState(() => _roleFilter = r),
@@ -141,7 +141,10 @@ class _RoleUserCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _Avatar(initials: user.avatarInitials, color: roleModel.color),
+              AdminAvatar(
+                initials: user.avatarInitials,
+                color: roleModel.color,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -272,7 +275,7 @@ class _RoleEditSheetState extends ConsumerState<_RoleEditSheet> {
             children: [
               Row(
                 children: [
-                  _Avatar(
+                  AdminAvatar(
                     initials: user.avatarInitials,
                     color: RoleModel.of(_default).color,
                   ),
@@ -345,40 +348,6 @@ class _RoleEditSheetState extends ConsumerState<_RoleEditSheet> {
 
 // ---- shared bits ------------------------------------------------------------
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.accentGreen : AppColors.border,
-          ),
-        ),
-        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
-      ),
-    );
-  }
-}
-
 class _SelectChip extends StatelessWidget {
   const _SelectChip({
     required this.label,
@@ -418,27 +387,6 @@ class _SelectChip extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials, required this.color});
-
-  final String initials;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 48,
-      height: 48,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-      ),
-      child: Text(initials, style: AppTextStyles.body.copyWith(color: color)),
     );
   }
 }

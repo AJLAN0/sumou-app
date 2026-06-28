@@ -220,7 +220,7 @@ class AdminDashboardScreen extends ConsumerWidget {
         _ActionCard(
           icon: Icons.work_outline,
           label: 'كل المشاريع',
-          onTap: () => _comingSoon(context),
+          onTap: () => context.push(AppRoutes.adminProjects),
         ),
         const SizedBox(height: 10),
         _ActionCard(

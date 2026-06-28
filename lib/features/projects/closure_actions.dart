@@ -79,23 +79,21 @@ Future<String?> _showRejectReasonSheet(BuildContext context) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-      ),
-      child: _RejectReasonSheet(
-        onConfirm: (reason) => Navigator.of(sheetContext).pop(reason),
-        onCancel: () => Navigator.of(sheetContext).pop(),
-      ),
-    ),
+    builder:
+        (sheetContext) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: _RejectReasonSheet(
+            onConfirm: (reason) => Navigator.of(sheetContext).pop(reason),
+            onCancel: () => Navigator.of(sheetContext).pop(),
+          ),
+        ),
   );
 }
 
 class _RejectReasonSheet extends StatefulWidget {
-  const _RejectReasonSheet({
-    required this.onConfirm,
-    required this.onCancel,
-  });
+  const _RejectReasonSheet({required this.onConfirm, required this.onCancel});
 
   final ValueChanged<String> onConfirm;
   final VoidCallback onCancel;

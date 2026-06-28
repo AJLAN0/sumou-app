@@ -44,7 +44,7 @@ class AdminStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? AppColors.accentGreen : AppColors.error;
-    return _Pill(color: color, label: active ? 'نشط' : 'موقوف');
+    return _Pill(color: color, label: active ? 'نشط' : 'غير نشط');
   }
 }
 
@@ -58,6 +58,70 @@ class AdminTextChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Pill(color: color ?? AppColors.primaryTeal, label: label);
+  }
+}
+
+/// Selectable filter chip shared across the admin screens.
+class AdminFilterChip extends StatelessWidget {
+  const AdminFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accentGreen.withValues(alpha: 0.15)
+              : AppColors.surfaceSecondary,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.accentGreen : AppColors.border,
+          ),
+        ),
+        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
+      ),
+    );
+  }
+}
+
+/// Circular initials avatar tinted by [color], shared across the admin screens.
+class AdminAvatar extends StatelessWidget {
+  const AdminAvatar({
+    super.key,
+    required this.initials,
+    required this.color,
+    this.size = 48,
+  });
+
+  final String initials;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+      ),
+      child: Text(initials, style: AppTextStyles.body.copyWith(color: color)),
+    );
   }
 }
 

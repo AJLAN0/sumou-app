@@ -1,0 +1,91 @@
+// Tests for admin role management (Sprint 4).
+
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:sumou_app/app/app.dart';
+import 'package:sumou_app/core/models/models.dart';
+import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
+import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+
+void main() {
+  Future<void> openRoleManagement(WidgetTester tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: 'admin', password: MockUsers.devPassword);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SumouApp()),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('المزيد'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إدارة الأدوار'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('admin opens role management from the More menu', (tester) async {
+    await openRoleManagement(tester);
+    expect(find.text('بحث بالاسم أو اسم المستخدم'), findsOneWidget);
+    expect(find.text('سعد المطيري'), findsOneWidget);
+  });
+
+  testWidgets('editing a user\'s roles shows a success snackbar', (
+    tester,
+  ) async {
+    await openRoleManagement(tester);
+
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('حفظ التغييرات'));
+    await tester.pumpAndSettle();
+    // Confirm in the Sumou bottom sheet.
+    await tester.tap(find.text('حفظ'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('تم تحديث الأدوار'), findsOneWidget);
+  });
+
+  test('updateUserRoles updates default and roles', () async {
+    final repo = MockUserRepository();
+    final updated = await repo.updateUserRoles(
+      'u-photographer',
+      defaultRole: RoleType.manager,
+      roles: const [RoleType.photographer, RoleType.manager],
+    );
+    expect(updated, isNotNull);
+    expect(updated!.defaultRole, RoleType.manager);
+    expect(updated.roles, containsAll(<RoleType>[
+      RoleType.manager,
+      RoleType.photographer,
+    ]));
+
+    final reloaded = await repo.getUserById('u-photographer');
+    expect(reloaded!.defaultRole, RoleType.manager);
+  });
+
+  test('updateUserRoles rejects a default not in roles', () async {
+    final repo = MockUserRepository();
+    final result = await repo.updateUserRoles(
+      'u-manager',
+      defaultRole: RoleType.photographer,
+      roles: const [RoleType.manager],
+    );
+    expect(result, isNull);
+  });
+
+  test('updateUserRoles returns null for an unknown user', () async {
+    final repo = MockUserRepository();
+    final result = await repo.updateUserRoles(
+      'nope',
+      defaultRole: RoleType.manager,
+      roles: const [RoleType.manager],
+    );
+    expect(result, isNull);
+  });
+}

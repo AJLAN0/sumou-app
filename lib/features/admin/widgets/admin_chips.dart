@@ -83,9 +83,10 @@ class AdminFilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

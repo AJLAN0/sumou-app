@@ -161,8 +161,8 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
         Expanded(
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) =>
-                const Center(child: Text('تعذّر تحميل الصلاحيات')),
+            error:
+                (_, __) => const Center(child: Text('تعذّر تحميل الصلاحيات')),
             data: (users) {
               final filtered = users.where(_matches).toList();
               if (filtered.isEmpty) {
@@ -175,10 +175,11 @@ class _PermissionsScreenState extends ConsumerState<PermissionsScreen> {
               return ListView.separated(
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => _PermissionCard(
-                  user: filtered[i],
-                  onTap: () => _editPermissions(filtered[i]),
-                ),
+                itemBuilder:
+                    (_, i) => _PermissionCard(
+                      user: filtered[i],
+                      onTap: () => _editPermissions(filtered[i]),
+                    ),
               );
             },
           ),
@@ -197,9 +198,8 @@ class _PermissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roleModel = RoleModel.of(user.defaultRole);
-    final enabled = AppFeature.values
-        .where((f) => user.permissions.has(f))
-        .toList();
+    final enabled =
+        AppFeature.values.where((f) => user.permissions.has(f)).toList();
     final top = enabled.take(3).toList();
 
     return SumouCard(
@@ -285,21 +285,22 @@ class _PermissionEditSheetState extends ConsumerState<_PermissionEditSheet> {
     setState(() => _perms = _perms.setFeature(f, value));
   }
 
-  bool get _sensitiveChanged => _sensitive.any(
-    (f) => _perms.has(f) != widget.user.permissions.has(f),
-  );
+  bool get _sensitiveChanged =>
+      _sensitive.any((f) => _perms.has(f) != widget.user.permissions.has(f));
 
   Future<void> _save() async {
     final ok = await showSumouConfirmSheet(
       context,
       title: 'حفظ الصلاحيات',
-      message: _sensitiveChanged
-          ? 'تتضمن التغييرات صلاحيات حساسة (إدارة/اعتماد). هل تريد الحفظ؟'
-          : 'تحديث صلاحيات ${widget.user.fullName}؟',
+      message:
+          _sensitiveChanged
+              ? 'تتضمن التغييرات صلاحيات حساسة (إدارة/اعتماد). هل تريد الحفظ؟'
+              : 'تحديث صلاحيات ${widget.user.fullName}؟',
       confirmLabel: 'حفظ',
       destructive: _sensitiveChanged,
     );
     if (!ok) return;
+    if (!mounted) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -473,4 +474,3 @@ class _PermSwitch extends StatelessWidget {
     );
   }
 }
-

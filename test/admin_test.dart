@@ -69,7 +69,7 @@ void main() {
     await tester.tap(find.text('سعد المطيري'));
     await tester.pumpAndSettle();
 
-    expect(find.text('الصلاحيات'), findsOneWidget);
+    expect(find.text('الأدوار'), findsOneWidget);
     expect(find.text('تعطيل المستخدم'), findsOneWidget); // active user
   });
 

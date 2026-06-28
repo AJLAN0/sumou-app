@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../projects/providers/projects_providers.dart';
 import 'providers/admin_providers.dart';
+import 'widgets/admin_chips.dart';
 
 /// Photo/team role types offered when editing a project team.
 const List<String> _kPhotoTypes = [
@@ -558,14 +559,14 @@ class _AddList extends StatelessWidget {
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                _FilterChip(
+                AdminFilterChip(
                   label: 'الكل',
                   selected: typeFilter == null,
                   onTap: () => onTypeFilter(null),
                 ),
                 for (final t in types) ...[
                   const SizedBox(width: 8),
-                  _FilterChip(
+                  AdminFilterChip(
                     label: t,
                     selected: typeFilter == t,
                     onTap: () => onTypeFilter(t),
@@ -696,39 +697,6 @@ class _Chip extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.accentGreen : AppColors.border,
-          ),
-        ),
-        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
-      ),
-    );
-  }
-}
 
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.initials});

@@ -8,6 +8,7 @@ import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../projects/providers/projects_providers.dart';
+import 'widgets/admin_chips.dart';
 import 'widgets/admin_project_card.dart';
 
 /// A project is "delayed" when it isn't completed and its delivery date has
@@ -105,7 +106,7 @@ class _AdminStageOversightScreenState
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
                     final f = _StageFilter.values[i];
-                    return _FilterChip(
+                    return AdminFilterChip(
                       label: f.label,
                       selected: _filter == f,
                       onTap: () => setState(() => _filter = f),
@@ -258,36 +259,3 @@ class _DelayedTag extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.accentGreen : AppColors.border,
-          ),
-        ),
-        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
-      ),
-    );
-  }
-}

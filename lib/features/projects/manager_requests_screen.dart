@@ -25,22 +25,36 @@ class ManagerRequestsScreen extends ConsumerWidget {
         const SumouSectionHeader(title: 'فئات الطلبات'),
         const SizedBox(height: 12),
         requestsAsync.when(
-          loading: () => const SumouCard(
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, __) => const SumouCard(
-            child: Text('تعذّر تحميل الطلبات', style: AppTextStyles.bodyMuted),
-          ),
+          loading:
+              () => const SumouCard(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (_, __) => const SumouCard(
+                child: Text(
+                  'تعذّر تحميل الطلبات',
+                  style: AppTextStyles.bodyMuted,
+                ),
+              ),
           data: (views) {
-            final pending = views
-                .where((v) => v.request.status == ClosureRequestStatus.pending)
-                .length;
-            final approved = views
-                .where((v) => v.request.status == ClosureRequestStatus.approved)
-                .length;
-            final rejected = views
-                .where((v) => v.request.status == ClosureRequestStatus.rejected)
-                .length;
+            final pending =
+                views
+                    .where(
+                      (v) => v.request.status == ClosureRequestStatus.pending,
+                    )
+                    .length;
+            final approved =
+                views
+                    .where(
+                      (v) => v.request.status == ClosureRequestStatus.approved,
+                    )
+                    .length;
+            final rejected =
+                views
+                    .where(
+                      (v) => v.request.status == ClosureRequestStatus.rejected,
+                    )
+                    .length;
             return _CategoryCard(
               icon: Icons.check_circle_outline,
               title: 'طلبات الإغلاق',

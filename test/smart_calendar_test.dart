@@ -89,13 +89,16 @@ void main() {
     expect(find.text('القائمة'), findsOneWidget);
   });
 
-  test('calendarProjectsProvider is empty for roles without projects', () async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    await container
-        .read(authControllerProvider.notifier)
-        .login(username: 'admin', password: MockUsers.devPassword);
-    final list = await container.read(calendarProjectsProvider.future);
-    expect(list, isEmpty);
-  });
+  test(
+    'calendarProjectsProvider is empty for roles without projects',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container
+          .read(authControllerProvider.notifier)
+          .login(username: 'admin', password: MockUsers.devPassword);
+      final list = await container.read(calendarProjectsProvider.future);
+      expect(list, isEmpty);
+    },
+  );
 }

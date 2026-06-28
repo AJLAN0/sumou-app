@@ -40,7 +40,9 @@ Future<void> approveClosureFlow(
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(
-        updated == null ? 'تعذّر تنفيذ العملية' : 'تم قبول الطلب وإنهاء المشروع',
+        updated == null
+            ? 'تعذّر تنفيذ العملية'
+            : 'تم قبول الطلب وإنهاء المشروع',
       ),
     ),
   );
@@ -69,8 +71,7 @@ Future<void> rejectClosureFlow(
 /// Bottom sheet collecting a required rejection reason. Returns the reason, or
 /// null when cancelled/dismissed.
 Future<String?> _showRejectReasonSheet(BuildContext context) async {
-  final controller = TextEditingController();
-  final result = await showModalBottomSheet<String>(
+  return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surface,
@@ -78,65 +79,88 @@ Future<String?> _showRejectReasonSheet(BuildContext context) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (sheetContext) {
-      var showError = false;
-      return StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              4,
-              20,
-              20 + MediaQuery.of(sheetContext).viewInsets.bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'سبب الرفض',
-                  style: AppTextStyles.titleMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                SumouTextField(
-                  controller: controller,
-                  hint: 'اذكر سبب رفض طلب الإغلاق',
-                  maxLines: 3,
-                ),
-                if (showError) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'الرجاء إدخال سبب الرفض',
-                    style: AppTextStyles.label.copyWith(color: AppColors.error),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                SumouButton(
-                  label: 'تأكيد الرفض',
-                  variant: SumouButtonVariant.danger,
-                  onPressed: () {
-                    final reason = controller.text.trim();
-                    if (reason.isEmpty) {
-                      setSheetState(() => showError = true);
-                      return;
-                    }
-                    Navigator.of(sheetContext).pop(reason);
-                  },
-                ),
-                const SizedBox(height: 10),
-                SumouButton(
-                  label: 'إلغاء',
-                  variant: SumouButtonVariant.secondary,
-                  onPressed: () => Navigator.of(sheetContext).pop(),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+      ),
+      child: _RejectReasonSheet(
+        onConfirm: (reason) => Navigator.of(sheetContext).pop(reason),
+        onCancel: () => Navigator.of(sheetContext).pop(),
+      ),
+    ),
   );
-  controller.dispose();
-  return result;
+}
+
+class _RejectReasonSheet extends StatefulWidget {
+  const _RejectReasonSheet({
+    required this.onConfirm,
+    required this.onCancel,
+  });
+
+  final ValueChanged<String> onConfirm;
+  final VoidCallback onCancel;
+
+  @override
+  State<_RejectReasonSheet> createState() => _RejectReasonSheetState();
+}
+
+class _RejectReasonSheetState extends State<_RejectReasonSheet> {
+  final _controller = TextEditingController();
+  var _showError = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'سبب الرفض',
+            style: AppTextStyles.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          SumouTextField(
+            controller: _controller,
+            hint: 'اذكر سبب رفض طلب الإغلاق',
+            maxLines: 3,
+          ),
+          if (_showError) ...[
+            const SizedBox(height: 6),
+            Text(
+              'الرجاء إدخال سبب الرفض',
+              style: AppTextStyles.label.copyWith(color: AppColors.error),
+            ),
+          ],
+          const SizedBox(height: 16),
+          SumouButton(
+            label: 'تأكيد الرفض',
+            variant: SumouButtonVariant.danger,
+            onPressed: () {
+              final reason = _controller.text.trim();
+              if (reason.isEmpty) {
+                setState(() => _showError = true);
+                return;
+              }
+              widget.onConfirm(reason);
+            },
+          ),
+          const SizedBox(height: 10),
+          SumouButton(
+            label: 'إلغاء',
+            variant: SumouButtonVariant.secondary,
+            onPressed: widget.onCancel,
+          ),
+        ],
+      ),
+    );
+  }
 }

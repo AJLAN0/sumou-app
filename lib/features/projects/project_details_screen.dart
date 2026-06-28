@@ -123,26 +123,34 @@ class _Details extends ConsumerWidget {
           const SumouSectionHeader(title: 'طلب الإغلاق'),
           const SizedBox(height: 12),
           pendingClosureAsync.when(
-            loading: () => const SumouCard(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => const SumouCard(
-              child: Text('تعذّر تحميل الطلب', style: AppTextStyles.bodyMuted),
-            ),
-            data: (request) => request == null
-                ? const SumouCard(
-                    child: Text(
-                      'لا يوجد طلب إغلاق',
-                      style: AppTextStyles.bodyMuted,
-                    ),
-                  )
-                : ClosureRequestCard(
-                    request: request,
-                    clientName: project.clientName,
-                    onApprove: () =>
-                        approveClosureFlow(context, ref, request),
-                    onReject: () => rejectClosureFlow(context, ref, request),
+            loading:
+                () => const SumouCard(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            error:
+                (_, __) => const SumouCard(
+                  child: Text(
+                    'تعذّر تحميل الطلب',
+                    style: AppTextStyles.bodyMuted,
                   ),
+                ),
+            data:
+                (request) =>
+                    request == null
+                        ? const SumouCard(
+                          child: Text(
+                            'لا يوجد طلب إغلاق',
+                            style: AppTextStyles.bodyMuted,
+                          ),
+                        )
+                        : ClosureRequestCard(
+                          request: request,
+                          clientName: project.clientName,
+                          onApprove:
+                              () => approveClosureFlow(context, ref, request),
+                          onReject:
+                              () => rejectClosureFlow(context, ref, request),
+                        ),
           ),
         ],
         const SizedBox(height: 24),
@@ -152,8 +160,8 @@ class _Details extends ConsumerWidget {
           SumouButton(
             label: 'تحديث المرحلة',
             icon: Icons.update,
-            onPressed: () =>
-                context.push(AppRoutes.projectStagePath(project.id)),
+            onPressed:
+                () => context.push(AppRoutes.projectStagePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],
@@ -162,8 +170,8 @@ class _Details extends ConsumerWidget {
             label: 'طلب إغلاق',
             variant: SumouButtonVariant.secondary,
             icon: Icons.check_circle_outline,
-            onPressed: () =>
-                context.push(AppRoutes.projectClosurePath(project.id)),
+            onPressed:
+                () => context.push(AppRoutes.projectClosurePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],
@@ -253,102 +261,6 @@ class _Line extends StatelessWidget {
               text,
               style: AppTextStyles.body.copyWith(color: valueColor),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StageProgress extends StatelessWidget {
-  const _StageProgress({required this.project});
-
-  final ProjectModel project;
-
-  @override
-  Widget build(BuildContext context) {
-    final percent = project.stageProgressPercent;
-    final current = project.currentStage?.title;
-
-    return SumouCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  current == null
-                      ? 'لا توجد مراحل'
-                      : 'المرحلة الحالية: $current',
-                  style: AppTextStyles.body,
-                ),
-              ),
-              Text(
-                '$percent%',
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.accentGreen,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: percent / 100,
-              minHeight: 5,
-              backgroundColor: AppColors.surfaceSecondary,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppColors.accentGreen,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          for (final stage in project.stages) _StageRow(stage: stage),
-        ],
-      ),
-    );
-  }
-}
-
-class _StageRow extends StatelessWidget {
-  const _StageRow({required this.stage});
-
-  final ProjectStageModel stage;
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color color, IconData icon) = switch (stage.status) {
-      ProjectStageStatus.done => (AppColors.accentGreen, Icons.check_circle),
-      ProjectStageStatus.current => (
-        AppColors.projectTeal,
-        Icons.radio_button_checked,
-      ),
-      ProjectStageStatus.pending => (
-        AppColors.textMuted,
-        Icons.radio_button_unchecked,
-      ),
-    };
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${stage.order}. ${stage.title}',
-              style: AppTextStyles.body.copyWith(
-                color: stage.isPending ? AppColors.textMuted : null,
-              ),
-            ),
-          ),
-          Text(
-            stage.status.nameAr,
-            style: AppTextStyles.label.copyWith(color: color),
           ),
         ],
       ),

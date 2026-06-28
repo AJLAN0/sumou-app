@@ -134,7 +134,8 @@ class _SmartCalendarScreenState extends ConsumerState<SmartCalendarScreen> {
     });
   }
 
-  void _openDetails(String id) => context.push(AppRoutes.projectDetailsPath(id));
+  void _openDetails(String id) =>
+      context.push(AppRoutes.projectDetailsPath(id));
 
   @override
   Widget build(BuildContext context) {
@@ -163,25 +164,26 @@ class _SmartCalendarScreenState extends ConsumerState<SmartCalendarScreen> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: _mode == _CalMode.calendar
-                  ? _CalendarView(
-                      projects: projects,
-                      today: today,
-                      focusedMonth: _focusedMonth,
-                      selectedDay: _selectedDay,
-                      role: role,
-                      userId: userId,
-                      onShiftMonth: _shiftMonth,
-                      onSelectDay: (d) => setState(() => _selectedDay = d),
-                      onOpen: _openDetails,
-                    )
-                  : _ListView(
-                      projects: projects,
-                      today: today,
-                      role: role,
-                      userId: userId,
-                      onOpen: _openDetails,
-                    ),
+              child:
+                  _mode == _CalMode.calendar
+                      ? _CalendarView(
+                        projects: projects,
+                        today: today,
+                        focusedMonth: _focusedMonth,
+                        selectedDay: _selectedDay,
+                        role: role,
+                        userId: userId,
+                        onShiftMonth: _shiftMonth,
+                        onSelectDay: (d) => setState(() => _selectedDay = d),
+                        onOpen: _openDetails,
+                      )
+                      : _ListView(
+                        projects: projects,
+                        today: today,
+                        role: role,
+                        userId: userId,
+                        onOpen: _openDetails,
+                      ),
             ),
           ],
         );
@@ -330,15 +332,16 @@ class _CalendarView extends StatelessWidget {
               children: [
                 for (final day in week)
                   Expanded(
-                    child: day == null
-                        ? const SizedBox.shrink()
-                        : _DayCell(
-                            day: day,
-                            isToday: DateUtils.isSameDay(day, today),
-                            isSelected: DateUtils.isSameDay(day, selectedDay),
-                            dayProjects: _projectsOnDay(projects, day),
-                            onTap: () => onSelectDay(day),
-                          ),
+                    child:
+                        day == null
+                            ? const SizedBox.shrink()
+                            : _DayCell(
+                              day: day,
+                              isToday: DateUtils.isSameDay(day, today),
+                              isSelected: DateUtils.isSameDay(day, selectedDay),
+                              dayProjects: _projectsOnDay(projects, day),
+                              onTap: () => onSelectDay(day),
+                            ),
                   ),
               ],
             ),
@@ -390,9 +393,8 @@ class _DayCell extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : null,
+          color:
+              isSelected ? AppColors.accentGreen.withValues(alpha: 0.15) : null,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? AppColors.accentGreen : Colors.transparent,
@@ -614,9 +616,10 @@ class _SegmentButton extends StatelessWidget {
         height: 44,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,
@@ -682,9 +685,10 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

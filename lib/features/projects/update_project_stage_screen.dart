@@ -36,8 +36,7 @@ class UpdateProjectStageScreen extends ConsumerWidget {
       ),
       body: projectAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذّر تحميل المشروع')),
+        error: (_, __) => const Center(child: Text('تعذّر تحميل المشروع')),
         data: (project) {
           if (project == null) {
             return const SumouEmptyState(
@@ -87,9 +86,9 @@ class _UpdateStageBodyState extends ConsumerState<_UpdateStageBody> {
 
   Future<void> _save() async {
     if (_selectedStageId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء اختيار المرحلة')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('الرجاء اختيار المرحلة')));
       return;
     }
     setState(() => _saving = true);

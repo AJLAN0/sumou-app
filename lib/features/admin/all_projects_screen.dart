@@ -126,7 +126,8 @@ class _AdminAllProjectsScreenState
     onChanged(result == '__all__' ? null : result);
   }
 
-  void _openDetails(String id) => context.push(AppRoutes.projectDetailsPath(id));
+  void _openDetails(String id) =>
+      context.push(AppRoutes.adminProjectDetailsPath(id));
 
   @override
   Widget build(BuildContext context) {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/models/role_type.dart';
 import '../features/admin/all_projects_screen.dart';
+import '../features/admin/project_details_screen.dart';
 import '../features/admin/role_management_screen.dart';
 import '../features/auth/providers/auth_controller.dart';
 import '../features/auth/screens/entry_screen.dart';
@@ -50,6 +51,8 @@ class AppRoutes {
   static const String managerClosures = '/manager/requests/closures';
   static const String adminRoles = '/admin/roles';
   static const String adminProjects = '/admin/projects';
+  static const String adminProjectDetails = '/admin/projects/:id';
+  static String adminProjectDetailsPath(String id) => '/admin/projects/$id';
   static const String profile = '/profile';
   static const String changePassword = '/settings/change-password';
 }
@@ -191,6 +194,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.adminProjects,
         builder: (context, state) => const AdminAllProjectsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminProjectDetails,
+        builder: (context, state) =>
+            AdminProjectDetailsScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.profile,

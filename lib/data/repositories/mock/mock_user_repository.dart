@@ -1,3 +1,4 @@
+import '../../../core/models/role_type.dart';
 import '../../../core/models/user_model.dart';
 import '../user_repository.dart';
 import 'mock_users.dart';
@@ -18,6 +19,23 @@ class MockUserRepository implements UserRepository {
     final i = _users.indexWhere((u) => u.id == userId);
     if (i < 0) return null;
     final updated = _users[i].copyWith(active: active);
+    _users[i] = updated;
+    return updated;
+  }
+
+  @override
+  Future<UserModel?> updateUserRoles(
+    String userId, {
+    required RoleType defaultRole,
+    required List<RoleType> roles,
+  }) async {
+    final i = _users.indexWhere((u) => u.id == userId);
+    if (i < 0) return null;
+    if (!roles.contains(defaultRole)) return null;
+    final updated = _users[i].copyWith(
+      defaultRole: defaultRole,
+      roles: List.of(roles),
+    );
     _users[i] = updated;
     return updated;
   }

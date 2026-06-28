@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
+import '../../core/models/role_type.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -29,9 +30,19 @@ class MoreMenuScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isAdmin =
+        ref.watch(authControllerProvider).activeRole == RoleType.admin;
     return ListView(
       children: [
         const SizedBox(height: 8),
+        if (isAdmin) ...[
+          _MoreItem(
+            icon: Icons.shield_outlined,
+            label: 'إدارة الأدوار',
+            onTap: () => context.push(AppRoutes.adminRoles),
+          ),
+          const SizedBox(height: 12),
+        ],
         _MoreItem(
           icon: Icons.calendar_month_outlined,
           label: 'التقويم',

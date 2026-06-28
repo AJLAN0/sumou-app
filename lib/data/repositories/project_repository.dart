@@ -50,6 +50,20 @@ abstract interface class ProjectRepository {
     List<ProjectTeamRole> teamRoles,
   );
 
+  /// Update a project's basic fields (admin edit). Leaves team, stages, manager,
+  /// and serial untouched. Returns the updated project, or null when [projectId]
+  /// is unknown. Mock-backed in Sprint 5.
+  Future<ProjectModel?> updateProjectBasics(
+    String projectId, {
+    required String name,
+    required String clientName,
+    required ProjectType type,
+    required ProjectStatus status,
+    required DateTime startDate,
+    required DateTime endDate,
+    String? notes,
+  });
+
   /// Set the project's current stage to [stageId]: earlier stages become done,
   /// the target becomes current, later stages pending. Optional [notes] and
   /// [updatedBy] are recorded on the target stage. Returns the updated project,

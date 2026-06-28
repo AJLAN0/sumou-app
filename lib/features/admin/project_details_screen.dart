@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
@@ -167,8 +168,9 @@ class _Body extends ConsumerWidget {
         const SizedBox(height: 12),
         _ActionCard(
           icon: Icons.edit_outlined,
-          label: 'تعديل المشروع - قريبًا',
-          onTap: () => _comingSoon(context),
+          label: 'تعديل بيانات المشروع',
+          onTap: () =>
+              context.push(AppRoutes.adminProjectEditPath(project.id)),
         ),
         const SizedBox(height: 10),
         _ActionCard(

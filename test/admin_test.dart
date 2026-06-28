@@ -47,19 +47,47 @@ void main() {
 
     expect(find.text('سعد المطيري'), findsOneWidget);
     expect(find.text('@admin'), findsOneWidget);
-    // The disabled mock user renders a موقوف pill.
-    expect(find.text('موقوف'), findsWidgets);
+    // The disabled mock user renders a غير نشط pill.
+    expect(find.text('غير نشط'), findsWidgets);
   });
 
   testWidgets('inactive filter narrows the list', (tester) async {
     await pumpAsAdmin(tester);
     await tapNav(tester, 'المستخدمين');
 
-    await tester.tap(find.text('الموقوفون'));
+    await tester.tap(find.text('غير نشط').first); // filter chip
     await tester.pumpAndSettle();
 
     expect(find.text('فهد القحطاني'), findsOneWidget);
     expect(find.text('سعد المطيري'), findsNothing);
+  });
+
+  testWidgets('tapping a user opens the details sheet', (tester) async {
+    await pumpAsAdmin(tester);
+    await tapNav(tester, 'المستخدمين');
+
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('الصلاحيات'), findsOneWidget);
+    expect(find.text('تعطيل المستخدم'), findsOneWidget); // active user
+  });
+
+  testWidgets('deactivating a user shows a success snackbar', (tester) async {
+    await pumpAsAdmin(tester);
+    await tapNav(tester, 'المستخدمين');
+
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تعطيل المستخدم'));
+    await tester.pumpAndSettle();
+    // Confirm in the Sumou bottom sheet.
+    await tester.tap(find.text('تعطيل'));
+    // Pump (not settle) so the success snackbar isn't auto-dismissed.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('تم تعطيل المستخدم'), findsOneWidget);
   });
 
   testWidgets('permissions tab shows feature chips', (tester) async {

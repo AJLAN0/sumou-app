@@ -44,7 +44,7 @@ class AdminStatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? AppColors.accentGreen : AppColors.error;
-    return _Pill(color: color, label: active ? 'نشط' : 'موقوف');
+    return _Pill(color: color, label: active ? 'نشط' : 'غير نشط');
   }
 }
 

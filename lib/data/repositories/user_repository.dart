@@ -1,3 +1,4 @@
+import '../../core/models/feature_permissions.dart';
 import '../../core/models/role_type.dart';
 import '../../core/models/user_model.dart';
 
@@ -20,4 +21,11 @@ abstract interface class UserRepository {
     required RoleType defaultRole,
     required List<RoleType> roles,
   });
+
+  /// Replace a user's feature [permissions]. Returns the updated user, or null
+  /// when the id is unknown. Mock-backed in this sprint.
+  Future<UserModel?> updateUserPermissions(
+    String userId,
+    FeaturePermissions permissions,
+  );
 }

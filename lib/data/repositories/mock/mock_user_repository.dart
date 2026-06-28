@@ -1,3 +1,4 @@
+import '../../../core/models/feature_permissions.dart';
 import '../../../core/models/role_type.dart';
 import '../../../core/models/user_model.dart';
 import '../user_repository.dart';
@@ -54,5 +55,17 @@ class MockUserRepository implements UserRepository {
       if (user.username == username) return user;
     }
     return null;
+  }
+
+  @override
+  Future<UserModel?> updateUserPermissions(
+    String userId,
+    FeaturePermissions permissions,
+  ) async {
+    final i = _users.indexWhere((u) => u.id == userId);
+    if (i < 0) return null;
+    final updated = _users[i].copyWith(permissions: permissions);
+    _users[i] = updated;
+    return updated;
   }
 }

@@ -56,6 +56,34 @@ class FeaturePermissions {
   final bool canManageWeddingProjects;
   final bool canManageFinance;
 
+  /// Return a copy with [feature] set to [value]. Mirrors [has], so callers can
+  /// toggle a permission by [AppFeature] without touching individual fields.
+  FeaturePermissions setFeature(AppFeature feature, bool value) =>
+      switch (feature) {
+        AppFeature.canAddProject => copyWith(canAddProject: value),
+        AppFeature.canEditProject => copyWith(canEditProject: value),
+        AppFeature.canAssignPhotographers => copyWith(
+          canAssignPhotographers: value,
+        ),
+        AppFeature.canRequestPhotographer => copyWith(
+          canRequestPhotographer: value,
+        ),
+        AppFeature.canRequestDesign => copyWith(canRequestDesign: value),
+        AppFeature.canUpdateStages => copyWith(canUpdateStages: value),
+        AppFeature.canRequestClosure => copyWith(canRequestClosure: value),
+        AppFeature.canApproveClosure => copyWith(canApproveClosure: value),
+        AppFeature.canManageUsers => copyWith(canManageUsers: value),
+        AppFeature.canManagePermissions => copyWith(
+          canManagePermissions: value,
+        ),
+        AppFeature.canViewReports => copyWith(canViewReports: value),
+        AppFeature.canManageAttendance => copyWith(canManageAttendance: value),
+        AppFeature.canManageWeddingProjects => copyWith(
+          canManageWeddingProjects: value,
+        ),
+        AppFeature.canManageFinance => copyWith(canManageFinance: value),
+      };
+
   /// Query a permission by [AppFeature].
   bool has(AppFeature feature) => switch (feature) {
     AppFeature.canAddProject => canAddProject,

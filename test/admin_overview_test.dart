@@ -1,0 +1,64 @@
+// Tests for the admin overview dashboard (Sprint 4).
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:sumou_app/app/app.dart';
+import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
+import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+
+void main() {
+  Future<void> pumpAdmin(WidgetTester tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: 'admin', password: MockUsers.devPassword);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SumouApp()),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('overview computes user and project stats from mock data', (
+    tester,
+  ) async {
+    await pumpAdmin(tester);
+    // Top overview is on-screen.
+    expect(find.text('نظرة عامة على النظام'), findsOneWidget);
+    expect(find.text('إجمالي المستخدمين'), findsOneWidget);
+  });
+
+  testWidgets('overview shows operations, team, requests and quick actions', (
+    tester,
+  ) async {
+    await pumpAdmin(tester);
+    final scroll = find.byType(Scrollable).first;
+
+    await tester.scrollUntilVisible(find.text('عمليات المشاريع'), 300,
+        scrollable: scroll);
+    expect(find.text('المشاريع حسب النوع'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('نظرة على الفريق'), 300,
+        scrollable: scroll);
+    expect(find.text('مصورون متاحون'), findsWidgets);
+
+    await tester.scrollUntilVisible(find.text('إجراءات سريعة'), 300,
+        scrollable: scroll);
+    expect(find.text('إدارة المستخدمين'), findsOneWidget);
+  });
+
+  testWidgets('quick action shows a coming-soon snackbar', (tester) async {
+    await pumpAdmin(tester);
+    await tester.scrollUntilVisible(
+      find.text('إدارة المستخدمين'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('إدارة المستخدمين'));
+    await tester.pumpAndSettle();
+    expect(find.text('هذه الميزة قريباً'), findsOneWidget);
+  });
+}

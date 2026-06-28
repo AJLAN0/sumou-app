@@ -137,6 +137,17 @@ final managerAllClosureRequestsProvider =
       return result;
     });
 
+/// All projects in the system (mock-backed, read-only). Used by the admin
+/// overview dashboard, which is not scoped to a single role.
+final allProjectsProvider = FutureProvider<List<ProjectModel>>(
+  (ref) => ref.read(projectRepositoryProvider).getProjects(),
+);
+
+/// All closure requests in the system (any status). Used by the admin overview.
+final allClosureRequestsProvider = FutureProvider<List<ClosureRequestModel>>(
+  (ref) => ref.read(projectRepositoryProvider).getClosureRequests(),
+);
+
 /// Closure requests submitted by the signed-in photographer (any status),
 /// joined with the project — used by the photographer requests screen.
 final photographerClosureRequestsProvider =

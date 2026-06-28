@@ -46,7 +46,7 @@ void main() {
 
   testWidgets('admin home shows system overview', (tester) async {
     await pumpAs(tester, 'admin');
+    expect(find.text('نظرة عامة على النظام'), findsOneWidget);
     expect(find.text('إجمالي المستخدمين'), findsOneWidget);
-    expect(find.text('النظام يعمل بشكل طبيعي'), findsOneWidget);
   });
 }

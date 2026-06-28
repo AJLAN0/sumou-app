@@ -1,8 +1,10 @@
 /// Repository for in-app notifications.
 ///
-/// Stub only in Sprint 1. The full API (list / mark read / create) is defined
-/// in Sprint 2 alongside `NotificationModel`. Declared now so dependency wiring
-/// and folder structure are in place.
+/// Declared so the folder structure / dependency wiring stay consistent, but
+/// intentionally left empty: notifications are **permanently out of scope** (see
+/// the "Permanent Out of Scope" section in `CLAUDE.md`). Do not add methods, an
+/// implementation, or a provider unless the project owner explicitly requests
+/// notifications later.
 abstract interface class NotificationRepository {
-  // Intentionally empty until Sprint 2.
+  // Intentionally empty — notifications are out of scope.
 }

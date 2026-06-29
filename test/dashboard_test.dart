@@ -47,6 +47,7 @@ void main() {
   testWidgets('admin home shows system overview', (tester) async {
     await pumpAs(tester, 'admin');
     expect(find.text('نظرة عامة على النظام'), findsOneWidget);
-    expect(find.text('إجمالي المستخدمين'), findsOneWidget);
+    // 'المستخدمون' appears in both the headline strip and the team card.
+    expect(find.text('المستخدمون'), findsWidgets);
   });
 }

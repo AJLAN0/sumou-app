@@ -28,20 +28,16 @@ void main() {
     await pumpAdmin(tester);
     // Top overview is on-screen.
     expect(find.text('نظرة عامة على النظام'), findsOneWidget);
-    expect(find.text('إجمالي المستخدمين'), findsOneWidget);
+    // 'المستخدمون' appears in both the headline strip and the team card.
+    expect(find.text('المستخدمون'), findsWidgets);
   });
 
-  testWidgets('overview shows operations, team, requests and quick actions', (
+  testWidgets('overview shows projects, team, requests and quick actions', (
     tester,
   ) async {
     await pumpAdmin(tester);
     final scroll = find.byType(Scrollable).first;
 
-    await tester.scrollUntilVisible(
-      find.text('عمليات المشاريع'),
-      300,
-      scrollable: scroll,
-    );
     await tester.scrollUntilVisible(
       find.text('المشاريع حسب النوع'),
       300,
@@ -50,11 +46,18 @@ void main() {
     expect(find.text('المشاريع حسب النوع'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('نظرة على الفريق'),
+      find.text('الفريق'),
       300,
       scrollable: scroll,
     );
-    expect(find.text('مصورون متاحون'), findsWidgets);
+    expect(find.text('متاحون'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('طلبات الإغلاق'),
+      300,
+      scrollable: scroll,
+    );
+    expect(find.text('طلبات الإغلاق'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('إجراءات سريعة'),
@@ -77,7 +80,8 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.tap(find.text('إدارة المستخدمين'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text('هذه الميزة قريباً'), findsOneWidget);
   });
 }

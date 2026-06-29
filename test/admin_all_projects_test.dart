@@ -8,6 +8,8 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
+import 'test_helpers.dart';
+
 void main() {
   Future<void> openAllProjects(WidgetTester tester) async {
     final container = ProviderContainer();
@@ -22,13 +24,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The dashboard quick action opens the screen.
-    await tester.scrollUntilVisible(
-      find.text('كل المشاريع'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('كل المشاريع'));
-    await tester.pumpAndSettle();
+    await scrollAndTapCard(tester, 'كل المشاريع');
   }
 
   testWidgets('admin opens all projects with stats and cards', (tester) async {

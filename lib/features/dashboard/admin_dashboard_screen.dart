@@ -20,9 +20,9 @@ class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
   void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('هذه الميزة قريباً')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('هذه الميزة قريباً')));
   }
 
   @override
@@ -53,8 +53,9 @@ class AdminDashboardScreen extends ConsumerWidget {
     final managers = users.where((u) => u.hasRole(RoleType.manager)).length;
     final photographers =
         users.where((u) => u.hasRole(RoleType.photographer)).length;
-    final activePhotographers =
-        users.where((u) => u.active && u.hasRole(RoleType.photographer));
+    final activePhotographers = users.where(
+      (u) => u.active && u.hasRole(RoleType.photographer),
+    );
     final highWorkload =
         activePhotographers.where((u) => (counts[u.id] ?? 0) >= 2).length;
     final available =
@@ -74,15 +75,12 @@ class AdminDashboardScreen extends ConsumerWidget {
     final recent = projects.take(2).toList();
 
     // ---- request stats ----
-    final pendingReq = closures
-        .where((r) => r.status == ClosureRequestStatus.pending)
-        .length;
-    final approvedReq = closures
-        .where((r) => r.status == ClosureRequestStatus.approved)
-        .length;
-    final rejectedReq = closures
-        .where((r) => r.status == ClosureRequestStatus.rejected)
-        .length;
+    final pendingReq =
+        closures.where((r) => r.status == ClosureRequestStatus.pending).length;
+    final approvedReq =
+        closures.where((r) => r.status == ClosureRequestStatus.approved).length;
+    final rejectedReq =
+        closures.where((r) => r.status == ClosureRequestStatus.rejected).length;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
@@ -101,7 +99,11 @@ class AdminDashboardScreen extends ConsumerWidget {
           tiles: [
             _Metric('$totalProjects', 'المشاريع', AppColors.projectTeal),
             _Metric('$activeProjects', 'نشطة', AppColors.primaryTeal),
-            _Metric('$pendingClosure', 'بانتظار الإغلاق', AppColors.financeYellow),
+            _Metric(
+              '$pendingClosure',
+              'بانتظار الإغلاق',
+              AppColors.financeYellow,
+            ),
             _Metric('$totalUsers', 'المستخدمون', AppColors.photographerPurple),
           ],
         ),
@@ -190,14 +192,14 @@ class AdminDashboardScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               _MetricRow(
                 metrics: [
-                  _Metric(
-                    '$managers',
-                    'المدراء',
-                    AppColors.photographerPurple,
-                  ),
+                  _Metric('$managers', 'المدراء', AppColors.photographerPurple),
                   _Metric('$photographers', 'المصورون', AppColors.projectTeal),
                   _Metric('$available', 'متاحون', AppColors.accentGreen),
-                  _Metric('$highWorkload', 'مرتفعو الحِمل', AppColors.financeYellow),
+                  _Metric(
+                    '$highWorkload',
+                    'مرتفعو الحِمل',
+                    AppColors.financeYellow,
+                  ),
                 ],
               ),
             ],
@@ -352,8 +354,7 @@ class _MetricRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         for (var i = 0; i < metrics.length; i++) ...[
-          if (i > 0)
-            Container(width: 1, height: 34, color: AppColors.border),
+          if (i > 0) Container(width: 1, height: 34, color: AppColors.border),
           Expanded(child: _MetricTile(metric: metrics[i], large: large)),
         ],
       ],
@@ -416,7 +417,11 @@ class _TypeChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.category_outlined, size: 14, color: AppColors.textMuted),
+          const Icon(
+            Icons.category_outlined,
+            size: 14,
+            color: AppColors.textMuted,
+          ),
           const SizedBox(width: 6),
           Text(label, style: AppTextStyles.label),
           const SizedBox(width: 6),
@@ -445,16 +450,18 @@ class _ActionGrid extends StatelessWidget {
     final rows = <Widget>[];
     for (var i = 0; i < actions.length; i += 2) {
       rows.add(
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: _ActionTile(action: actions[i])),
-            const SizedBox(width: 12),
-            if (i + 1 < actions.length)
-              Expanded(child: _ActionTile(action: actions[i + 1]))
-            else
-              const Expanded(child: SizedBox()),
-          ],
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _ActionTile(action: actions[i])),
+              const SizedBox(width: 12),
+              if (i + 1 < actions.length)
+                Expanded(child: _ActionTile(action: actions[i + 1]))
+              else
+                const Expanded(child: SizedBox()),
+            ],
+          ),
         ),
       );
       if (i + 2 < actions.length) rows.add(const SizedBox(height: 12));

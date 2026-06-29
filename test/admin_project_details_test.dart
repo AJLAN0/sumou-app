@@ -9,6 +9,8 @@ import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/projects/providers/projects_providers.dart';
 
+import 'test_helpers.dart';
+
 void main() {
   Future<void> openAdminDetails(WidgetTester tester, String projectName) async {
     final container = ProviderContainer();
@@ -22,21 +24,14 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('كل المشاريع'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('كل المشاريع'));
-    await tester.pumpAndSettle();
+    await scrollAndTapCard(tester, 'كل المشاريع');
 
-    await tester.scrollUntilVisible(
-      find.text(projectName),
-      200,
+    await scrollAndTapCard(
+      tester,
+      projectName,
       scrollable: find.byType(Scrollable).last,
+      scrollDelta: 200,
     );
-    await tester.tap(find.text(projectName));
-    await tester.pumpAndSettle();
   }
 
   testWidgets('admin opens read-only project oversight', (tester) async {
@@ -55,13 +50,7 @@ void main() {
 
   testWidgets('team action opens team management', (tester) async {
     await openAdminDetails(tester, 'تصوير ميداني — مهرجان الرياض');
-    await tester.scrollUntilVisible(
-      find.text('تعديل الفريق'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('تعديل الفريق'));
-    await tester.pumpAndSettle();
+    await scrollAndTapCard(tester, 'تعديل الفريق');
     expect(find.text('إدارة الفريق'), findsOneWidget);
   });
 

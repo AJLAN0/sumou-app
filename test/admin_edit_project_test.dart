@@ -10,6 +10,8 @@ import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
+import 'test_helpers.dart';
+
 void main() {
   Future<void> openEdit(WidgetTester tester, String projectName) async {
     final container = ProviderContainer();
@@ -23,29 +25,16 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('كل المشاريع'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('كل المشاريع'));
-    await tester.pumpAndSettle();
+    await scrollAndTapCard(tester, 'كل المشاريع');
 
-    await tester.scrollUntilVisible(
-      find.text(projectName),
-      200,
+    await scrollAndTapCard(
+      tester,
+      projectName,
       scrollable: find.byType(Scrollable).last,
+      scrollDelta: 200,
     );
-    await tester.tap(find.text(projectName));
-    await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('تعديل بيانات المشروع'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('تعديل بيانات المشروع'));
-    await tester.pumpAndSettle();
+    await scrollAndTapCard(tester, 'تعديل بيانات المشروع');
   }
 
   testWidgets('edit screen opens pre-filled', (tester) async {

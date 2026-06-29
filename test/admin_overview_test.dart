@@ -8,6 +8,8 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
+import 'test_helpers.dart';
+
 void main() {
   Future<void> pumpAdmin(WidgetTester tester) async {
     final container = ProviderContainer();
@@ -74,14 +76,7 @@ void main() {
 
   testWidgets('quick action shows a coming-soon snackbar', (tester) async {
     await pumpAdmin(tester);
-    await tester.scrollUntilVisible(
-      find.text('إدارة المستخدمين'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('إدارة المستخدمين'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await scrollAndTapCard(tester, 'إدارة المستخدمين');
     expect(find.text('هذه الميزة قريباً'), findsOneWidget);
   });
 }

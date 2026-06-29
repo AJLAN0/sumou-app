@@ -13,17 +13,16 @@ import '../projects/widgets/project_card.dart';
 
 /// Admin overview dashboard (home tab of the admin shell).
 ///
-/// A read-only control center computed from the mock repositories: user/team,
-/// project-operations, and request stats. No user/permission editing, no
-/// finance/notifications. Quick actions are placeholders until their screens
-/// get routes.
+/// A read-only control center computed from the mock repositories, grouped into
+/// clear sections: a headline strip, projects, team, requests, and quick
+/// actions. No user/permission editing, no finance/notifications.
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
   void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('هذه الميزة قريباً')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('هذه الميزة قريباً')),
+    );
   }
 
   @override
@@ -47,24 +46,21 @@ class AdminDashboardScreen extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // ---- user / team stats --------------------------------------------------
+    // ---- team stats ----
     final totalUsers = users.length;
     final activeUsers = users.where((u) => u.active).length;
     final inactiveUsers = totalUsers - activeUsers;
     final managers = users.where((u) => u.hasRole(RoleType.manager)).length;
     final photographers =
         users.where((u) => u.hasRole(RoleType.photographer)).length;
-    final activeManagers =
-        users.where((u) => u.active && u.hasRole(RoleType.manager)).length;
-    final activePhotographers = users.where(
-      (u) => u.active && u.hasRole(RoleType.photographer),
-    );
+    final activePhotographers =
+        users.where((u) => u.active && u.hasRole(RoleType.photographer));
     final highWorkload =
         activePhotographers.where((u) => (counts[u.id] ?? 0) >= 2).length;
     final available =
         activePhotographers.where((u) => (counts[u.id] ?? 0) < 2).length;
 
-    // ---- project stats ------------------------------------------------------
+    // ---- project stats ----
     final totalProjects = projects.length;
     final activeProjects = projects.where((p) => p.isActive).length;
     final completedProjects = projects.where((p) => p.isCompleted).length;
@@ -75,17 +71,21 @@ class AdminDashboardScreen extends ConsumerWidget {
         projects.where((p) => p.type == ProjectType.social).length;
     final weddingCount =
         projects.where((p) => p.type == ProjectType.wedding).length;
-    final recent = projects.take(3).toList();
+    final recent = projects.take(2).toList();
 
-    // ---- request stats ------------------------------------------------------
-    final pendingReq =
-        closures.where((r) => r.status == ClosureRequestStatus.pending).length;
-    final approvedReq =
-        closures.where((r) => r.status == ClosureRequestStatus.approved).length;
-    final rejectedReq =
-        closures.where((r) => r.status == ClosureRequestStatus.rejected).length;
+    // ---- request stats ----
+    final pendingReq = closures
+        .where((r) => r.status == ClosureRequestStatus.pending)
+        .length;
+    final approvedReq = closures
+        .where((r) => r.status == ClosureRequestStatus.approved)
+        .length;
+    final rejectedReq = closures
+        .where((r) => r.status == ClosureRequestStatus.rejected)
+        .length;
 
     return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         const SizedBox(height: 4),
         Text('نظرة عامة على النظام', style: AppTextStyles.titleMedium),
@@ -96,107 +96,66 @@ class AdminDashboardScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
 
-        // ---- overview ----
-        _Grid(
-          cards: [
-            _Stat(
-              '$totalUsers',
-              'إجمالي المستخدمين',
-              Icons.people_outline,
-              AppColors.projectTeal,
-            ),
-            _Stat(
-              '$activeUsers',
-              'المستخدمون النشطون',
-              Icons.verified_user_outlined,
-              AppColors.accentGreen,
-            ),
-            _Stat(
-              '$inactiveUsers',
-              'غير النشطين',
-              Icons.person_off_outlined,
-              AppColors.error,
-            ),
-            _Stat(
-              '$totalProjects',
-              'إجمالي المشاريع',
-              Icons.work_outline,
-              AppColors.projectTeal,
-            ),
-            _Stat(
-              '$activeProjects',
-              'المشاريع النشطة',
-              Icons.play_circle_outline,
-              AppColors.primaryTeal,
-            ),
-            _Stat(
-              '$completedProjects',
-              'المشاريع المنتهية',
-              Icons.check_circle_outline,
-              AppColors.accentGreen,
-            ),
-            _Stat(
-              '$pendingReq',
-              'طلبات الإغلاق المعلقة',
-              Icons.inbox_outlined,
-              AppColors.financeYellow,
-            ),
-            _Stat(
-              '$managers',
-              'عدد المدراء',
-              Icons.badge_outlined,
-              AppColors.photographerPurple,
-            ),
-            _Stat(
-              '$photographers',
-              'عدد المصورين',
-              Icons.camera_alt_outlined,
-              AppColors.projectTeal,
-            ),
+        // ---- headline strip ----
+        _Hero(
+          tiles: [
+            _Metric('$totalProjects', 'المشاريع', AppColors.projectTeal),
+            _Metric('$activeProjects', 'نشطة', AppColors.primaryTeal),
+            _Metric('$pendingClosure', 'بانتظار الإغلاق', AppColors.financeYellow),
+            _Metric('$totalUsers', 'المستخدمون', AppColors.photographerPurple),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // ---- project operations ----
-        const SumouSectionHeader(title: 'عمليات المشاريع'),
-        const SizedBox(height: 12),
-        _Grid(
-          cards: [
-            _Stat(
-              '$activeProjects',
-              'نشطة',
-              Icons.play_circle_outline,
-              AppColors.primaryTeal,
-            ),
-            _Stat(
-              '$completedProjects',
-              'منتهية',
-              Icons.check_circle_outline,
-              AppColors.accentGreen,
-            ),
-            _Stat(
-              '$pendingClosure',
-              'بانتظار الإغلاق',
-              Icons.hourglass_top,
-              AppColors.financeYellow,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SumouCard(
+        // ---- projects ----
+        _SectionCard(
+          title: 'المشاريع',
+          icon: Icons.work_outline,
+          actionLabel: 'عرض الكل',
+          onAction: () => context.push(AppRoutes.adminProjects),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _MetricRow(
+                metrics: [
+                  _Metric('$activeProjects', 'نشطة', AppColors.primaryTeal),
+                  _Metric(
+                    '$completedProjects',
+                    'منتهية',
+                    AppColors.accentGreen,
+                  ),
+                  _Metric(
+                    '$pendingClosure',
+                    'بانتظار الإغلاق',
+                    AppColors.financeYellow,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const _Divider(),
+              const SizedBox(height: 12),
               Text('المشاريع حسب النوع', style: AppTextStyles.label),
               const SizedBox(height: 10),
-              _TypeRow(label: 'ميداني', count: fieldCount),
-              _TypeRow(label: 'سوشال', count: socialCount),
-              _TypeRow(label: 'زواج', count: weddingCount),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _TypeChip(label: 'ميداني', count: fieldCount),
+                  _TypeChip(label: 'سوشال', count: socialCount),
+                  _TypeChip(label: 'زواج', count: weddingCount),
+                ],
+              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
-        Text('أحدث المشاريع', style: AppTextStyles.label),
+
+        // ---- recent projects ----
+        SumouSectionHeader(
+          title: 'أحدث المشاريع',
+          actionLabel: 'مراقبة المراحل',
+          onAction: () => context.push(AppRoutes.adminStages),
+        ),
         const SizedBox(height: 12),
         if (recent.isEmpty)
           const SumouEmptyState(
@@ -211,182 +170,267 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
           ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
 
-        // ---- team overview ----
-        const SumouSectionHeader(title: 'نظرة على الفريق'),
-        const SizedBox(height: 12),
-        _Grid(
-          cards: [
-            _Stat(
-              '$activeManagers',
-              'مدراء نشطون',
-              Icons.badge_outlined,
-              AppColors.photographerPurple,
-            ),
-            _Stat(
-              '${activePhotographers.length}',
-              'مصورون نشطون',
-              Icons.camera_alt_outlined,
-              AppColors.projectTeal,
-            ),
-            _Stat(
-              '$inactiveUsers',
-              'مستخدمون معطّلون',
-              Icons.person_off_outlined,
-              AppColors.error,
-            ),
-            _Stat(
-              '$highWorkload',
-              'مصورون مرتفعو الحِمل',
-              Icons.trending_up,
-              AppColors.financeYellow,
-            ),
-            _Stat(
-              '$available',
-              'مصورون متاحون',
-              Icons.event_available_outlined,
-              AppColors.accentGreen,
-            ),
-          ],
+        // ---- team ----
+        _SectionCard(
+          title: 'الفريق',
+          icon: Icons.group_outlined,
+          child: Column(
+            children: [
+              _MetricRow(
+                metrics: [
+                  _Metric('$totalUsers', 'المستخدمون', AppColors.projectTeal),
+                  _Metric('$activeUsers', 'نشطون', AppColors.accentGreen),
+                  _Metric('$inactiveUsers', 'معطّلون', AppColors.error),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const _Divider(),
+              const SizedBox(height: 12),
+              _MetricRow(
+                metrics: [
+                  _Metric(
+                    '$managers',
+                    'المدراء',
+                    AppColors.photographerPurple,
+                  ),
+                  _Metric('$photographers', 'المصورون', AppColors.projectTeal),
+                  _Metric('$available', 'متاحون', AppColors.accentGreen),
+                  _Metric('$highWorkload', 'مرتفعو الحِمل', AppColors.financeYellow),
+                ],
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // ---- requests overview ----
-        const SumouSectionHeader(title: 'الطلبات'),
-        const SizedBox(height: 12),
-        _Grid(
-          cards: [
-            _Stat(
-              '$pendingReq',
-              'معلقة',
-              Icons.hourglass_top,
-              AppColors.financeYellow,
-            ),
-            _Stat(
-              '$approvedReq',
-              'مقبولة',
-              Icons.check_circle_outline,
-              AppColors.accentGreen,
-            ),
-            _Stat(
-              '$rejectedReq',
-              'مرفوضة',
-              Icons.cancel_outlined,
-              AppColors.error,
-            ),
-          ],
+        // ---- requests ----
+        _SectionCard(
+          title: 'طلبات الإغلاق',
+          icon: Icons.inbox_outlined,
+          child: _MetricRow(
+            metrics: [
+              _Metric('$pendingReq', 'معلقة', AppColors.financeYellow),
+              _Metric('$approvedReq', 'مقبولة', AppColors.accentGreen),
+              _Metric('$rejectedReq', 'مرفوضة', AppColors.error),
+            ],
+          ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
         // ---- quick actions ----
         const SumouSectionHeader(title: 'إجراءات سريعة'),
         const SizedBox(height: 12),
-        _ActionCard(
-          icon: Icons.group_outlined,
-          label: 'إدارة المستخدمين',
-          onTap: () => _comingSoon(context),
+        _ActionGrid(
+          actions: [
+            _Action(
+              icon: Icons.work_outline,
+              label: 'كل المشاريع',
+              onTap: () => context.push(AppRoutes.adminProjects),
+            ),
+            _Action(
+              icon: Icons.timeline_outlined,
+              label: 'مراقبة المراحل',
+              onTap: () => context.push(AppRoutes.adminStages),
+            ),
+            _Action(
+              icon: Icons.shield_outlined,
+              label: 'إدارة الأدوار',
+              onTap: () => context.push(AppRoutes.adminRoles),
+            ),
+            _Action(
+              icon: Icons.group_outlined,
+              label: 'إدارة المستخدمين',
+              onTap: () => _comingSoon(context),
+            ),
+            _Action(
+              icon: Icons.lock_outline,
+              label: 'الصلاحيات',
+              onTap: () => _comingSoon(context),
+            ),
+            _Action(
+              icon: Icons.bar_chart,
+              label: 'التقارير',
+              onTap: () => _comingSoon(context),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
-        _ActionCard(
-          icon: Icons.shield_outlined,
-          label: 'الصلاحيات',
-          onTap: () => _comingSoon(context),
-        ),
-        const SizedBox(height: 10),
-        _ActionCard(
-          icon: Icons.work_outline,
-          label: 'كل المشاريع',
-          onTap: () => context.push(AppRoutes.adminProjects),
-        ),
-        const SizedBox(height: 10),
-        _ActionCard(
-          icon: Icons.inbox_outlined,
-          label: 'الطلبات',
-          onTap: () => _comingSoon(context),
-        ),
-        const SizedBox(height: 10),
-        _ActionCard(
-          icon: Icons.bar_chart,
-          label: 'التقارير',
-          onTap: () => _comingSoon(context),
-        ),
-        const SizedBox(height: 24),
       ],
     );
   }
 }
 
-/// A small value object describing one stat card.
-class _Stat {
-  const _Stat(this.value, this.label, this.icon, this.color);
+// ---- value objects ----------------------------------------------------------
+
+class _Metric {
+  const _Metric(this.value, this.label, this.color);
 
   final String value;
   final String label;
-  final IconData icon;
   final Color color;
 }
 
-/// Lays out stat cards in a 2-column grid.
-class _Grid extends StatelessWidget {
-  const _Grid({required this.cards});
+class _Action {
+  const _Action({required this.icon, required this.label, required this.onTap});
 
-  final List<_Stat> cards;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+}
+
+// ---- headline strip ---------------------------------------------------------
+
+class _Hero extends StatelessWidget {
+  const _Hero({required this.tiles});
+
+  final List<_Metric> tiles;
 
   @override
   Widget build(BuildContext context) {
-    final rows = <Widget>[];
-    for (var i = 0; i < cards.length; i += 2) {
-      rows.add(
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: _card(cards[i])),
-              const SizedBox(width: 12),
-              if (i + 1 < cards.length)
-                Expanded(child: _card(cards[i + 1]))
-              else
-                const Expanded(child: SizedBox()),
-            ],
-          ),
-        ),
-      );
-      if (i + 2 < cards.length) rows.add(const SizedBox(height: 12));
-    }
-    return Column(children: rows);
+    return SumouCard(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      child: _MetricRow(metrics: tiles, large: true),
+    );
   }
-
-  Widget _card(_Stat s) => SumouStatCard(
-    value: s.value,
-    label: s.label,
-    icon: s.icon,
-    accentColor: s.color,
-  );
 }
 
-class _TypeRow extends StatelessWidget {
-  const _TypeRow({required this.label, required this.count});
+// ---- section card -----------------------------------------------------------
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return SumouCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.accentGreen),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title, style: AppTextStyles.titleMedium)),
+              if (actionLabel != null && onAction != null)
+                GestureDetector(
+                  onTap: onAction,
+                  child: Text(
+                    actionLabel!,
+                    style: AppTextStyles.label.copyWith(
+                      color: AppColors.accentGreen,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// ---- metrics ----------------------------------------------------------------
+
+class _MetricRow extends StatelessWidget {
+  const _MetricRow({required this.metrics, this.large = false});
+
+  final List<_Metric> metrics;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (var i = 0; i < metrics.length; i++) ...[
+          if (i > 0)
+            Container(width: 1, height: 34, color: AppColors.border),
+          Expanded(child: _MetricTile(metric: metrics[i], large: large)),
+        ],
+      ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({required this.metric, required this.large});
+
+  final _Metric metric;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          metric.value,
+          style: (large ? AppTextStyles.titleLarge : AppTextStyles.titleMedium)
+              .copyWith(color: metric.color),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          metric.label,
+          style: AppTextStyles.label.copyWith(color: AppColors.textMuted),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(height: 1, color: AppColors.border);
+}
+
+class _TypeChip extends StatelessWidget {
+  const _TypeChip({required this.label, required this.count});
 
   final String label;
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.category_outlined,
-            size: 16,
-            color: AppColors.textMuted,
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(label, style: AppTextStyles.body)),
+          const Icon(Icons.category_outlined, size: 14, color: AppColors.textMuted),
+          const SizedBox(width: 6),
+          Text(label, style: AppTextStyles.label),
+          const SizedBox(width: 6),
           Text(
             '$count',
-            style: AppTextStyles.label.copyWith(color: AppColors.accentGreen),
+            style: AppTextStyles.label.copyWith(
+              color: AppColors.accentGreen,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -394,27 +438,66 @@ class _TypeRow extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+// ---- quick actions ----------------------------------------------------------
 
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+class _ActionGrid extends StatelessWidget {
+  const _ActionGrid({required this.actions});
+
+  final List<_Action> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < actions.length; i += 2) {
+      rows.add(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _ActionTile(action: actions[i])),
+            const SizedBox(width: 12),
+            if (i + 1 < actions.length)
+              Expanded(child: _ActionTile(action: actions[i + 1]))
+            else
+              const Expanded(child: SizedBox()),
+          ],
+        ),
+      );
+      if (i + 2 < actions.length) rows.add(const SizedBox(height: 12));
+    }
+    return Column(children: rows);
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({required this.action});
+
+  final _Action action;
 
   @override
   Widget build(BuildContext context) {
     return SumouCard(
-      onTap: onTap,
+      onTap: action.onTap,
       child: Row(
         children: [
-          Icon(icon, color: AppColors.accentGreen, size: 22),
-          const SizedBox(width: 14),
-          Expanded(child: Text(label, style: AppTextStyles.body)),
-          const Icon(Icons.chevron_left, color: AppColors.textMuted),
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.accentGreen.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(action.icon, color: AppColors.accentGreen, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              action.label,
+              style: AppTextStyles.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

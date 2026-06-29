@@ -96,9 +96,8 @@ class _Body extends ConsumerWidget {
             _TeamRow(
               name: role.personName,
               type: role.type,
-              active: role.userId == null
-                  ? null
-                  : usersById[role.userId]?.active,
+              active:
+                  role.userId == null ? null : usersById[role.userId]?.active,
               color: AppColors.photographerPurple,
             ),
             const SizedBox(height: 10),
@@ -115,24 +114,31 @@ class _Body extends ConsumerWidget {
         const SumouSectionHeader(title: 'طلب الإغلاق'),
         const SizedBox(height: 12),
         closureAsync.when(
-          loading: () => const SumouCard(
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, __) => const SumouCard(
-            child: Text('تعذّر تحميل الطلب', style: AppTextStyles.bodyMuted),
-          ),
-          data: (request) => request == null
-              ? const SumouCard(
-                  child: Text(
-                    'لا يوجد طلب إغلاق لهذا المشروع',
-                    style: AppTextStyles.bodyMuted,
-                  ),
-                )
-              // Read-only: no approve/reject callbacks for the admin here.
-              : ClosureRequestCard(
-                  request: request,
-                  clientName: project.clientName,
+          loading:
+              () => const SumouCard(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          error:
+              (_, __) => const SumouCard(
+                child: Text(
+                  'تعذّر تحميل الطلب',
+                  style: AppTextStyles.bodyMuted,
                 ),
+              ),
+          data:
+              (request) =>
+                  request == null
+                      ? const SumouCard(
+                        child: Text(
+                          'لا يوجد طلب إغلاق لهذا المشروع',
+                          style: AppTextStyles.bodyMuted,
+                        ),
+                      )
+                      // Read-only: no approve/reject callbacks for the admin here.
+                      : ClosureRequestCard(
+                        request: request,
+                        clientName: project.clientName,
+                      ),
         ),
         const SizedBox(height: 24),
 
@@ -163,22 +169,19 @@ class _Body extends ConsumerWidget {
         _ActionCard(
           icon: Icons.edit_outlined,
           label: 'تعديل بيانات المشروع',
-          onTap: () =>
-              context.push(AppRoutes.adminProjectEditPath(project.id)),
+          onTap: () => context.push(AppRoutes.adminProjectEditPath(project.id)),
         ),
         const SizedBox(height: 10),
         _ActionCard(
           icon: Icons.swap_horiz,
           label: 'تغيير المدير',
-          onTap: () =>
-              context.push(AppRoutes.adminProjectTeamPath(project.id)),
+          onTap: () => context.push(AppRoutes.adminProjectTeamPath(project.id)),
         ),
         const SizedBox(height: 10),
         _ActionCard(
           icon: Icons.group_outlined,
           label: 'تعديل الفريق',
-          onTap: () =>
-              context.push(AppRoutes.adminProjectTeamPath(project.id)),
+          onTap: () => context.push(AppRoutes.adminProjectTeamPath(project.id)),
         ),
         const SizedBox(height: 10),
         _ActionCard(
@@ -209,9 +212,7 @@ class _Summary extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(p.name, style: AppTextStyles.titleLarge),
-              ),
+              Expanded(child: Text(p.name, style: AppTextStyles.titleLarge)),
               const SizedBox(width: 8),
               SumouStatusChip(sumouStatusForProject(p.status)),
             ],
@@ -395,8 +396,7 @@ class _ClientLinks extends StatelessWidget {
   Widget build(BuildContext context) {
     final link = request?.deliveryLink;
     final approved = request?.isApproved ?? false;
-    final hasApprovedLink =
-        approved && link != null && link.trim().isNotEmpty;
+    final hasApprovedLink = approved && link != null && link.trim().isNotEmpty;
 
     if (!hasApprovedLink) {
       return const SumouCard(
@@ -416,7 +416,7 @@ class _ClientLinks extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  link!,
+                  link,
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.accentGreen,
                   ),

@@ -1,6 +1,5 @@
 // Tests for admin role management (Sprint 4).
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -60,10 +59,10 @@ void main() {
     );
     expect(updated, isNotNull);
     expect(updated!.defaultRole, RoleType.manager);
-    expect(updated.roles, containsAll(<RoleType>[
-      RoleType.manager,
-      RoleType.photographer,
-    ]));
+    expect(
+      updated.roles,
+      containsAll(<RoleType>[RoleType.manager, RoleType.photographer]),
+    );
 
     final reloaded = await repo.getUserById('u-photographer');
     expect(reloaded!.defaultRole, RoleType.manager);

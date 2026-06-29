@@ -37,16 +37,35 @@ void main() {
     await pumpAdmin(tester);
     final scroll = find.byType(Scrollable).first;
 
-    await tester.scrollUntilVisible(find.text('عمليات المشاريع'), 300,
-        scrollable: scroll);
+    await tester.scrollUntilVisible(
+      find.text('عمليات المشاريع'),
+      300,
+      scrollable: scroll,
+    );
+    await tester.scrollUntilVisible(
+      find.text('المشاريع حسب النوع'),
+      300,
+      scrollable: scroll,
+    );
     expect(find.text('المشاريع حسب النوع'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('نظرة على الفريق'), 300,
-        scrollable: scroll);
+    await tester.scrollUntilVisible(
+      find.text('نظرة على الفريق'),
+      300,
+      scrollable: scroll,
+    );
     expect(find.text('مصورون متاحون'), findsWidgets);
 
-    await tester.scrollUntilVisible(find.text('إجراءات سريعة'), 300,
-        scrollable: scroll);
+    await tester.scrollUntilVisible(
+      find.text('إجراءات سريعة'),
+      300,
+      scrollable: scroll,
+    );
+    await tester.scrollUntilVisible(
+      find.text('إدارة المستخدمين'),
+      300,
+      scrollable: scroll,
+    );
     expect(find.text('إدارة المستخدمين'), findsOneWidget);
   });
 

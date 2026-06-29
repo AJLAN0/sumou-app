@@ -63,19 +63,20 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) => _UserDetailSheet(
-        user: user,
-        onToggleActive: () {
-          Navigator.of(sheetContext).pop();
-          _toggleActive(user);
-        },
-        onEdit: () {
-          Navigator.of(sheetContext).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعديل البيانات - قريبًا')),
-          );
-        },
-      ),
+      builder:
+          (sheetContext) => _UserDetailSheet(
+            user: user,
+            onToggleActive: () {
+              Navigator.of(sheetContext).pop();
+              _toggleActive(user);
+            },
+            onEdit: () {
+              Navigator.of(sheetContext).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('تعديل البيانات - قريبًا')),
+              );
+            },
+          ),
     );
   }
 
@@ -84,13 +85,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     final ok = await showSumouConfirmSheet(
       context,
       title: activate ? 'تفعيل المستخدم' : 'تعطيل المستخدم',
-      message: activate
-          ? 'سيتمكن ${user.fullName} من استخدام النظام.'
-          : 'لن يتمكن ${user.fullName} من تسجيل الدخول.',
+      message:
+          activate
+              ? 'سيتمكن ${user.fullName} من استخدام النظام.'
+              : 'لن يتمكن ${user.fullName} من تسجيل الدخول.',
       confirmLabel: activate ? 'تفعيل' : 'تعطيل',
       destructive: !activate,
     );
     if (!ok) return;
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final updated = await ref
         .read(userRepositoryProvider)
@@ -140,8 +143,8 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
         Expanded(
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) =>
-                const Center(child: Text('تعذّر تحميل المستخدمين')),
+            error:
+                (_, __) => const Center(child: Text('تعذّر تحميل المستخدمين')),
             data: (users) {
               final filtered = users.where(_matches).toList();
               if (filtered.isEmpty) {
@@ -154,10 +157,11 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               return ListView.separated(
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => _UserCard(
-                  user: filtered[i],
-                  onTap: () => _showUserSheet(filtered[i]),
-                ),
+                itemBuilder:
+                    (_, i) => _UserCard(
+                      user: filtered[i],
+                      onTap: () => _showUserSheet(filtered[i]),
+                    ),
               );
             },
           ),
@@ -217,9 +221,7 @@ class _UserCard extends StatelessWidget {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                for (final t in user.photoTypes) AdminTextChip(t),
-              ],
+              children: [for (final t in user.photoTypes) AdminTextChip(t)],
             ),
           ],
         ],
@@ -243,9 +245,8 @@ class _UserDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final roleModel = RoleModel.of(user.defaultRole);
     final extraRoles = user.roles.where((r) => r != user.defaultRole).toList();
-    final permissions = AppFeature.values
-        .where((f) => user.hasPermission(f))
-        .toList();
+    final permissions =
+        AppFeature.values.where((f) => user.hasPermission(f)).toList();
 
     return SafeArea(
       child: ConstrainedBox(
@@ -299,9 +300,7 @@ class _UserDetailSheet extends StatelessWidget {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: [
-                    for (final t in user.photoTypes) AdminTextChip(t),
-                  ],
+                  children: [for (final t in user.photoTypes) AdminTextChip(t)],
                 ),
               ],
               const SizedBox(height: 16),
@@ -314,16 +313,18 @@ class _UserDetailSheet extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final f in permissions) AdminTextChip(featureLabelAr(f)),
+                    for (final f in permissions)
+                      AdminTextChip(featureLabelAr(f)),
                   ],
                 ),
               const SizedBox(height: 24),
               SumouButton(
                 label: user.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم',
                 icon: user.active ? Icons.block : Icons.check_circle_outline,
-                variant: user.active
-                    ? SumouButtonVariant.danger
-                    : SumouButtonVariant.primary,
+                variant:
+                    user.active
+                        ? SumouButtonVariant.danger
+                        : SumouButtonVariant.primary,
                 onPressed: onToggleActive,
               ),
               const SizedBox(height: 10),
@@ -340,4 +341,3 @@ class _UserDetailSheet extends StatelessWidget {
     );
   }
 }
-

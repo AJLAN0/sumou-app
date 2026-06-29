@@ -62,11 +62,11 @@ class _AdminRoleManagementScreenState
       ),
       body: usersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذّر تحميل المستخدمين')),
+        error: (_, __) => const Center(child: Text('تعذّر تحميل المستخدمين')),
         data: (users) {
           // Role filter options: only roles actually held by some user.
-          final present = <RoleType>{for (final u in users) ...u.roles}.toList();
+          final present =
+              <RoleType>{for (final u in users) ...u.roles}.toList();
           final filtered = users.where(_matches).toList();
 
           return Column(
@@ -100,20 +100,23 @@ class _AdminRoleManagementScreenState
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: filtered.isEmpty
-                    ? const SumouEmptyState(
-                        title: 'لا يوجد مستخدمون',
-                        message: 'لا توجد نتائج مطابقة',
-                        icon: Icons.group_outlined,
-                      )
-                    : ListView.separated(
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (_, i) => _RoleUserCard(
-                          user: filtered[i],
-                          onTap: () => _editRoles(filtered[i]),
+                child:
+                    filtered.isEmpty
+                        ? const SumouEmptyState(
+                          title: 'لا يوجد مستخدمون',
+                          message: 'لا توجد نتائج مطابقة',
+                          icon: Icons.group_outlined,
+                        )
+                        : ListView.separated(
+                          itemCount: filtered.length,
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 12),
+                          itemBuilder:
+                              (_, i) => _RoleUserCard(
+                                user: filtered[i],
+                                onTap: () => _editRoles(filtered[i]),
+                              ),
                         ),
-                      ),
               ),
             ],
           );
@@ -205,9 +208,9 @@ class _RoleEditSheetState extends ConsumerState<_RoleEditSheet> {
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _toggleRole(RoleType r) {
@@ -234,6 +237,7 @@ class _RoleEditSheetState extends ConsumerState<_RoleEditSheet> {
       confirmLabel: 'حفظ',
     );
     if (!ok) return;
+    if (!mounted) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -259,8 +263,8 @@ class _RoleEditSheetState extends ConsumerState<_RoleEditSheet> {
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
-    final defaultOptions = _roles.toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
+    final defaultOptions =
+        _roles.toList()..sort((a, b) => a.index.compareTo(b.index));
 
     return SafeArea(
       child: ConstrainedBox(
@@ -368,9 +372,10 @@ class _SelectChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

@@ -1,4 +1,5 @@
-// Tests for admin role management (Sprint 4).
+// Tests for admin role management, now part of the merged access-control
+// screen (roles and permissions live together under the الصلاحيات tab).
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,9 +8,10 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'package:sumou_app/features/shell/role_based_bottom_nav.dart';
 
 void main() {
-  Future<void> openRoleManagement(WidgetTester tester) async {
+  Future<void> openAccessControl(WidgetTester tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     await container
@@ -21,14 +23,17 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('المزيد'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('إدارة الأدوار'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(RoleBasedBottomNav),
+        matching: find.text('الصلاحيات'),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 
-  testWidgets('admin opens role management from the More menu', (tester) async {
-    await openRoleManagement(tester);
+  testWidgets('admin opens access control from the nav', (tester) async {
+    await openAccessControl(tester);
     expect(find.text('بحث بالاسم أو اسم المستخدم'), findsOneWidget);
     expect(find.text('سعد المطيري'), findsOneWidget);
   });
@@ -36,10 +41,11 @@ void main() {
   testWidgets('editing a user\'s roles shows a success snackbar', (
     tester,
   ) async {
-    await openRoleManagement(tester);
+    await openAccessControl(tester);
 
     await tester.tap(find.text('سعد المطيري'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('حفظ التغييرات'));
     await tester.tap(find.text('حفظ التغييرات'));
     await tester.pumpAndSettle();
     // Confirm in the Sumou bottom sheet.
@@ -47,7 +53,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('تم تحديث الأدوار'), findsOneWidget);
+    expect(find.text('تم تحديث الأدوار والصلاحيات'), findsOneWidget);
   });
 
   test('updateUserRoles updates default and roles', () async {

@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/models/role_type.dart';
+import '../features/admin/access_control_screen.dart';
 import '../features/admin/all_projects_screen.dart';
 import '../features/admin/edit_project_screen.dart';
 import '../features/admin/project_details_screen.dart';
 import '../features/admin/project_team_screen.dart';
-import '../features/admin/role_management_screen.dart';
 import '../features/admin/stage_oversight_screen.dart';
+import '../features/admin/users_screen.dart';
 import '../features/auth/providers/auth_controller.dart';
 import '../features/auth/screens/entry_screen.dart';
 import '../features/auth/screens/login_screen.dart';
@@ -52,7 +53,8 @@ class AppRoutes {
   static const String adminHome = '/admin/home';
   static const String calendar = '/calendar';
   static const String managerClosures = '/manager/requests/closures';
-  static const String adminRoles = '/admin/roles';
+  static const String adminUsers = '/admin/users';
+  static const String adminAccess = '/admin/access';
   static const String adminProjects = '/admin/projects';
   static const String adminProjectDetails = '/admin/projects/:id';
   static String adminProjectDetailsPath(String id) => '/admin/projects/$id';
@@ -196,8 +198,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ClosureRequestsPage(),
       ),
       GoRoute(
-        path: AppRoutes.adminRoles,
-        builder: (context, state) => const AdminRoleManagementScreen(),
+        path: AppRoutes.adminUsers,
+        builder: (context, state) => const AdminUsersPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminAccess,
+        builder: (context, state) => const AdminAccessPage(),
       ),
       GoRoute(
         path: AppRoutes.adminProjects,

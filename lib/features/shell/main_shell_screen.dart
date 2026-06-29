@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
-import '../admin/permissions_screen.dart';
+import '../admin/access_control_screen.dart';
 import '../admin/reports_placeholder_screen.dart';
 import '../admin/users_screen.dart';
 import '../auth/providers/auth_controller.dart';
@@ -62,7 +62,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     } else if (current.label == RoleNavConfig.usersLabel) {
       body = const UsersScreen();
     } else if (current.label == RoleNavConfig.permissionsLabel) {
-      body = const PermissionsScreen();
+      body = const AccessControlScreen();
     } else if (current.label == RoleNavConfig.reportsLabel) {
       body = const ReportsPlaceholderScreen();
     } else if (current.label == RoleNavConfig.projectsLabel) {

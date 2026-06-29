@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'package:sumou_app/features/dashboard/admin_dashboard_screen.dart';
 
 import 'test_helpers.dart';
 
@@ -74,9 +75,23 @@ void main() {
     expect(find.text('إدارة المستخدمين'), findsOneWidget);
   });
 
-  testWidgets('quick action shows a coming-soon snackbar', (tester) async {
+  testWidgets('reports quick action shows a coming-soon snackbar', (
+    tester,
+  ) async {
     await pumpAdmin(tester);
-    await scrollAndTapCard(tester, 'إدارة المستخدمين');
+    // 'التقارير' is also a bottom-nav tab label; scope to the dashboard action.
+    final reportsAction = find.descendant(
+      of: find.byType(AdminDashboardScreen),
+      matching: find.text('التقارير'),
+    );
+    await tester.scrollUntilVisible(
+      reportsAction,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(reportsAction);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text('هذه الميزة قريباً'), findsOneWidget);
   });
 }

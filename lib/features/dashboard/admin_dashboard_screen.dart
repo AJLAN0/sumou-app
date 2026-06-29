@@ -237,19 +237,14 @@ class AdminDashboardScreen extends ConsumerWidget {
               onTap: () => context.push(AppRoutes.adminStages),
             ),
             _Action(
-              icon: Icons.shield_outlined,
-              label: 'إدارة الأدوار',
-              onTap: () => context.push(AppRoutes.adminRoles),
-            ),
-            _Action(
               icon: Icons.group_outlined,
               label: 'إدارة المستخدمين',
-              onTap: () => _comingSoon(context),
+              onTap: () => context.push(AppRoutes.adminUsers),
             ),
             _Action(
-              icon: Icons.lock_outline,
-              label: 'الصلاحيات',
-              onTap: () => _comingSoon(context),
+              icon: Icons.shield_outlined,
+              label: 'الأدوار والصلاحيات',
+              onTap: () => context.push(AppRoutes.adminAccess),
             ),
             _Action(
               icon: Icons.bar_chart,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -156,16 +157,43 @@ class _Details extends ConsumerWidget {
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'الإجراءات'),
         const SizedBox(height: 12),
+        // Manager main actions: edit the project and end it (submit closure).
+        if (isManager) ...[
+          SumouButton(
+            label: 'تعديل المشروع',
+            icon: Icons.edit_outlined,
+            onPressed:
+                () => context.push(AppRoutes.projectEditPath(project.id)),
+          ),
+          const SizedBox(height: 10),
+          if (!project.isCompleted) ...[
+            SumouButton(
+              label: 'إنهاء المشروع',
+              variant: SumouButtonVariant.secondary,
+              icon: Icons.flag_outlined,
+              onPressed:
+                  () => context.push(AppRoutes.projectClosurePath(project.id)),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+        // Stage update stays accessible: primary for photographers, demoted to
+        // secondary for managers (no longer a main manager action).
         if (canUpdateStages) ...[
           SumouButton(
             label: 'تحديث المرحلة',
+            variant:
+                isManager
+                    ? SumouButtonVariant.secondary
+                    : SumouButtonVariant.primary,
             icon: Icons.update,
             onPressed:
                 () => context.push(AppRoutes.projectStagePath(project.id)),
           ),
           const SizedBox(height: 10),
         ],
-        if (canRequestClosure) ...[
+        // Photographer closure request (assigned + permitted).
+        if (canRequestClosure && !isManager) ...[
           SumouButton(
             label: 'طلب إغلاق',
             variant: SumouButtonVariant.secondary,
@@ -175,6 +203,7 @@ class _Details extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
         ],
+        // Assign photographers — kept accessible, not a main manager action.
         if (canAssign) ...[
           SumouButton(
             label: 'إسناد مصور',
@@ -220,11 +249,7 @@ class _Summary extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _Line(icon: Icons.person_outline, text: project.clientName),
-          _Line(
-            icon: Icons.qr_code_2,
-            text: project.serial,
-            valueColor: AppColors.accentGreen,
-          ),
+          _SerialRow(serial: project.serial),
           _Line(icon: Icons.category_outlined, text: project.type.nameAr),
           _Line(
             icon: Icons.calendar_today_outlined,
@@ -260,6 +285,48 @@ class _Line extends StatelessWidget {
             child: Text(
               text,
               style: AppTextStyles.body.copyWith(color: valueColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Project serial line with a copy-to-clipboard button.
+class _SerialRow extends StatelessWidget {
+  const _SerialRow({required this.serial});
+
+  final String serial;
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: serial));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ الرقم التسلسلي')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.qr_code_2, size: 16, color: AppColors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              serial,
+              style: AppTextStyles.body.copyWith(color: AppColors.accentGreen),
+            ),
+          ),
+          InkWell(
+            onTap: () => _copy(context),
+            borderRadius: BorderRadius.circular(20),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.copy, size: 16, color: AppColors.textMuted),
             ),
           ),
         ],

@@ -48,15 +48,21 @@ void main() {
     expect(find.text('7. النشر'), findsOneWidget);
   });
 
-  testWidgets('manager sees permitted action buttons', (tester) async {
+  testWidgets('manager sees the new main actions plus accessible ones', (
+    tester,
+  ) async {
     await openDetails(tester, 'تصوير ميداني — مهرجان الرياض');
     // Actions are at the bottom; scroll to them.
     await tester.scrollUntilVisible(
-      find.text('إسناد مصور'),
+      find.text('تعديل المشروع'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('إسناد مصور'), findsOneWidget);
+    // New main manager actions.
+    expect(find.text('تعديل المشروع'), findsOneWidget);
+    expect(find.text('إنهاء المشروع'), findsOneWidget);
+    // Stage update / assign stay accessible (secondary).
     expect(find.text('تحديث المرحلة'), findsOneWidget);
+    expect(find.text('إسناد مصور'), findsOneWidget);
   });
 }

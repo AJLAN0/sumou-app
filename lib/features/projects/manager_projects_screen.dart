@@ -7,6 +7,7 @@ import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../shell/shell_providers.dart';
 import 'providers/projects_providers.dart';
 import 'widgets/project_card.dart';
 
@@ -44,6 +45,16 @@ class ManagerProjectsScreen extends ConsumerStatefulWidget {
 class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
   String _query = '';
   _ProjectFilter _filter = _ProjectFilter.all;
+
+  @override
+  void initState() {
+    super.initState();
+    // The manager home can request an active-only view when jumping here.
+    if (ref.read(managerProjectsShowActiveProvider)) {
+      _filter = _ProjectFilter.active;
+      ref.read(managerProjectsShowActiveProvider.notifier).state = false;
+    }
+  }
 
   bool _matchesQuery(ProjectModel p) {
     final q = _query.trim().toLowerCase();

@@ -30,7 +30,7 @@ void main() {
 
   testWidgets('add button opens the create-project flow', (tester) async {
     await openAddProject(tester);
-    expect(find.text('الخطوة 1 من 5'), findsOneWidget);
+    expect(find.text('الخطوة 1 من 4'), findsOneWidget);
     expect(find.text('المعلومات الأساسية'), findsWidgets);
   });
 
@@ -42,7 +42,7 @@ void main() {
     expect(find.text('الرجاء إدخال اسم المشروع'), findsOneWidget);
     expect(find.text('الرجاء اختيار نوع المشروع'), findsOneWidget);
     // Still on step 1.
-    expect(find.text('الخطوة 1 من 5'), findsOneWidget);
+    expect(find.text('الخطوة 1 من 4'), findsOneWidget);
   });
 
   testWidgets('advances to step 2 then gates on missing dates', (tester) async {
@@ -55,7 +55,7 @@ void main() {
     await tester.tap(find.text('التالي'));
     await tester.pumpAndSettle();
 
-    expect(find.text('الخطوة 2 من 5'), findsOneWidget);
+    expect(find.text('الخطوة 2 من 4'), findsOneWidget);
 
     // Step 2: fill client but leave dates empty, then try to advance.
     await tester.enterText(find.byType(TextField).first, 'عميل تجريبي');
@@ -63,7 +63,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('الرجاء اختيار تاريخ البداية'), findsOneWidget);
-    expect(find.text('الخطوة 2 من 5'), findsOneWidget);
+    expect(find.text('الخطوة 2 من 4'), findsOneWidget);
   });
 
   test('MockProjectRepository.createProject persists a new project', () async {

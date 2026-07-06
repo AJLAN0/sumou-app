@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Scrolls [text] into view and taps the enclosing [InkWell] (e.g. SumouCard).
-Future<void> scrollAndTapCard(
+/// Scrolls [label] into view and taps the enclosing [InkWell] (e.g. SumouCard).
+Future<void> scrollAndTapCardFinder(
   WidgetTester tester,
-  String text, {
+  Finder label, {
   Finder? scrollable,
   double scrollDelta = 300,
 }) async {
-  final label = find.text(text);
   await tester.scrollUntilVisible(
     label,
     scrollDelta,
@@ -21,3 +20,17 @@ Future<void> scrollAndTapCard(
   );
   await tester.pumpAndSettle();
 }
+
+/// Scrolls [text] into view and taps the enclosing [InkWell] (e.g. SumouCard).
+Future<void> scrollAndTapCard(
+  WidgetTester tester,
+  String text, {
+  Finder? scrollable,
+  double scrollDelta = 300,
+}) =>
+    scrollAndTapCardFinder(
+      tester,
+      find.text(text),
+      scrollable: scrollable,
+      scrollDelta: scrollDelta,
+    );

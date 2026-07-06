@@ -10,10 +10,7 @@ import 'providers/admin_providers.dart';
 
 /// Open the add/edit user form. Pass [user] to edit, or omit to create a new
 /// account. Saves through the user repository and refreshes [usersListProvider].
-Future<void> showUserFormSheet(
-  BuildContext context, {
-  UserModel? user,
-}) {
+Future<void> showUserFormSheet(BuildContext context, {UserModel? user}) {
   return showModalBottomSheet<void>(
     context: context,
     backgroundColor: AppColors.surface,
@@ -90,11 +87,12 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
     }
   }
 
-  List<String> _parsePhotoTypes() => _photoTypes.text
-      .split(RegExp(r'[،,]'))
-      .map((s) => s.trim())
-      .where((s) => s.isNotEmpty)
-      .toList();
+  List<String> _parsePhotoTypes() =>
+      _photoTypes.text
+          .split(RegExp(r'[،,]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
 
   Future<void> _save() async {
     final name = _name.text.trim();
@@ -163,8 +161,8 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final defaultOptions = _roles.toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
+    final defaultOptions =
+        _roles.toList()..sort((a, b) => a.index.compareTo(b.index));
 
     return SafeArea(
       child: ConstrainedBox(
@@ -306,9 +304,10 @@ class _SelectChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

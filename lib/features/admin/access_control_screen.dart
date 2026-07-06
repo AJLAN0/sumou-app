@@ -175,8 +175,8 @@ class _AccessControlScreenState extends ConsumerState<AccessControlScreen> {
         Expanded(
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) =>
-                const Center(child: Text('تعذّر تحميل المستخدمين')),
+            error:
+                (_, __) => const Center(child: Text('تعذّر تحميل المستخدمين')),
             data: (users) {
               final filtered = users.where(_matches).toList();
               if (filtered.isEmpty) {
@@ -189,10 +189,11 @@ class _AccessControlScreenState extends ConsumerState<AccessControlScreen> {
               return ListView.separated(
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => _AccessCard(
-                  user: filtered[i],
-                  onTap: () => _edit(filtered[i]),
-                ),
+                itemBuilder:
+                    (_, i) => _AccessCard(
+                      user: filtered[i],
+                      onTap: () => _edit(filtered[i]),
+                    ),
               );
             },
           ),
@@ -344,9 +345,10 @@ class _AccessEditSheetState extends ConsumerState<_AccessEditSheet> {
     final ok = await showSumouConfirmSheet(
       context,
       title: 'حفظ الأدوار والصلاحيات',
-      message: _sensitiveChanged
-          ? 'تتضمن التغييرات صلاحيات حساسة (إدارة/اعتماد). هل تريد الحفظ؟'
-          : 'تحديث أدوار وصلاحيات ${widget.user.fullName}؟',
+      message:
+          _sensitiveChanged
+              ? 'تتضمن التغييرات صلاحيات حساسة (إدارة/اعتماد). هل تريد الحفظ؟'
+              : 'تحديث أدوار وصلاحيات ${widget.user.fullName}؟',
       confirmLabel: 'حفظ',
       destructive: _sensitiveChanged,
     );
@@ -362,8 +364,10 @@ class _AccessEditSheetState extends ConsumerState<_AccessEditSheet> {
       defaultRole: _default,
       roles: _roles.toList(),
     );
-    final permsResult =
-        await repo.updateUserPermissions(widget.user.id, _perms);
+    final permsResult = await repo.updateUserPermissions(
+      widget.user.id,
+      _perms,
+    );
     ref.invalidate(usersListProvider);
     if (!mounted) return;
     navigator.pop();
@@ -371,7 +375,9 @@ class _AccessEditSheetState extends ConsumerState<_AccessEditSheet> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          ok2 ? 'تم تحديث الأدوار والصلاحيات' : 'تعذّر تحديث الأدوار والصلاحيات',
+          ok2
+              ? 'تم تحديث الأدوار والصلاحيات'
+              : 'تعذّر تحديث الأدوار والصلاحيات',
         ),
       ),
     );
@@ -380,8 +386,8 @@ class _AccessEditSheetState extends ConsumerState<_AccessEditSheet> {
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
-    final defaultOptions = _roles.toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
+    final defaultOptions =
+        _roles.toList()..sort((a, b) => a.index.compareTo(b.index));
 
     return SafeArea(
       child: ConstrainedBox(
@@ -621,9 +627,10 @@ class _SelectChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,

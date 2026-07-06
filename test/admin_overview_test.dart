@@ -1,6 +1,6 @@
 // Tests for the admin overview dashboard (Sprint 4).
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -84,14 +84,11 @@ void main() {
       of: find.byType(AdminDashboardScreen),
       matching: find.text('التقارير'),
     );
-    await tester.scrollUntilVisible(
+    await scrollAndTapCardFinder(
+      tester,
       reportsAction,
-      300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(reportsAction);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
     expect(find.text('هذه الميزة قريباً'), findsOneWidget);
   });
 }

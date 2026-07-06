@@ -36,6 +36,9 @@ class RoleNavConfig {
   /// Photographer calendar tab.
   static const String calendarLabel = 'تقويمي';
 
+  /// Manager team tab.
+  static const String teamLabel = 'الفريق';
+
   /// Admin tab labels (used to route to the admin screens).
   static const String usersLabel = 'المستخدمين';
   static const String permissionsLabel = 'الصلاحيات';
@@ -46,7 +49,7 @@ class RoleNavConfig {
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
       NavItem(label: projectsLabel, icon: Icons.work_outline),
       NavItem(label: requestsLabel, icon: Icons.inbox_outlined),
-      NavItem(label: 'الفريق', icon: Icons.group_outlined),
+      NavItem(label: teamLabel, icon: Icons.group_outlined),
       NavItem(label: moreLabel, icon: Icons.more_horiz),
     ],
     RoleType.photographer => const [

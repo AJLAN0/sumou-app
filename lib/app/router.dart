@@ -49,6 +49,8 @@ class AppRoutes {
   static const String projectClosure = '/manager/projects/:id/closure';
   static String projectClosurePath(String id) =>
       '/manager/projects/$id/closure';
+  static const String projectEdit = '/manager/projects/:id/edit';
+  static String projectEditPath(String id) => '/manager/projects/$id/edit';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
   static const String calendar = '/calendar';
@@ -182,6 +184,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             (context, state) => SubmitClosureRequestScreen(
               projectId: state.pathParameters['id']!,
             ),
+      ),
+      // The `/:id/edit` segment is more specific than `/:id`, so no conflict.
+      // Reuses the shared safe basic-edit screen for managers.
+      GoRoute(
+        path: AppRoutes.projectEdit,
+        builder:
+            (context, state) =>
+                AdminEditProjectScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

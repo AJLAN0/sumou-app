@@ -10,6 +10,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
 import 'providers/projects_providers.dart';
+import 'team_availability.dart';
 
 /// Photo/team role types offered when assigning the team. Mock list; a real
 /// catalogue arrives with the backend.
@@ -23,22 +24,25 @@ const List<String> _kPhotoTypes = [
 const List<String> _kStepTitles = [
   'المعلومات الأساسية',
   'العميل والتواريخ',
-  'مدير المشروع',
   'الفريق',
   'المراجعة',
 ];
 
-/// A draft team assignment built up while creating a project.
+/// A draft team assignment built up while creating a project. A photographer can
+/// hold more than one [photoTypes] and an optional [fee] (assignment metadata
+/// only — no finance records are created).
 class _TeamDraft {
   _TeamDraft({
     required this.userId,
     required this.personName,
-    required this.photoType,
+    required this.photoTypes,
+    this.fee = 0,
   });
 
   final String? userId;
   final String personName;
-  String photoType;
+  final Set<String> photoTypes;
+  num fee;
 }
 
 /// Full-screen, mobile-first multi-step flow for creating a project.
@@ -53,7 +57,7 @@ class AddProjectScreen extends ConsumerStatefulWidget {
 }
 
 class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
-  static const int _lastStep = 4;
+  static const int _lastStep = 3;
 
   int _step = 0;
   bool _showErrors = false;
@@ -114,13 +118,10 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
     return null;
   }
 
-  String? get _managerError =>
-      _managerId == null ? 'الرجاء اختيار مدير المشروع' : null;
-
   bool _stepIsValid(int step) => switch (step) {
     0 => _nameError == null && _typeError == null,
     1 => _clientError == null && _startError == null && _endError == null,
-    2 => _managerError == null,
+    // Step 2 (team) is optional; step 3 is review.
     _ => true,
   };
 
@@ -152,11 +153,18 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
   }
 
   Future<void> _save() async {
-    // Defensive re-check across all gated steps.
-    if (!(_stepIsValid(0) && _stepIsValid(1) && _stepIsValid(2))) {
+    // Defensive re-check across the gated steps.
+    if (!(_stepIsValid(0) && _stepIsValid(1))) {
       setState(() => _showErrors = true);
       return;
     }
+    // The project manager is always the signed-in manager (no manager step).
+    if (_managerId == null) {
+      final user = ref.read(authControllerProvider).currentUser;
+      _managerId = user?.id;
+      _managerName = user?.fullName;
+    }
+    if (_managerId == null) return; // no signed-in manager — nothing to save
     setState(() => _saving = true);
     final repo = ref.read(projectRepositoryProvider);
     final notes = _notesController.text.trim();
@@ -172,13 +180,17 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
       serial: _serialPreview,
       teamRoles: [
         for (final member in _team)
-          ProjectTeamRole(
-            id: '',
-            projectId: '',
-            type: member.photoType,
-            personName: member.personName,
-            userId: member.userId,
-          ),
+          for (var i = 0; i < member.photoTypes.length; i++)
+            ProjectTeamRole(
+              id: '',
+              projectId: '',
+              type: member.photoTypes.elementAt(i),
+              personName: member.personName,
+              userId: member.userId,
+              // Keep the fee on the first role only so it isn't double-counted.
+              value: i == 0 ? member.fee : 0,
+              date: _startDate,
+            ),
       ],
     );
     ref.invalidate(managerProjectsProvider);
@@ -209,24 +221,20 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
     });
   }
 
-  Future<void> _pickManager(List<UserModel> candidates) async {
-    final chosen = await _showUserPicker(
-      title: 'اختر مدير المشروع',
-      users: candidates,
-      selectedId: _managerId,
-    );
-    if (chosen == null) return;
-    setState(() {
-      _managerId = chosen.id;
-      _managerName = chosen.fullName;
-    });
-  }
-
-  Future<void> _addTeamMember(List<UserModel> candidates) async {
+  Future<void> _addTeamMember(
+    List<UserModel> candidates,
+    List<ProjectModel> allProjects,
+  ) async {
+    // Prevent picking the same photographer twice.
+    final existing = _team.map((m) => m.userId).toSet();
+    final selectable = candidates.where((u) => !existing.contains(u.id)).toList();
     final chosen = await _showUserPicker(
       title: 'اختر عضو الفريق',
-      users: candidates,
+      users: selectable,
       selectedId: null,
+      lockFor: (u) => _startDate == null
+          ? AvailabilityLock.none
+          : availabilityLockFor(u, _startDate!, allProjects),
     );
     if (chosen == null) return;
     setState(() {
@@ -234,10 +242,11 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
         _TeamDraft(
           userId: chosen.id,
           personName: chosen.fullName,
-          photoType:
-              chosen.photoTypes.isNotEmpty
-                  ? chosen.photoTypes.first
-                  : _kPhotoTypes.first,
+          photoTypes: {
+            chosen.photoTypes.isNotEmpty
+                ? chosen.photoTypes.first
+                : _kPhotoTypes.first,
+          },
         ),
       );
     });
@@ -247,6 +256,7 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
     required String title,
     required List<UserModel> users,
     required String? selectedId,
+    AvailabilityLock Function(UserModel)? lockFor,
   }) {
     return showModalBottomSheet<UserModel>(
       context: context,
@@ -287,35 +297,55 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                       itemBuilder: (_, i) {
                         final u = users[i];
                         final selected = u.id == selectedId;
-                        return SumouCard(
-                          borderColor: selected ? AppColors.accentGreen : null,
-                          onTap: () => Navigator.of(sheetContext).pop(u),
-                          child: Row(
-                            children: [
-                              _Avatar(initials: u.avatarInitials),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      u.fullName,
-                                      style: AppTextStyles.titleMedium,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      u.defaultRole.nameAr,
-                                      style: AppTextStyles.bodyMuted,
-                                    ),
-                                  ],
+                        final lock =
+                            lockFor?.call(u) ?? AvailabilityLock.none;
+                        final locked = lock.isLocked;
+                        return Opacity(
+                          opacity: locked ? 0.55 : 1,
+                          child: SumouCard(
+                            borderColor:
+                                selected ? AppColors.accentGreen : null,
+                            onTap: locked
+                                ? null
+                                : () => Navigator.of(sheetContext).pop(u),
+                            child: Row(
+                              children: [
+                                _Avatar(initials: u.avatarInitials),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        u.fullName,
+                                        style: AppTextStyles.titleMedium,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        locked
+                                            ? lock.reasonAr!
+                                            : u.defaultRole.nameAr,
+                                        style: AppTextStyles.bodyMuted.copyWith(
+                                          color: locked ? AppColors.error : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              if (selected)
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: AppColors.accentGreen,
-                                ),
-                            ],
+                                if (locked)
+                                  const Icon(
+                                    Icons.lock_outline,
+                                    color: AppColors.error,
+                                    size: 18,
+                                  )
+                                else if (selected)
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: AppColors.accentGreen,
+                                  ),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -367,8 +397,7 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
   Widget _buildStep() => switch (_step) {
     0 => _basicInfoStep(),
     1 => _clientDatesStep(),
-    2 => _managerStep(),
-    3 => _teamStep(),
+    2 => _teamStep(),
     _ => _reviewStep(),
   };
 
@@ -443,69 +472,26 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
     );
   }
 
-  // Step 3 — manager.
-  Widget _managerStep() {
-    final managersAsync = ref.watch(managerCandidatesProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _StepHeader(title: 'مدير المشروع'),
-        managersAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error:
-              (_, __) =>
-                  Text('تعذّر تحميل المدراء', style: AppTextStyles.bodyMuted),
-          data: (managers) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SumouCard(
-                  onTap: () => _pickManager(managers),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _managerId == null
-                            ? Icons.person_add_alt
-                            : Icons.badge_outlined,
-                        color: AppColors.accentGreen,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _managerName ?? 'اختر مدير المشروع',
-                          style:
-                              _managerName == null
-                                  ? AppTextStyles.bodyMuted
-                                  : AppTextStyles.titleMedium,
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_left,
-                        color: AppColors.textMuted,
-                      ),
-                    ],
-                  ),
-                ),
-                if (_showErrors && _managerError != null)
-                  _ErrorText(_managerError!),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // Step 4 — team.
+  // Step 3 — team.
   Widget _teamStep() {
     final photographersAsync = ref.watch(photographerCandidatesProvider);
+    final allProjects =
+        ref.watch(allProjectsProvider).valueOrNull ?? const <ProjectModel>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _StepHeader(
           title: 'الفريق',
-          subtitle: 'أضف المصورين وأعضاء الفريق (اختياري)',
+          subtitle: 'أضف المصورين وحدّد أنواع التصوير والقيمة (اختياري)',
         ),
+        if (_startDate != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'المتاحون محسوبون حسب تاريخ المشروع: ${_fmtDate(_startDate)}',
+              style: AppTextStyles.label,
+            ),
+          ),
         if (_team.isEmpty)
           SumouCard(
             child: Text(
@@ -516,9 +502,17 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
         else
           for (var i = 0; i < _team.length; i++) ...[
             _TeamMemberEditor(
+              key: ValueKey(_team[i].userId ?? _team[i].personName),
               member: _team[i],
-              onTypeChanged:
-                  (type) => setState(() => _team[i].photoType = type),
+              onToggleType: (type) => setState(() {
+                final types = _team[i].photoTypes;
+                if (types.contains(type)) {
+                  if (types.length > 1) types.remove(type);
+                } else {
+                  types.add(type);
+                }
+              }),
+              onFeeChanged: (fee) => _team[i].fee = fee,
               onRemove: () => setState(() => _team.removeAt(i)),
             ),
             const SizedBox(height: 10),
@@ -534,14 +528,14 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                 label: 'إضافة عضو للفريق',
                 variant: SumouButtonVariant.secondary,
                 icon: Icons.person_add_alt,
-                onPressed: () => _addTeamMember(photographers),
+                onPressed: () => _addTeamMember(photographers, allProjects),
               ),
         ),
       ],
     );
   }
 
-  // Step 5 — review.
+  // Step 4 — review.
   Widget _reviewStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,19 +809,44 @@ class _DateField extends StatelessWidget {
   }
 }
 
-class _TeamMemberEditor extends StatelessWidget {
+class _TeamMemberEditor extends StatefulWidget {
   const _TeamMemberEditor({
+    super.key,
     required this.member,
-    required this.onTypeChanged,
+    required this.onToggleType,
+    required this.onFeeChanged,
     required this.onRemove,
   });
 
   final _TeamDraft member;
-  final ValueChanged<String> onTypeChanged;
+  final ValueChanged<String> onToggleType;
+  final ValueChanged<num> onFeeChanged;
   final VoidCallback onRemove;
 
   @override
+  State<_TeamMemberEditor> createState() => _TeamMemberEditorState();
+}
+
+class _TeamMemberEditorState extends State<_TeamMemberEditor> {
+  late final TextEditingController _fee;
+
+  @override
+  void initState() {
+    super.initState();
+    _fee = TextEditingController(
+      text: widget.member.fee > 0 ? '${widget.member.fee}' : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _fee.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final member = widget.member;
     return SumouCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,13 +863,13 @@ class _TeamMemberEditor extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                onPressed: onRemove,
+                onPressed: widget.onRemove,
                 tooltip: 'إزالة',
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text('نوع التصوير', style: AppTextStyles.label),
+          Text('أنواع التصوير', style: AppTextStyles.label),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -859,10 +878,19 @@ class _TeamMemberEditor extends StatelessWidget {
               for (final type in _kPhotoTypes)
                 _ChoiceChip(
                   label: type,
-                  selected: member.photoType == type,
-                  onTap: () => onTypeChanged(type),
+                  selected: member.photoTypes.contains(type),
+                  onTap: () => widget.onToggleType(type),
                 ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SumouTextField(
+            controller: _fee,
+            label: 'القيمة (ر.س) — اختياري',
+            hint: '0',
+            keyboardType: TextInputType.number,
+            prefixIcon: Icons.sell_outlined,
+            onChanged: (v) => widget.onFeeChanged(num.tryParse(v.trim()) ?? 0),
           ),
         ],
       ),

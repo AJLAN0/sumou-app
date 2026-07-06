@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -219,11 +220,7 @@ class _Summary extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _Line(icon: Icons.person_outline, text: p.clientName),
-          _Line(
-            icon: Icons.qr_code_2,
-            text: p.serial,
-            valueColor: AppColors.accentGreen,
-          ),
+          _SerialRow(serial: p.serial),
           _Line(icon: Icons.category_outlined, text: p.type.nameAr),
           _Line(
             icon: Icons.badge_outlined,
@@ -275,6 +272,48 @@ class _Summary extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Project serial line with a copy-to-clipboard button.
+class _SerialRow extends StatelessWidget {
+  const _SerialRow({required this.serial});
+
+  final String serial;
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: serial));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ الرقم التسلسلي')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.qr_code_2, size: 16, color: AppColors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              serial,
+              style: AppTextStyles.body.copyWith(color: AppColors.accentGreen),
+            ),
+          ),
+          InkWell(
+            onTap: () => _copy(context),
+            borderRadius: BorderRadius.circular(20),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.copy, size: 16, color: AppColors.textMuted),
+            ),
           ),
         ],
       ),

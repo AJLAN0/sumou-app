@@ -29,16 +29,15 @@ void main() {
     await tester.tap(find.text(projectName));
     await tester.pumpAndSettle();
 
-    final updateStage = find.widgetWithText(SumouButton, 'تحديث المرحلة');
-    final detailsScroll = find.byType(Scrollable).first;
+    // Stage update now lives inside the "تعديل المشروع" hub.
     await tester.scrollUntilVisible(
-      updateStage,
+      find.text('تعديل المشروع'),
       500,
-      scrollable: detailsScroll,
+      scrollable: find.byType(Scrollable).first,
     );
-    await tester.drag(detailsScroll, const Offset(0, -100));
+    await tester.tap(find.text('تعديل المشروع'));
     await tester.pumpAndSettle();
-    await tester.tap(updateStage);
+    await tester.tap(find.text('تحديث المرحلة'));
     await tester.pumpAndSettle();
   }
 

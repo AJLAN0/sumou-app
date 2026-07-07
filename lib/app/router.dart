@@ -22,6 +22,8 @@ import '../features/profile/profile_screen.dart';
 import '../features/projects/add_project_screen.dart';
 import '../features/projects/assign_photographers_screen.dart';
 import '../features/projects/closure_requests_screen.dart';
+import '../features/projects/end_project_screen.dart';
+import '../features/projects/manage_project_screen.dart';
 import '../features/projects/project_details_screen.dart';
 import '../features/projects/smart_calendar_screen.dart';
 import '../features/projects/submit_closure_request_screen.dart';
@@ -51,6 +53,11 @@ class AppRoutes {
       '/manager/projects/$id/closure';
   static const String projectEdit = '/manager/projects/:id/edit';
   static String projectEditPath(String id) => '/manager/projects/$id/edit';
+  static const String projectManage = '/manager/projects/:id/manage';
+  static String projectManagePath(String id) =>
+      '/manager/projects/$id/manage';
+  static const String projectEnd = '/manager/projects/:id/end';
+  static String projectEndPath(String id) => '/manager/projects/$id/end';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
   static const String calendar = '/calendar';
@@ -192,6 +199,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder:
             (context, state) =>
                 AdminEditProjectScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.projectManage,
+        builder:
+            (context, state) =>
+                ManageProjectScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.projectEnd,
+        builder:
+            (context, state) =>
+                EndProjectScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.projectDetails,

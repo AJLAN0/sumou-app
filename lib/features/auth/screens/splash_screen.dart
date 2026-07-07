@@ -51,9 +51,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     // Size the mark to the screen so it reads big on any device.
-    final logoWidth = (MediaQuery.sizeOf(context).width * 0.62).clamp(
-      220.0,
-      340.0,
+    final logoWidth = (MediaQuery.sizeOf(context).width * 0.432).clamp(
+      153.0,
+      225.0,
     );
     return SumouScaffold(
       // The brand mark fills with liquid white as the loading indicator.

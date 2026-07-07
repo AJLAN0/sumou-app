@@ -54,8 +54,7 @@ class AppRoutes {
   static const String projectEdit = '/manager/projects/:id/edit';
   static String projectEditPath(String id) => '/manager/projects/$id/edit';
   static const String projectManage = '/manager/projects/:id/manage';
-  static String projectManagePath(String id) =>
-      '/manager/projects/$id/manage';
+  static String projectManagePath(String id) => '/manager/projects/$id/manage';
   static const String projectEnd = '/manager/projects/:id/end';
   static String projectEndPath(String id) => '/manager/projects/$id/end';
   static const String photographerHome = '/photographer/home';

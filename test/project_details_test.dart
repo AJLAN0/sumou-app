@@ -52,9 +52,10 @@ void main() {
     tester,
   ) async {
     await openDetails(tester, 'تصوير ميداني — مهرجان الرياض');
-    // Actions are at the bottom; scroll to them.
+    // Actions are at the bottom of a lazy ListView. Scroll to the last action so
+    // the whole action group is built and visible together before asserting.
     await tester.scrollUntilVisible(
-      find.text('تعديل المشروع'),
+      find.text('إسناد مصور'),
       300,
       scrollable: find.byType(Scrollable).first,
     );

@@ -63,8 +63,15 @@ void main() {
     await tester.tap(find.widgetWithText(SumouButton, 'حفظ المرحلة'));
     await tester.pumpAndSettle();
 
-    // Back on the details screen with the new progress (2 of 3 done).
+    // Back on the details screen with the new progress (2 of 3 done). The
+    // details list is still scrolled down from opening the update-stage button,
+    // so scroll the progress header (near the top) back into view.
     expect(find.text('تفاصيل المشروع'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('67%'),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('67%'), findsOneWidget);
   });
 

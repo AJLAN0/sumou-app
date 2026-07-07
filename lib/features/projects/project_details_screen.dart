@@ -267,11 +267,10 @@ class _Summary extends StatelessWidget {
 }
 
 class _Line extends StatelessWidget {
-  const _Line({required this.icon, required this.text, this.valueColor});
+  const _Line({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
-  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -282,10 +281,7 @@ class _Line extends StatelessWidget {
           Icon(icon, size: 16, color: AppColors.textMuted),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: AppTextStyles.body.copyWith(color: valueColor),
-            ),
+            child: Text(text, style: AppTextStyles.body),
           ),
         ],
       ),
@@ -302,9 +298,9 @@ class _SerialRow extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: serial));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم نسخ الرقم التسلسلي')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('تم نسخ الرقم التسلسلي')));
   }
 
   @override

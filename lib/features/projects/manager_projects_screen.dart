@@ -50,9 +50,14 @@ class _ManagerProjectsScreenState extends ConsumerState<ManagerProjectsScreen> {
   void initState() {
     super.initState();
     // The manager home can request an active-only view when jumping here.
+    // Reading the flag now is safe; clearing it must happen after this build
+    // frame, since modifying a provider during a widget build throws.
     if (ref.read(managerProjectsShowActiveProvider)) {
       _filter = _ProjectFilter.active;
-      ref.read(managerProjectsShowActiveProvider.notifier).state = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(managerProjectsShowActiveProvider.notifier).state = false;
+      });
     }
   }
 

@@ -27,10 +27,9 @@ Future<void> scrollAndTapCard(
   String text, {
   Finder? scrollable,
   double scrollDelta = 300,
-}) =>
-    scrollAndTapCardFinder(
-      tester,
-      find.text(text),
-      scrollable: scrollable,
-      scrollDelta: scrollDelta,
-    );
+}) => scrollAndTapCardFinder(
+  tester,
+  find.text(text),
+  scrollable: scrollable,
+  scrollDelta: scrollDelta,
+);

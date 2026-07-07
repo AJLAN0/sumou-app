@@ -30,9 +30,8 @@ class ManagerTeamScreen extends ConsumerWidget {
             icon: Icons.group_outlined,
           );
         }
-        final available = photographers
-            .where((u) => (counts[u.id] ?? 0) < 2)
-            .length;
+        final available =
+            photographers.where((u) => (counts[u.id] ?? 0) < 2).length;
         return ListView(
           children: [
             const SizedBox(height: 4),
@@ -102,7 +101,8 @@ class _TeamMemberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final available = activeCount < 2;
-    final statusColor = available ? AppColors.accentGreen : AppColors.financeYellow;
+    final statusColor =
+        available ? AppColors.accentGreen : AppColors.financeYellow;
     final statusLabel = available ? 'متاح' : 'مشغول';
 
     return SumouCard(

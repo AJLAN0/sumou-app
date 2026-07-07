@@ -28,12 +28,17 @@ void main() {
     await tester.tap(find.text(projectName));
     await tester.pumpAndSettle();
 
+    // Team management now lives inside the "تعديل المشروع" hub.
     await tester.scrollUntilVisible(
-      find.text('إسناد مصور'),
+      find.text('تعديل المشروع'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('إسناد مصور'));
+    await tester.ensureVisible(find.text('تعديل المشروع'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تعديل المشروع'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إدارة الفريق'));
     await tester.pumpAndSettle();
   }
 

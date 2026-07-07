@@ -13,33 +13,26 @@ class EntryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Size the logo to the screen so it reads clearly on any device, while
+    // keeping sensible min/max bounds. The source art is wordmark-width, so we
+    // size by width and let the height follow the aspect ratio.
+    final logoWidth = (MediaQuery.sizeOf(context).width * 0.468).clamp(
+      162.0,
+      252.0,
+    );
     return SumouScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 24),
+          const SizedBox(height: 48),
+          // Full Sumou logo (with wordmark), centered and never stretched.
           Center(
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.primaryTeal,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.camera_alt_outlined,
-                color: AppColors.accentGreen,
-                size: 36,
-              ),
+            child: SumouLogo.full(
+              width: logoWidth,
+              fallback: const _BrandFallback(),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'سمو الإبداع',
-            style: AppTextStyles.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 24),
           Text(
             'كيف تريد المتابعة؟',
             style: AppTextStyles.bodyMuted,
@@ -64,6 +57,40 @@ class EntryScreen extends StatelessWidget {
           const Spacer(),
         ],
       ),
+    );
+  }
+}
+
+/// Shown on the entry screen while the full logo asset isn't available yet —
+/// mirrors the previous branded header (teal icon + name).
+class _BrandFallback extends StatelessWidget {
+  const _BrandFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: AppColors.primaryTeal,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Icon(
+            Icons.camera_alt_outlined,
+            color: AppColors.accentGreen,
+            size: 36,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'سمو الإبداع',
+          style: AppTextStyles.titleLarge,
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

@@ -16,7 +16,15 @@ import 'widgets/admin_project_card.dart';
 bool _isDelayed(ProjectModel p, DateTime today) =>
     !p.isCompleted && DateUtils.dateOnly(p.endDate).isBefore(today);
 
-enum _StageFilter { all, inProgress, pendingClosure, completed, delayed, field, social }
+enum _StageFilter {
+  all,
+  inProgress,
+  pendingClosure,
+  completed,
+  delayed,
+  field,
+  social,
+}
 
 extension _StageFilterView on _StageFilter {
   String get label => switch (this) {
@@ -58,7 +66,8 @@ class _AdminStageOversightScreenState
 
   bool _matches(ProjectModel p, DateTime today) {
     final q = _query.trim().toLowerCase();
-    final matchesQuery = q.isEmpty ||
+    final matchesQuery =
+        q.isEmpty ||
         p.name.toLowerCase().contains(q) ||
         p.clientName.toLowerCase().contains(q) ||
         p.serial.toLowerCase().contains(q);
@@ -83,11 +92,9 @@ class _AdminStageOversightScreenState
       ),
       body: projectsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذّر تحميل المشاريع')),
+        error: (_, __) => const Center(child: Text('تعذّر تحميل المشاريع')),
         data: (projects) {
-          final filtered =
-              projects.where((p) => _matches(p, today)).toList();
+          final filtered = projects.where((p) => _matches(p, today)).toList();
           return Column(
             children: [
               _StatsStrip(projects: projects, today: today),
@@ -116,39 +123,40 @@ class _AdminStageOversightScreenState
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: projects.isEmpty
-                    ? const SumouEmptyState(
-                        title: 'لا توجد مشاريع',
-                        icon: Icons.timeline_outlined,
-                      )
-                    : filtered.isEmpty
+                child:
+                    projects.isEmpty
                         ? const SumouEmptyState(
-                            title: 'لا توجد نتائج مطابقة',
-                            message: 'جرّب تعديل البحث أو الفلاتر',
-                            icon: Icons.search_off,
-                          )
+                          title: 'لا توجد مشاريع',
+                          icon: Icons.timeline_outlined,
+                        )
+                        : filtered.isEmpty
+                        ? const SumouEmptyState(
+                          title: 'لا توجد نتائج مطابقة',
+                          message: 'جرّب تعديل البحث أو الفلاتر',
+                          icon: Icons.search_off,
+                        )
                         : ListView.separated(
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (_, i) {
-                              final p = filtered[i];
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (_isDelayed(p, today))
-                                    const Padding(
-                                      padding: EdgeInsets.only(bottom: 6),
-                                      child: _DelayedTag(),
-                                    ),
-                                  AdminProjectCard(
-                                    project: p,
-                                    onTap: () => _openDetails(p.id),
+                          itemCount: filtered.length,
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (_, i) {
+                            final p = filtered[i];
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_isDelayed(p, today))
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 6),
+                                    child: _DelayedTag(),
                                   ),
-                                ],
-                              );
-                            },
-                          ),
+                                AdminProjectCard(
+                                  project: p,
+                                  onTap: () => _openDetails(p.id),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
               ),
             ],
           );
@@ -173,17 +181,24 @@ class _StatsStrip extends StatelessWidget {
     final pending = projects.where((p) => p.hasPendingClosure).length;
     final completed = projects.where((p) => p.isCompleted).length;
     final delayed = projects.where((p) => _isDelayed(p, today)).length;
-    final inProgressStages = projects
-        .where((p) => !p.isCompleted && p.currentStage != null)
-        .length;
+    final inProgressStages =
+        projects.where((p) => !p.isCompleted && p.currentStage != null).length;
 
     return SumouCard(
       child: Wrap(
         spacing: 16,
         runSpacing: 10,
         children: [
-          _MiniStat(value: '$total', label: 'الإجمالي', color: AppColors.projectTeal),
-          _MiniStat(value: '$active', label: 'نشطة', color: AppColors.primaryTeal),
+          _MiniStat(
+            value: '$total',
+            label: 'الإجمالي',
+            color: AppColors.projectTeal,
+          ),
+          _MiniStat(
+            value: '$active',
+            label: 'نشطة',
+            color: AppColors.primaryTeal,
+          ),
           _MiniStat(
             value: '$pending',
             label: 'بانتظار الإغلاق',
@@ -244,7 +259,11 @@ class _DelayedTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.error),
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: AppColors.error,
+          ),
           const SizedBox(width: 4),
           Text(
             'متأخر عن موعد التسليم',
@@ -258,4 +277,3 @@ class _DelayedTag extends StatelessWidget {
     );
   }
 }
-

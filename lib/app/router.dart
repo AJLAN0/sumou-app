@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/models/role_type.dart';
+import '../features/admin/access_control_screen.dart';
 import '../features/admin/all_projects_screen.dart';
 import '../features/admin/edit_project_screen.dart';
 import '../features/admin/project_details_screen.dart';
 import '../features/admin/project_team_screen.dart';
-import '../features/admin/role_management_screen.dart';
 import '../features/admin/stage_oversight_screen.dart';
+import '../features/admin/users_screen.dart';
 import '../features/auth/providers/auth_controller.dart';
 import '../features/auth/screens/entry_screen.dart';
 import '../features/auth/screens/login_screen.dart';
@@ -21,6 +22,8 @@ import '../features/profile/profile_screen.dart';
 import '../features/projects/add_project_screen.dart';
 import '../features/projects/assign_photographers_screen.dart';
 import '../features/projects/closure_requests_screen.dart';
+import '../features/projects/end_project_screen.dart';
+import '../features/projects/manage_project_screen.dart';
 import '../features/projects/project_details_screen.dart';
 import '../features/projects/smart_calendar_screen.dart';
 import '../features/projects/submit_closure_request_screen.dart';
@@ -48,11 +51,18 @@ class AppRoutes {
   static const String projectClosure = '/manager/projects/:id/closure';
   static String projectClosurePath(String id) =>
       '/manager/projects/$id/closure';
+  static const String projectEdit = '/manager/projects/:id/edit';
+  static String projectEditPath(String id) => '/manager/projects/$id/edit';
+  static const String projectManage = '/manager/projects/:id/manage';
+  static String projectManagePath(String id) => '/manager/projects/$id/manage';
+  static const String projectEnd = '/manager/projects/:id/end';
+  static String projectEndPath(String id) => '/manager/projects/$id/end';
   static const String photographerHome = '/photographer/home';
   static const String adminHome = '/admin/home';
   static const String calendar = '/calendar';
   static const String managerClosures = '/manager/requests/closures';
-  static const String adminRoles = '/admin/roles';
+  static const String adminUsers = '/admin/users';
+  static const String adminAccess = '/admin/access';
   static const String adminProjects = '/admin/projects';
   static const String adminProjectDetails = '/admin/projects/:id';
   static String adminProjectDetailsPath(String id) => '/admin/projects/$id';
@@ -181,6 +191,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               projectId: state.pathParameters['id']!,
             ),
       ),
+      // The `/:id/edit` segment is more specific than `/:id`, so no conflict.
+      // Reuses the shared safe basic-edit screen for managers.
+      GoRoute(
+        path: AppRoutes.projectEdit,
+        builder:
+            (context, state) =>
+                AdminEditProjectScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.projectManage,
+        builder:
+            (context, state) =>
+                ManageProjectScreen(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.projectEnd,
+        builder:
+            (context, state) =>
+                EndProjectScreen(projectId: state.pathParameters['id']!),
+      ),
       GoRoute(
         path: AppRoutes.projectDetails,
         builder:
@@ -196,8 +226,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ClosureRequestsPage(),
       ),
       GoRoute(
-        path: AppRoutes.adminRoles,
-        builder: (context, state) => const AdminRoleManagementScreen(),
+        path: AppRoutes.adminUsers,
+        builder: (context, state) => const AdminUsersPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.adminAccess,
+        builder: (context, state) => const AdminAccessPage(),
       ),
       GoRoute(
         path: AppRoutes.adminProjects,
@@ -206,13 +240,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // The `/:id/edit` segment is more specific than `/:id`, so no conflict.
       GoRoute(
         path: AppRoutes.adminProjectEdit,
-        builder: (context, state) =>
-            AdminEditProjectScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) =>
+                AdminEditProjectScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.adminProjectTeam,
-        builder: (context, state) =>
-            AdminProjectTeamScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) =>
+                AdminProjectTeamScreen(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.adminStages,
@@ -220,8 +256,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.adminProjectDetails,
-        builder: (context, state) =>
-            AdminProjectDetailsScreen(projectId: state.pathParameters['id']!),
+        builder:
+            (context, state) => AdminProjectDetailsScreen(
+              projectId: state.pathParameters['id']!,
+            ),
       ),
       GoRoute(
         path: AppRoutes.profile,

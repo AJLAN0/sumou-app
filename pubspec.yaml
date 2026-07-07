@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+3
+version: 1.1.0+4
 
 environment:
   sdk: ^3.7.2
@@ -78,7 +78,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
+  # Branding assets (Sumou logos). Declared as a directory so the logo files
+  # are picked up once dropped in — see lib/core/constants/app_assets.dart.
+  assets:
+    - assets/branding/
+
+  # To add more assets to your application, add them to an assets section, like:
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

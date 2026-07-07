@@ -36,9 +36,7 @@ class AdminProjectCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(p.name, style: AppTextStyles.titleMedium),
-              ),
+              Expanded(child: Text(p.name, style: AppTextStyles.titleMedium)),
               const SizedBox(width: 8),
               SumouStatusChip(sumouStatusForProject(p.status)),
             ],

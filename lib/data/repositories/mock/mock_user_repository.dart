@@ -12,8 +12,87 @@ class MockUserRepository implements UserRepository {
 
   final List<UserModel> _users;
 
+  // Monotonic counter so generated ids are unique within a session.
+  int _seq = 0;
+
+  String _newId() => 'u-new-${DateTime.now().millisecondsSinceEpoch}-${_seq++}';
+
+  bool _usernameTaken(String username, {String? exceptId}) {
+    final target = username.trim().toLowerCase();
+    return _users.any(
+      (u) => u.id != exceptId && u.username.trim().toLowerCase() == target,
+    );
+  }
+
   @override
   Future<List<UserModel>> getUsers() async => List.unmodifiable(_users);
+
+  @override
+  Future<UserModel?> createUser({
+    required String fullName,
+    required String username,
+    String? email,
+    required RoleType defaultRole,
+    required List<RoleType> roles,
+    List<String> photoTypes = const [],
+    FeaturePermissions permissions = const FeaturePermissions(),
+    bool active = true,
+  }) async {
+    if (!roles.contains(defaultRole)) return null;
+    if (_usernameTaken(username)) return null;
+    final user = UserModel(
+      id: _newId(),
+      fullName: fullName,
+      username: username,
+      email: email,
+      defaultRole: defaultRole,
+      roles: List.of(roles),
+      photoTypes: List.of(photoTypes),
+      permissions: permissions,
+      active: active,
+    );
+    _users.add(user);
+    return user;
+  }
+
+  @override
+  Future<UserModel?> updateUser(
+    String userId, {
+    required String fullName,
+    required String username,
+    String? email,
+    required RoleType defaultRole,
+    required List<RoleType> roles,
+    List<String> photoTypes = const [],
+    bool active = true,
+  }) async {
+    final i = _users.indexWhere((u) => u.id == userId);
+    if (i < 0) return null;
+    if (!roles.contains(defaultRole)) return null;
+    if (_usernameTaken(username, exceptId: userId)) return null;
+    // Build a fresh model so cleared fields (e.g. email) actually clear, while
+    // preserving permissions (managed separately).
+    final updated = UserModel(
+      id: userId,
+      fullName: fullName,
+      username: username,
+      email: email,
+      defaultRole: defaultRole,
+      roles: List.of(roles),
+      photoTypes: List.of(photoTypes),
+      permissions: _users[i].permissions,
+      active: active,
+    );
+    _users[i] = updated;
+    return updated;
+  }
+
+  @override
+  Future<bool> deleteUser(String userId) async {
+    final before = _users.length;
+    _users.removeWhere((u) => u.id == userId);
+    return _users.length != before;
+  }
 
   @override
   Future<UserModel?> setUserActive(String userId, bool active) async {

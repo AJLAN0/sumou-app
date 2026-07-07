@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
+import 'package:sumou_app/core/widgets/widgets.dart';
 
 void main() {
   testWidgets(
@@ -12,9 +13,9 @@ void main() {
     (tester) async {
       await tester.pumpWidget(const ProviderScope(child: SumouApp()));
 
-      // Splash is shown first.
+      // Splash is shown first (the animated brand loader).
       await tester.pump();
-      expect(find.text('سمو الإبداع'), findsOneWidget);
+      expect(find.byType(LiquidLogoLoader), findsOneWidget);
 
       // After the splash delay it routes to the entry screen.
       await tester.pump(const Duration(seconds: 2));

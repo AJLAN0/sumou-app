@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
-import '../admin/permissions_screen.dart';
+import '../admin/access_control_screen.dart';
 import '../admin/reports_placeholder_screen.dart';
 import '../admin/users_screen.dart';
 import '../auth/providers/auth_controller.dart';
@@ -14,12 +14,14 @@ import '../dashboard/role_placeholder_home.dart';
 import '../profile/profile_view.dart';
 import '../projects/manager_projects_screen.dart';
 import '../projects/manager_requests_screen.dart';
+import '../projects/manager_team_screen.dart';
 import '../projects/photographer_my_projects_screen.dart';
 import '../projects/photographer_requests_screen.dart';
 import '../projects/smart_calendar_screen.dart';
 import 'more_menu_screen.dart';
 import 'nav_item.dart';
 import 'role_based_bottom_nav.dart';
+import 'shell_providers.dart';
 import 'tab_placeholder_screen.dart';
 
 /// Authenticated app shell: a Sumou-styled header, a body that switches with
@@ -39,6 +41,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Let a tab body (e.g. the manager home) request a tab switch.
+    ref.listen<int?>(shellJumpTabProvider, (_, next) {
+      if (next == null) return;
+      setState(() => _index = next);
+      ref.read(shellJumpTabProvider.notifier).state = null;
+    });
+
     final role = ref.watch(authControllerProvider.select((s) => s.activeRole));
 
     // Should not happen on a role-home route (redirect guards it), but stay
@@ -62,9 +71,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     } else if (current.label == RoleNavConfig.usersLabel) {
       body = const UsersScreen();
     } else if (current.label == RoleNavConfig.permissionsLabel) {
-      body = const PermissionsScreen();
+      body = const AccessControlScreen();
     } else if (current.label == RoleNavConfig.reportsLabel) {
       body = const ReportsPlaceholderScreen();
+    } else if (current.label == RoleNavConfig.teamLabel &&
+        role == RoleType.manager) {
+      body = const ManagerTeamScreen();
     } else if (current.label == RoleNavConfig.projectsLabel) {
       body = const ManagerProjectsScreen();
     } else if (current.label == RoleNavConfig.myProjectsLabel) {

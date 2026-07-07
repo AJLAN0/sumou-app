@@ -31,6 +31,19 @@ void main() {
     expect(find.text('إضافة مشروع'), findsOneWidget);
   });
 
+  testWidgets('tapping the active-projects card opens the projects tab', (
+    tester,
+  ) async {
+    await pumpAs(tester, 'manager');
+    await tester.tap(find.text('مشاريع نشطة'));
+    await tester.pumpAndSettle();
+
+    // Jumped to the projects tab (no provider-modification error), pre-filtered.
+    expect(find.text('مشروع جديد'), findsOneWidget);
+    expect(find.text('بحث باسم المشروع أو العميل أو المصور'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('photographer home shows dashboard content', (tester) async {
     await pumpAs(tester, 'photographer');
     expect(find.text('مشاريعي النشطة'), findsOneWidget);
@@ -47,6 +60,7 @@ void main() {
   testWidgets('admin home shows system overview', (tester) async {
     await pumpAs(tester, 'admin');
     expect(find.text('نظرة عامة على النظام'), findsOneWidget);
-    expect(find.text('إجمالي المستخدمين'), findsOneWidget);
+    // 'المستخدمون' appears in both the headline strip and the team card.
+    expect(find.text('المستخدمون'), findsWidgets);
   });
 }

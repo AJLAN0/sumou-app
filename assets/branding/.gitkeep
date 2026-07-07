@@ -1,0 +1,4 @@
+# Placeholder so the branding asset directory exists for the build.
+# Drop the logo files here (referenced by lib/core/constants/app_assets.dart):
+#   sumou_logo_full.png   (full logo with wordmark — entry screen)
+#   sumou_logo_icon.png   (icon-only logo — app headers)

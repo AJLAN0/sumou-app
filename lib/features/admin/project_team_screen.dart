@@ -111,12 +111,6 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
 
   bool _isAdded(String userId) => _team.any((d) => d.userId == userId);
 
-  void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
   Future<void> _changeManager(List<UserModel> managers) async {
     final chosen = await _showUserPicker(
       title: 'اختر مدير المشروع',
@@ -132,6 +126,7 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
       confirmLabel: 'تأكيد',
     );
     if (!ok) return;
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final updated = await ref
         .read(projectRepositoryProvider)
@@ -163,9 +158,8 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
         _TeamDraft(
           userId: u.id,
           personName: u.fullName,
-          photoType: u.photoTypes.isNotEmpty
-              ? u.photoTypes.first
-              : _kPhotoTypes.first,
+          photoType:
+              u.photoTypes.isNotEmpty ? u.photoTypes.first : _kPhotoTypes.first,
         ),
       );
     });
@@ -188,20 +182,19 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final updated = await ref.read(projectRepositoryProvider).assignTeamRoles(
-      widget.project.id,
-      [
-        for (final m in _team)
-          ProjectTeamRole(
-            id: '',
-            projectId: '',
-            type: m.photoType,
-            personName: m.personName,
-            userId: m.userId,
-            value: m.value,
-          ),
-      ],
-    );
+    final updated = await ref
+        .read(projectRepositoryProvider)
+        .assignTeamRoles(widget.project.id, [
+          for (final m in _team)
+            ProjectTeamRole(
+              id: '',
+              projectId: '',
+              type: m.photoType,
+              personName: m.personName,
+              userId: m.userId,
+              value: m.value,
+            ),
+        ]);
     ref.invalidate(projectByIdProvider(widget.project.id));
     ref.invalidate(allProjectsProvider);
     ref.invalidate(managerProjectsProvider);
@@ -210,13 +203,13 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
     if (!mounted) return;
     if (updated == null) {
       setState(() => _saving = false);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('تعذّر حفظ الفريق')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('تعذّر حفظ الفريق')));
       return;
     }
     navigator.pop();
-    messenger.showSnackBar(const SnackBar(content: Text('تم تحديث فريق المشروع')));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('تم تحديث فريق المشروع')),
+    );
   }
 
   Future<UserModel?> _showUserPicker({
@@ -303,8 +296,8 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
         ref.watch(photographerActiveCountsProvider).valueOrNull ??
         const <String, int>{};
     final usersById = {
-      for (final u in ref.watch(usersListProvider).valueOrNull ??
-          const <UserModel>[])
+      for (final u
+          in ref.watch(usersListProvider).valueOrNull ?? const <UserModel>[])
         u.id: u,
     };
 
@@ -337,43 +330,51 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
                 const SumouSectionHeader(title: 'مدير المشروع'),
                 const SizedBox(height: 12),
                 managersAsync.when(
-                  loading: () => const SumouCard(
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => const SumouCard(
-                    child: Text(
-                      'تعذّر تحميل المدراء',
-                      style: AppTextStyles.bodyMuted,
-                    ),
-                  ),
-                  data: (managers) => SumouCard(
-                    onTap: () => _changeManager(managers),
-                    child: Row(
-                      children: [
-                        _Avatar(
-                          initials: UserModel.initialsFrom(_managerName ?? '—'),
+                  loading:
+                      () => const SumouCard(
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  error:
+                      (_, __) => const SumouCard(
+                        child: Text(
+                          'تعذّر تحميل المدراء',
+                          style: AppTextStyles.bodyMuted,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
+                      ),
+                  data:
+                      (managers) => SumouCard(
+                        onTap: () => _changeManager(managers),
+                        child: Row(
+                          children: [
+                            _Avatar(
+                              initials: UserModel.initialsFrom(
                                 _managerName ?? '—',
-                                style: AppTextStyles.titleMedium,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'اضغط لتغيير المدير',
-                                style: AppTextStyles.label,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _managerName ?? '—',
+                                    style: AppTextStyles.titleMedium,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'اضغط لتغيير المدير',
+                                    style: AppTextStyles.label,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const Icon(
+                              Icons.swap_horiz,
+                              color: AppColors.textMuted,
+                            ),
+                          ],
                         ),
-                        const Icon(Icons.swap_horiz, color: AppColors.textMuted),
-                      ],
-                    ),
-                  ),
+                      ),
                 ),
                 const SizedBox(height: 20),
 
@@ -391,11 +392,12 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
                   for (var i = 0; i < _team.length; i++) ...[
                     _TeamMemberEditor(
                       draft: _team[i],
-                      active: _team[i].userId == null
-                          ? null
-                          : usersById[_team[i].userId]?.active,
-                      onTypeChanged: (t) =>
-                          setState(() => _team[i].photoType = t),
+                      active:
+                          _team[i].userId == null
+                              ? null
+                              : usersById[_team[i].userId]?.active,
+                      onTypeChanged:
+                          (t) => setState(() => _team[i].photoType = t),
                       onRemove: () => _removeAt(i),
                     ),
                     const SizedBox(height: 10),
@@ -412,23 +414,26 @@ class _TeamBodyState extends ConsumerState<_TeamBody> {
                 ),
                 const SizedBox(height: 12),
                 photographersAsync.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => Text(
-                    'تعذّر تحميل المصورين',
-                    style: AppTextStyles.bodyMuted,
-                  ),
-                  data: (photographers) => _AddList(
-                    photographers: photographers,
-                    counts: counts,
-                    query: _query,
-                    typeFilter: _typeFilter,
-                    isAdded: _isAdded,
-                    onAdd: _addPhotographer,
-                    onTypeFilter: (t) => setState(() => _typeFilter = t),
-                  ),
+                  loading:
+                      () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  error:
+                      (_, __) => Text(
+                        'تعذّر تحميل المصورين',
+                        style: AppTextStyles.bodyMuted,
+                      ),
+                  data:
+                      (photographers) => _AddList(
+                        photographers: photographers,
+                        counts: counts,
+                        query: _query,
+                        typeFilter: _typeFilter,
+                        isAdded: _isAdded,
+                        onAdd: _addPhotographer,
+                        onTypeFilter: (t) => setState(() => _typeFilter = t),
+                      ),
                 ),
               ],
             ),
@@ -468,9 +473,10 @@ class _TeamMemberEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final types = _kPhotoTypes.contains(draft.photoType)
-        ? _kPhotoTypes
-        : [draft.photoType, ..._kPhotoTypes];
+    final types =
+        _kPhotoTypes.contains(draft.photoType)
+            ? _kPhotoTypes
+            : [draft.photoType, ..._kPhotoTypes];
     return SumouCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,10 +486,7 @@ class _TeamMemberEditor extends StatelessWidget {
               _Avatar(initials: UserModel.initialsFrom(draft.personName)),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  draft.personName,
-                  style: AppTextStyles.titleMedium,
-                ),
+                child: Text(draft.personName, style: AppTextStyles.titleMedium),
               ),
               if (active != null) _StatusPill(active: active!),
               IconButton(
@@ -537,18 +540,20 @@ class _AddList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final types = <String>{
-      for (final u in photographers) ...u.photoTypes,
-    }.toList();
+    final types =
+        <String>{for (final u in photographers) ...u.photoTypes}.toList();
     final q = query.trim().toLowerCase();
-    final filtered = photographers.where((u) {
-      if (isAdded(u.id)) return false; // no duplicates
-      final matchesQuery = q.isEmpty ||
-          u.fullName.toLowerCase().contains(q) ||
-          u.username.toLowerCase().contains(q);
-      final matchesType = typeFilter == null || u.photoTypes.contains(typeFilter);
-      return matchesQuery && matchesType;
-    }).toList();
+    final filtered =
+        photographers.where((u) {
+          if (isAdded(u.id)) return false; // no duplicates
+          final matchesQuery =
+              q.isEmpty ||
+              u.fullName.toLowerCase().contains(q) ||
+              u.username.toLowerCase().contains(q);
+          final matchesType =
+              typeFilter == null || u.photoTypes.contains(typeFilter);
+          return matchesQuery && matchesType;
+        }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,9 +688,10 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentGreen.withValues(alpha: 0.15)
-              : AppColors.surfaceSecondary,
+          color:
+              selected
+                  ? AppColors.accentGreen.withValues(alpha: 0.15)
+                  : AppColors.surfaceSecondary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accentGreen : AppColors.border,
@@ -696,7 +702,6 @@ class _Chip extends StatelessWidget {
     );
   }
 }
-
 
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.initials});

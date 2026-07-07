@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,9 +9,7 @@ import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
-import 'closure_actions.dart';
 import 'providers/projects_providers.dart';
-import 'widgets/closure_request_card.dart';
 import 'widgets/project_card.dart';
 import 'widgets/stage_timeline.dart';
 
@@ -78,14 +77,6 @@ class _Details extends ConsumerWidget {
     final canRequestClosure =
         (user?.hasPermission(AppFeature.canRequestClosure) ?? false) &&
         isAssigned;
-    final canAssign =
-        user?.hasPermission(AppFeature.canAssignPhotographers) ?? false;
-    // Closure review (approve/reject) for managers with the permission.
-    final canApproveClosure =
-        user?.hasPermission(AppFeature.canApproveClosure) ?? false;
-    final pendingClosureAsync = ref.watch(
-      pendingClosureForProjectProvider(project.id),
-    );
 
     return ListView(
       children: [
@@ -118,72 +109,51 @@ class _Details extends ConsumerWidget {
           const SumouCard(
             child: Text('لا توجد ملاحظات', style: AppTextStyles.bodyMuted),
           ),
-        if (canApproveClosure && project.hasPendingClosure) ...[
-          const SizedBox(height: 24),
-          const SumouSectionHeader(title: 'طلب الإغلاق'),
-          const SizedBox(height: 12),
-          pendingClosureAsync.when(
-            loading:
-                () => const SumouCard(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            error:
-                (_, __) => const SumouCard(
-                  child: Text(
-                    'تعذّر تحميل الطلب',
-                    style: AppTextStyles.bodyMuted,
-                  ),
-                ),
-            data:
-                (request) =>
-                    request == null
-                        ? const SumouCard(
-                          child: Text(
-                            'لا يوجد طلب إغلاق',
-                            style: AppTextStyles.bodyMuted,
-                          ),
-                        )
-                        : ClosureRequestCard(
-                          request: request,
-                          clientName: project.clientName,
-                          onApprove:
-                              () => approveClosureFlow(context, ref, request),
-                          onReject:
-                              () => rejectClosureFlow(context, ref, request),
-                        ),
-          ),
-        ],
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'الإجراءات'),
         const SizedBox(height: 12),
-        if (canUpdateStages) ...[
+        // Manager: exactly two actions. "تعديل المشروع" is a hub that merges the
+        // basics edit, stage update, and team management; "إنهاء المشروع" reviews
+        // and accepts the photographer's closure request.
+        if (isManager) ...[
           SumouButton(
-            label: 'تحديث المرحلة',
-            icon: Icons.update,
+            label: 'تعديل المشروع',
+            icon: Icons.edit_outlined,
             onPressed:
-                () => context.push(AppRoutes.projectStagePath(project.id)),
+                () => context.push(AppRoutes.projectManagePath(project.id)),
           ),
           const SizedBox(height: 10),
-        ],
-        if (canRequestClosure) ...[
-          SumouButton(
-            label: 'طلب إغلاق',
-            variant: SumouButtonVariant.secondary,
-            icon: Icons.check_circle_outline,
-            onPressed:
-                () => context.push(AppRoutes.projectClosurePath(project.id)),
-          ),
-          const SizedBox(height: 10),
-        ],
-        if (canAssign) ...[
-          SumouButton(
-            label: 'إسناد مصور',
-            variant: SumouButtonVariant.secondary,
-            icon: Icons.person_add_alt,
-            onPressed:
-                () => context.push(AppRoutes.projectAssignPath(project.id)),
-          ),
-          const SizedBox(height: 10),
+          if (!project.isCompleted) ...[
+            SumouButton(
+              label: 'إنهاء المشروع',
+              variant: SumouButtonVariant.secondary,
+              icon: Icons.flag_outlined,
+              onPressed:
+                  () => context.push(AppRoutes.projectEndPath(project.id)),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ] else ...[
+          // Photographer: update the stage and request closure.
+          if (canUpdateStages) ...[
+            SumouButton(
+              label: 'تحديث المرحلة',
+              icon: Icons.update,
+              onPressed:
+                  () => context.push(AppRoutes.projectStagePath(project.id)),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (canRequestClosure) ...[
+            SumouButton(
+              label: 'طلب إغلاق',
+              variant: SumouButtonVariant.secondary,
+              icon: Icons.check_circle_outline,
+              onPressed:
+                  () => context.push(AppRoutes.projectClosurePath(project.id)),
+            ),
+            const SizedBox(height: 10),
+          ],
         ],
         if (project.isCompleted)
           SumouButton(
@@ -220,11 +190,7 @@ class _Summary extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _Line(icon: Icons.person_outline, text: project.clientName),
-          _Line(
-            icon: Icons.qr_code_2,
-            text: project.serial,
-            valueColor: AppColors.accentGreen,
-          ),
+          _SerialRow(serial: project.serial),
           _Line(icon: Icons.category_outlined, text: project.type.nameAr),
           _Line(
             icon: Icons.calendar_today_outlined,
@@ -242,11 +208,10 @@ class _Summary extends StatelessWidget {
 }
 
 class _Line extends StatelessWidget {
-  const _Line({required this.icon, required this.text, this.valueColor});
+  const _Line({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
-  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -256,10 +221,47 @@ class _Line extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: AppColors.textMuted),
           const SizedBox(width: 8),
+          Expanded(child: Text(text, style: AppTextStyles.body)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Project serial line with a copy-to-clipboard button.
+class _SerialRow extends StatelessWidget {
+  const _SerialRow({required this.serial});
+
+  final String serial;
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: serial));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('تم نسخ الرقم التسلسلي')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.qr_code_2, size: 16, color: AppColors.textMuted),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              text,
-              style: AppTextStyles.body.copyWith(color: valueColor),
+              serial,
+              style: AppTextStyles.body.copyWith(color: AppColors.accentGreen),
+            ),
+          ),
+          InkWell(
+            onTap: () => _copy(context),
+            borderRadius: BorderRadius.circular(20),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.copy, size: 16, color: AppColors.textMuted),
             ),
           ),
         ],

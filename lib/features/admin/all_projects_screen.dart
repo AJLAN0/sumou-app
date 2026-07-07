@@ -11,7 +11,15 @@ import '../projects/providers/projects_providers.dart';
 import 'widgets/admin_chips.dart';
 import 'widgets/admin_project_card.dart';
 
-enum _ProjFilter { all, active, completed, pendingClosure, field, social, wedding }
+enum _ProjFilter {
+  all,
+  active,
+  completed,
+  pendingClosure,
+  field,
+  social,
+  wedding,
+}
 
 extension _ProjFilterView on _ProjFilter {
   String get label => switch (this) {
@@ -70,7 +78,10 @@ class _AdminAllProjectsScreenState
     final photographerOk =
         _photographerName == null ||
         p.teamRoles.any((r) => r.personName == _photographerName);
-    return _matchesQuery(p) && _filter.matches(p) && managerOk && photographerOk;
+    return _matchesQuery(p) &&
+        _filter.matches(p) &&
+        managerOk &&
+        photographerOk;
   }
 
   Future<void> _pick({
@@ -148,17 +159,18 @@ class _AdminAllProjectsScreenState
       ),
       body: projectsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) =>
-            const Center(child: Text('تعذر تحميل المشاريع')),
+        error: (_, __) => const Center(child: Text('تعذر تحميل المشاريع')),
         data: (projects) {
-          final managers = <String>{
-            for (final p in projects)
-              if (p.managerName != null) p.managerName!,
-          }.toList();
-          final photographers = <String>{
-            for (final p in projects)
-              for (final r in p.teamRoles) r.personName,
-          }.toList();
+          final managers =
+              <String>{
+                for (final p in projects)
+                  if (p.managerName != null) p.managerName!,
+              }.toList();
+          final photographers =
+              <String>{
+                for (final p in projects)
+                  for (final r in p.teamRoles) r.personName,
+              }.toList();
           final filtered = projects.where(_matches).toList();
 
           return Column(
@@ -194,13 +206,14 @@ class _AdminAllProjectsScreenState
                     child: _SelectorButton(
                       icon: Icons.badge_outlined,
                       label: _managerName ?? 'كل المدراء',
-                      onTap: () => _pick(
-                        title: 'تصفية حسب المدير',
-                        allLabel: 'كل المدراء',
-                        options: managers,
-                        current: _managerName,
-                        onChanged: (v) => setState(() => _managerName = v),
-                      ),
+                      onTap:
+                          () => _pick(
+                            title: 'تصفية حسب المدير',
+                            allLabel: 'كل المدراء',
+                            options: managers,
+                            current: _managerName,
+                            onChanged: (v) => setState(() => _managerName = v),
+                          ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -208,41 +221,44 @@ class _AdminAllProjectsScreenState
                     child: _SelectorButton(
                       icon: Icons.camera_alt_outlined,
                       label: _photographerName ?? 'كل المصورين',
-                      onTap: () => _pick(
-                        title: 'تصفية حسب المصور',
-                        allLabel: 'كل المصورين',
-                        options: photographers,
-                        current: _photographerName,
-                        onChanged: (v) =>
-                            setState(() => _photographerName = v),
-                      ),
+                      onTap:
+                          () => _pick(
+                            title: 'تصفية حسب المصور',
+                            allLabel: 'كل المصورين',
+                            options: photographers,
+                            current: _photographerName,
+                            onChanged:
+                                (v) => setState(() => _photographerName = v),
+                          ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: projects.isEmpty
-                    ? const SumouEmptyState(
-                        title: 'لا توجد مشاريع',
-                        message: 'لم تتم إضافة أي مشروع بعد',
-                        icon: Icons.work_outline,
-                      )
-                    : filtered.isEmpty
+                child:
+                    projects.isEmpty
                         ? const SumouEmptyState(
-                            title: 'لا توجد نتائج مطابقة',
-                            message: 'جرّب تعديل البحث أو الفلاتر',
-                            icon: Icons.search_off,
-                          )
+                          title: 'لا توجد مشاريع',
+                          message: 'لم تتم إضافة أي مشروع بعد',
+                          icon: Icons.work_outline,
+                        )
+                        : filtered.isEmpty
+                        ? const SumouEmptyState(
+                          title: 'لا توجد نتائج مطابقة',
+                          message: 'جرّب تعديل البحث أو الفلاتر',
+                          icon: Icons.search_off,
+                        )
                         : ListView.separated(
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (_, i) => AdminProjectCard(
-                              project: filtered[i],
-                              onTap: () => _openDetails(filtered[i].id),
-                            ),
-                          ),
+                          itemCount: filtered.length,
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 12),
+                          itemBuilder:
+                              (_, i) => AdminProjectCard(
+                                project: filtered[i],
+                                onTap: () => _openDetails(filtered[i].id),
+                              ),
+                        ),
               ),
             ],
           );
@@ -273,8 +289,16 @@ class _StatsStrip extends StatelessWidget {
         spacing: 16,
         runSpacing: 10,
         children: [
-          _MiniStat(value: '$total', label: 'الإجمالي', color: AppColors.projectTeal),
-          _MiniStat(value: '$active', label: 'نشطة', color: AppColors.primaryTeal),
+          _MiniStat(
+            value: '$total',
+            label: 'الإجمالي',
+            color: AppColors.projectTeal,
+          ),
+          _MiniStat(
+            value: '$active',
+            label: 'نشطة',
+            color: AppColors.primaryTeal,
+          ),
           _MiniStat(
             value: '$completed',
             label: 'منتهية',
@@ -285,8 +309,16 @@ class _StatsStrip extends StatelessWidget {
             label: 'بانتظار الإغلاق',
             color: AppColors.financeYellow,
           ),
-          _MiniStat(value: '$field', label: 'ميدانية', color: AppColors.projectTeal),
-          _MiniStat(value: '$social', label: 'سوشال', color: AppColors.photographerPurple),
+          _MiniStat(
+            value: '$field',
+            label: 'ميدانية',
+            color: AppColors.projectTeal,
+          ),
+          _MiniStat(
+            value: '$social',
+            label: 'سوشال',
+            color: AppColors.photographerPurple,
+          ),
         ],
       ),
     );
@@ -310,10 +342,7 @@ class _MiniStat extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value,
-          style: AppTextStyles.titleMedium.copyWith(color: color),
-        ),
+        Text(value, style: AppTextStyles.titleMedium.copyWith(color: color)),
         Text(label, style: AppTextStyles.label),
       ],
     );
@@ -395,4 +424,3 @@ class _PickerRow extends StatelessWidget {
     );
   }
 }
-

@@ -1,12 +1,15 @@
 // Tests for the admin overview dashboard (Sprint 4).
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'package:sumou_app/features/dashboard/admin_dashboard_screen.dart';
+
+import 'test_helpers.dart';
 
 void main() {
   Future<void> pumpAdmin(WidgetTester tester) async {
@@ -28,20 +31,16 @@ void main() {
     await pumpAdmin(tester);
     // Top overview is on-screen.
     expect(find.text('نظرة عامة على النظام'), findsOneWidget);
-    expect(find.text('إجمالي المستخدمين'), findsOneWidget);
+    // 'المستخدمون' appears in both the headline strip and the team card.
+    expect(find.text('المستخدمون'), findsWidgets);
   });
 
-  testWidgets('overview shows operations, team, requests and quick actions', (
+  testWidgets('overview shows projects, team, requests and quick actions', (
     tester,
   ) async {
     await pumpAdmin(tester);
     final scroll = find.byType(Scrollable).first;
 
-    await tester.scrollUntilVisible(
-      find.text('عمليات المشاريع'),
-      300,
-      scrollable: scroll,
-    );
     await tester.scrollUntilVisible(
       find.text('المشاريع حسب النوع'),
       300,
@@ -50,11 +49,18 @@ void main() {
     expect(find.text('المشاريع حسب النوع'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('نظرة على الفريق'),
+      find.text('الفريق'),
       300,
       scrollable: scroll,
     );
-    expect(find.text('مصورون متاحون'), findsWidgets);
+    expect(find.text('متاحون'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('طلبات الإغلاق'),
+      300,
+      scrollable: scroll,
+    );
+    expect(find.text('طلبات الإغلاق'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('إجراءات سريعة'),
@@ -69,15 +75,20 @@ void main() {
     expect(find.text('إدارة المستخدمين'), findsOneWidget);
   });
 
-  testWidgets('quick action shows a coming-soon snackbar', (tester) async {
+  testWidgets('reports quick action shows a coming-soon snackbar', (
+    tester,
+  ) async {
     await pumpAdmin(tester);
-    await tester.scrollUntilVisible(
-      find.text('إدارة المستخدمين'),
-      300,
+    // 'التقارير' is also a bottom-nav tab label; scope to the dashboard action.
+    final reportsAction = find.descendant(
+      of: find.byType(AdminDashboardScreen),
+      matching: find.text('التقارير'),
+    );
+    await scrollAndTapCardFinder(
+      tester,
+      reportsAction,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('إدارة المستخدمين'));
-    await tester.pumpAndSettle();
     expect(find.text('هذه الميزة قريباً'), findsOneWidget);
   });
 }

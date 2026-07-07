@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'providers/admin_providers.dart';
+import 'user_form_sheet.dart';
 import 'widgets/admin_chips.dart';
 
 enum _UserFilter { all, active, inactive, managers, photographers, admins }
@@ -31,9 +34,29 @@ extension _UserFilterView on _UserFilter {
   };
 }
 
-/// Admin users management: mobile cards with search + filters. Tapping a user
-/// opens a details sheet with an activate/deactivate action (mock-backed). No
-/// create/delete; profile editing is a placeholder.
+/// Routed wrapper for [UsersScreen] (used by the admin dashboard deep-link).
+/// The shell renders [UsersScreen] directly as a tab body, so it stays
+/// app-bar-less; this page adds the scaffold + back button for push navigation.
+class AdminUsersPage extends StatelessWidget {
+  const AdminUsersPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SumouScaffold(
+      appBar: SumouAppBar(
+        title: 'إدارة المستخدمين',
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: const UsersScreen(),
+    );
+  }
+}
+
+/// Admin users management: mobile cards with search + filters, plus full CRUD —
+/// add, edit, activate/deactivate, and remove accounts (mock-backed).
 class UsersScreen extends ConsumerStatefulWidget {
   const UsersScreen({super.key});
 
@@ -72,11 +95,34 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
             },
             onEdit: () {
               Navigator.of(sheetContext).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تعديل البيانات - قريبًا')),
-              );
+              showUserFormSheet(context, user: user);
+            },
+            onDelete: () {
+              Navigator.of(sheetContext).pop();
+              _deleteUser(user);
             },
           ),
+    );
+  }
+
+  Future<void> _deleteUser(UserModel user) async {
+    final ok = await showSumouConfirmSheet(
+      context,
+      title: 'حذف المستخدم',
+      message: 'سيتم حذف حساب ${user.fullName} نهائياً. لا يمكن التراجع.',
+      confirmLabel: 'حذف',
+      destructive: true,
+    );
+    if (!ok) return;
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final removed = await ref.read(userRepositoryProvider).deleteUser(user.id);
+    ref.invalidate(usersListProvider);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(removed ? 'تم حذف المستخدم' : 'تعذّر حذف المستخدم'),
+      ),
     );
   }
 
@@ -117,6 +163,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
 
     return Column(
       children: [
+        SumouButton(
+          label: 'إضافة مستخدم',
+          icon: Icons.person_add_alt_1,
+          onPressed: () => showUserFormSheet(context),
+        ),
+        const SizedBox(height: 12),
         SumouTextField(
           hint: 'بحث بالاسم أو اسم المستخدم',
           prefixIcon: Icons.search,
@@ -235,11 +287,13 @@ class _UserDetailSheet extends StatelessWidget {
     required this.user,
     required this.onToggleActive,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final UserModel user;
   final VoidCallback onToggleActive;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -329,10 +383,17 @@ class _UserDetailSheet extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               SumouButton(
-                label: 'تعديل البيانات - قريبًا',
+                label: 'تعديل البيانات',
                 variant: SumouButtonVariant.secondary,
                 icon: Icons.edit_outlined,
                 onPressed: onEdit,
+              ),
+              const SizedBox(height: 10),
+              SumouButton(
+                label: 'حذف المستخدم',
+                variant: SumouButtonVariant.danger,
+                icon: Icons.delete_outline,
+                onPressed: onDelete,
               ),
             ],
           ),

@@ -8,6 +8,8 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 
+import 'test_helpers.dart';
+
 void main() {
   Future<void> openStages(WidgetTester tester) async {
     final container = ProviderContainer();
@@ -21,13 +23,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('كل المشاريع'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('كل المشاريع'));
-    await tester.pumpAndSettle();
+    await scrollAndTapCard(tester, 'كل المشاريع');
 
     // Appbar timeline action opens stage oversight.
     await tester.tap(find.byIcon(Icons.timeline_outlined));
@@ -57,13 +53,12 @@ void main() {
 
   testWidgets('tapping a card opens admin project oversight', (tester) async {
     await openStages(tester);
-    await tester.scrollUntilVisible(
-      find.text('تصوير ميداني — مهرجان الرياض'),
-      200,
+    await scrollAndTapCard(
+      tester,
+      'تصوير ميداني — مهرجان الرياض',
       scrollable: find.byType(Scrollable).last,
+      scrollDelta: 200,
     );
-    await tester.tap(find.text('تصوير ميداني — مهرجان الرياض'));
-    await tester.pumpAndSettle();
     expect(find.text('مراقبة المشروع'), findsOneWidget); // admin details
   });
 }

@@ -36,13 +36,12 @@ class _TeamDraft {
     required this.userId,
     required this.personName,
     required this.photoTypes,
-    this.fee = 0,
   });
 
   final String? userId;
   final String personName;
   final Set<String> photoTypes;
-  num fee;
+  num fee = 0;
 }
 
 /// Full-screen, mobile-first multi-step flow for creating a project.
@@ -227,14 +226,17 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
   ) async {
     // Prevent picking the same photographer twice.
     final existing = _team.map((m) => m.userId).toSet();
-    final selectable = candidates.where((u) => !existing.contains(u.id)).toList();
+    final selectable =
+        candidates.where((u) => !existing.contains(u.id)).toList();
     final chosen = await _showUserPicker(
       title: 'اختر عضو الفريق',
       users: selectable,
       selectedId: null,
-      lockFor: (u) => _startDate == null
-          ? AvailabilityLock.none
-          : availabilityLockFor(u, _startDate!, allProjects),
+      lockFor:
+          (u) =>
+              _startDate == null
+                  ? AvailabilityLock.none
+                  : availabilityLockFor(u, _startDate!, allProjects),
     );
     if (chosen == null) return;
     setState(() {
@@ -297,17 +299,17 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                       itemBuilder: (_, i) {
                         final u = users[i];
                         final selected = u.id == selectedId;
-                        final lock =
-                            lockFor?.call(u) ?? AvailabilityLock.none;
+                        final lock = lockFor?.call(u) ?? AvailabilityLock.none;
                         final locked = lock.isLocked;
                         return Opacity(
                           opacity: locked ? 0.55 : 1,
                           child: SumouCard(
                             borderColor:
                                 selected ? AppColors.accentGreen : null,
-                            onTap: locked
-                                ? null
-                                : () => Navigator.of(sheetContext).pop(u),
+                            onTap:
+                                locked
+                                    ? null
+                                    : () => Navigator.of(sheetContext).pop(u),
                             child: Row(
                               children: [
                                 _Avatar(initials: u.avatarInitials),
@@ -327,7 +329,8 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
                                             ? lock.reasonAr!
                                             : u.defaultRole.nameAr,
                                         style: AppTextStyles.bodyMuted.copyWith(
-                                          color: locked ? AppColors.error : null,
+                                          color:
+                                              locked ? AppColors.error : null,
                                         ),
                                       ),
                                     ],
@@ -504,14 +507,15 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
             _TeamMemberEditor(
               key: ValueKey(_team[i].userId ?? _team[i].personName),
               member: _team[i],
-              onToggleType: (type) => setState(() {
-                final types = _team[i].photoTypes;
-                if (types.contains(type)) {
-                  if (types.length > 1) types.remove(type);
-                } else {
-                  types.add(type);
-                }
-              }),
+              onToggleType:
+                  (type) => setState(() {
+                    final types = _team[i].photoTypes;
+                    if (types.contains(type)) {
+                      if (types.length > 1) types.remove(type);
+                    } else {
+                      types.add(type);
+                    }
+                  }),
               onFeeChanged: (fee) => _team[i].fee = fee,
               onRemove: () => setState(() => _team.removeAt(i)),
             ),

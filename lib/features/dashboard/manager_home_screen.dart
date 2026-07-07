@@ -40,13 +40,13 @@ class ManagerHomeScreen extends ConsumerWidget {
         const <String, int>{};
 
     final activeCount = projects?.where((p) => p.isActive).length;
-    final pendingClosures = closures
-        ?.where((v) => v.request.status == ClosureRequestStatus.pending)
-        .length;
+    final pendingClosures =
+        closures
+            ?.where((v) => v.request.status == ClosureRequestStatus.pending)
+            .length;
     final totalPhotographers = photographers?.length;
-    final availablePhotographers = photographers
-        ?.where((u) => (counts[u.id] ?? 0) < 2)
-        .length;
+    final availablePhotographers =
+        photographers?.where((u) => (counts[u.id] ?? 0) < 2).length;
 
     String n(int? value) => value?.toString() ?? '—';
 

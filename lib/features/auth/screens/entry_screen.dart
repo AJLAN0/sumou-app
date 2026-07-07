@@ -13,16 +13,26 @@ class EntryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Size the logo to the screen so it reads clearly on any device, while
+    // keeping sensible min/max bounds. The source art is wordmark-width, so we
+    // size by width and let the height follow the aspect ratio.
+    final logoWidth = (MediaQuery.sizeOf(context).width * 0.68).clamp(
+      220.0,
+      360.0,
+    );
     return SumouScaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 48),
           // Full Sumou logo (with wordmark), centered and never stretched.
-          const Center(
-            child: SumouLogo.full(height: 120, fallback: _BrandFallback()),
+          Center(
+            child: SumouLogo.full(
+              width: logoWidth,
+              fallback: const _BrandFallback(),
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Text(
             'كيف تريد المتابعة؟',
             style: AppTextStyles.bodyMuted,

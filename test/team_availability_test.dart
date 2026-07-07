@@ -68,7 +68,10 @@ void main() {
   });
 
   test('MockLeave flags seeded leave dates only', () {
-    expect(MockLeave.isOnLeave('u-photographer', DateTime(2026, 8, 10)), isTrue);
+    expect(
+      MockLeave.isOnLeave('u-photographer', DateTime(2026, 8, 10)),
+      isTrue,
+    );
     expect(
       MockLeave.isOnLeave('u-photographer', DateTime(2026, 8, 11)),
       isFalse,

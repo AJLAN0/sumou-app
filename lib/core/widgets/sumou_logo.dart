@@ -10,15 +10,16 @@ import '../constants/app_assets.dart';
 /// dropped in.
 class SumouLogo extends StatelessWidget {
   /// Full logo with the wordmark — for the entry/landing screen.
-  const SumouLogo.full({super.key, this.height, this.fallback})
+  const SumouLogo.full({super.key, this.height, this.width, this.fallback})
     : _asset = AppAssets.logoFull;
 
   /// Icon-only logo — for the small brand mark in app headers.
-  const SumouLogo.icon({super.key, this.height, this.fallback})
+  const SumouLogo.icon({super.key, this.height, this.width, this.fallback})
     : _asset = AppAssets.logoIcon;
 
   final String _asset;
   final double? height;
+  final double? width;
   final Widget? fallback;
 
   @override
@@ -26,7 +27,10 @@ class SumouLogo extends StatelessWidget {
     return Image.asset(
       _asset,
       height: height,
+      width: width,
       fit: BoxFit.contain,
+      // High quality downscaling of the large source art.
+      filterQuality: FilterQuality.medium,
       errorBuilder: (_, __, ___) => fallback ?? const SizedBox.shrink(),
     );
   }

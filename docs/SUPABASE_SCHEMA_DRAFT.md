@@ -280,3 +280,33 @@ erDiagram
 ## 8. Explicitly NOT created (guardrail)
 
 No `finance_*`, `payments`, `payment_requests`, `transfers`, `finance_reports`, `rekaz_*`, `notifications`, `notification_settings`, `reminders`, `devices`, or `fcm_tokens` — now or in any future sprint, unless the owner explicitly reverses the exclusion.
+
+---
+
+## 9. Step 2 implementation notes (identity & access)
+
+Migration `supabase/migrations/20260714120000_identity_and_access.sql` implements
+§2 (identity/roles/permissions) + `audit_logs`. Details decided at implementation
+time (consistent with, and refining, this draft):
+
+- **Seeded `name_ar`:** roles use `RoleType.nameAr`; permissions use
+  `featureLabelAr` (Flutter). Seeded via idempotent `on conflict` upserts.
+- **`marketing` name_ar = «تسويق»** — provisional: the Flutter `RoleType` has no
+  `marketing` value yet, so it has no canonical Arabic label. Update when the
+  Flutter role is added.
+- **`client_tracking` is NOT a staff role** — it exists in Flutter `RoleType` but
+  public tracking is anonymous (no profile), so it is not seeded into `roles`.
+- **`finance` / `wedding_finance` roles carry NO permission defaults** — inert
+  labels only (guardrail); their `FeaturePermissions.defaultsFor` finance grants
+  are dropped.
+- **Default-role invariant** (`profiles.default_role_id` must be a role the user
+  holds) is enforced by a **composite `DEFERRABLE INITIALLY DEFERRED` FK**
+  `profiles(id, default_role_id) → user_roles(user_id, role_id)`, so a profile
+  and its default `user_roles` row are inserted in one transaction.
+- **Finance exclusion is enforced in-DB** via `permissions_no_finance_chk`
+  (`code <> 'can_manage_finance'`), so the excluded permission can never be added.
+- **Normalized username** enforced by check `^[a-z0-9._-]{2,50}$` (lowercase,
+  trimmed, no spaces, non-blank).
+- **`updated_at`** maintained by a generic `public.set_updated_at()` trigger
+  (only `profiles` has `updated_at` in this domain).
+- **RLS enabled, no policies** on all 7 tables → access denied until Step 6.

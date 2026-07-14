@@ -62,10 +62,12 @@ PK links 1:1 to `auth.users`.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `code` | `text` unique not null | mirrors `AppFeature` (**excluding `can_manage_finance`**) |
+| `code` | `text` unique not null | mirrors `AppFeature` |
 | `name_ar` | `text` | |
+| `is_active` | `boolean` not null default true | inactive = inert reserved placeholder, never granted |
 
-> In-scope codes: `can_add_project`, `can_edit_project`, `can_assign_photographers`, `can_request_photographer`, `can_request_design`, `can_update_stages`, `can_request_closure`, `can_approve_closure`, `can_manage_users`, `can_manage_permissions`, `can_view_reports`, `can_manage_attendance`, `can_manage_wedding_projects`. **Excluded:** `can_manage_finance`.
+> Active/grantable codes: `can_add_project`, `can_edit_project`, `can_assign_photographers`, `can_request_photographer`, `can_request_design`, `can_update_stages`, `can_request_closure`, `can_approve_closure`, `can_manage_users`, `can_manage_permissions`, `can_view_reports`, `can_manage_attendance`, `can_manage_wedding_projects`.
+> **Inert reserved (is_active=false, never granted/assigned):** `can_manage_finance` — kept as a legacy placeholder for future compatibility; finance remains permanently out of scope functionally.
 
 ### 2.5 `role_permissions` (role defaults — D5)
 | Column | Type | Notes |
@@ -296,9 +298,13 @@ time (consistent with, and refining, this draft):
   Flutter role is added.
 - **`client_tracking` is NOT a staff role** — it exists in Flutter `RoleType` but
   public tracking is anonymous (no profile), so it is not seeded into `roles`.
-- **`finance` / `wedding_finance` roles carry NO permission defaults** — inert
-  labels only (guardrail); their `FeaturePermissions.defaultsFor` finance grants
-  are dropped.
+- **Excluded-domain codes kept as inert reserved placeholders** (future
+  compatibility, per owner decision): the `finance` / `wedding_finance` roles and
+  the `can_manage_finance` permission exist in the catalog but are marked
+  **`is_active = false`**, carry **NO permission defaults**, and are **never
+  granted or assigned**. Zero operational behavior; finance stays permanently out
+  of scope functionally. (`roles` and `permissions` both have an `is_active`
+  column to support this marking.)
 - **Default-role invariant** (`profiles.default_role_id` must be a role the user
   holds) is enforced by a **composite `DEFERRABLE INITIALLY DEFERRED` FK**
   `profiles(id, default_role_id) → user_roles(user_id, role_id)`, so a profile

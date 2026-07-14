@@ -12,9 +12,12 @@
 --   D6 soft delete on profiles (is_active/deleted_at/deleted_by); audit_logs
 --      is retained operational history (no delete)
 --
--- Guardrail (docs/BACKEND_SCOPE_GUARD.md): this migration creates NOTHING for
--- finance, payments, Rekaz, notifications, FCM, push, or reminders. The
--- `can_manage_finance` permission is deliberately excluded from the catalog.
+-- Guardrail (docs/BACKEND_SCOPE_GUARD.md): this migration creates NO working
+-- tables, grants, RLS, RPCs, or logic for finance, payments, Rekaz,
+-- notifications, FCM, push, or reminders. The finance role codes and the
+-- `can_manage_finance` permission are kept ONLY as inert, INACTIVE catalog
+-- placeholders (is_active = false) for future compatibility — never granted,
+-- never assigned, zero operational behavior.
 --
 -- RLS: enabled on every table below with NO policies yet → access is DENIED for
 -- anon and authenticated roles until Sprint 9 Step 6 adds the policy set. These
@@ -52,19 +55,19 @@ comment on table public.roles is
   'Role catalog (lookup, not an enum). Codes mirror Flutter RoleType keys plus the marketing role.';
 
 -- ---------------------------------------------------------------------------
--- permissions (D5) — normalized feature catalog. Excludes can_manage_finance.
+-- permissions (D5) — normalized feature catalog. `is_active` lets excluded
+-- codes (can_manage_finance) exist as inert reserved placeholders, never granted.
 -- ---------------------------------------------------------------------------
 create table public.permissions (
   id        uuid primary key default gen_random_uuid(),
   code      text not null unique,
   name_ar   text not null,
+  is_active boolean not null default true,
   constraint permissions_code_format_chk check (code ~ '^[a-z][a-z_]*$'),
-  -- Guardrail: finance is permanently out of scope.
-  constraint permissions_no_finance_chk check (code <> 'can_manage_finance'),
   constraint permissions_name_ar_not_blank_chk check (char_length(btrim(name_ar)) > 0)
 );
 comment on table public.permissions is
-  'Feature-permission catalog (normalized). can_manage_finance is intentionally excluded.';
+  'Feature-permission catalog (normalized). Inactive rows (is_active=false) are inert reserved placeholders, never granted (e.g. can_manage_finance).';
 
 -- ---------------------------------------------------------------------------
 -- profiles (D2, D6) — staff identity, 1:1 with auth.users.
@@ -175,25 +178,26 @@ create index audit_logs_created_at_idx    on public.audit_logs (created_at);
 -- ---------------------------------------------------------------------------
 
 -- Roles: Flutter RoleType keys + name_ar, plus `marketing` (D1).
--- Note: `client_tracking` is intentionally NOT a staff role — public client
--- tracking is anonymous (no profile). `finance`/`wedding_finance` are inert
--- labels (no finance data/logic). `marketing` name_ar is provisional ('تسويق')
--- until the Flutter RoleType adds it (see Step 2 report).
-insert into public.roles (code, name_ar) values
-  ('admin',           'الإدارة'),
-  ('manager',         'مدير مشاريع'),
-  ('photographer',    'مصور'),
-  ('marketing',       'تسويق'),
-  ('designer',        'مصمم'),
-  ('wedding_admin',   'إدارة الزواجات'),
-  ('attendance',      'تسجيل الحضور'),
-  ('personal_photo',  'التصوير الشخصي'),
-  ('finance',         'مالية سمو'),
-  ('wedding_finance', 'مالية الزواجات')
-on conflict (code) do update set name_ar = excluded.name_ar;
+-- `finance`/`wedding_finance` are kept as INACTIVE reserved placeholders
+-- (is_active=false) — inert legacy codes, never granted/assigned (guardrail).
+-- `client_tracking` is intentionally NOT a staff role — public client tracking
+-- is anonymous (no profile). `marketing` name_ar is provisional ('تسويق') until
+-- the Flutter RoleType adds it (see Step 2 report).
+insert into public.roles (code, name_ar, is_active) values
+  ('admin',           'الإدارة',        true),
+  ('manager',         'مدير مشاريع',    true),
+  ('photographer',    'مصور',           true),
+  ('marketing',       'تسويق',          true),
+  ('designer',        'مصمم',           true),
+  ('wedding_admin',   'إدارة الزواجات', true),
+  ('attendance',      'تسجيل الحضور',   true),
+  ('personal_photo',  'التصوير الشخصي', true),
+  ('finance',         'مالية سمو',      false),
+  ('wedding_finance', 'مالية الزواجات', false)
+on conflict (code) do update set name_ar = excluded.name_ar, is_active = excluded.is_active;
 
--- Permissions: AppFeature codes (name_ar from featureLabelAr), EXCLUDING
--- can_manage_finance (guardrail).
+-- Permissions: AppFeature codes (name_ar from featureLabelAr). These 13 are
+-- active/grantable. can_manage_finance is inserted separately (inactive).
 insert into public.permissions (code, name_ar) values
   ('can_add_project',            'إضافة مشروع'),
   ('can_edit_project',           'تعديل مشروع'),
@@ -210,10 +214,18 @@ insert into public.permissions (code, name_ar) values
   ('can_manage_wedding_projects','إدارة الزواجات')
 on conflict (code) do update set name_ar = excluded.name_ar;
 
+-- Inert reserved placeholder for future compatibility (guardrail): kept in the
+-- catalog but INACTIVE — never granted (see role_permissions), never assigned,
+-- zero operational behavior. Finance stays permanently out of scope functionally.
+insert into public.permissions (code, name_ar, is_active) values
+  ('can_manage_finance', 'إدارة المالية', false)
+on conflict (code) do update set name_ar = excluded.name_ar, is_active = excluded.is_active;
+
 -- Role default permissions, mirroring FeaturePermissions.defaultsFor.
 -- Inert roles (finance, wedding_finance) and roles without defined defaults
--- (marketing, designer, personal_photo) get NO defaults seeded. The finance
--- roles carry no permissions at all — they are inert labels (guardrail).
+-- (marketing, designer, personal_photo) get NO defaults seeded. The inactive
+-- finance roles and the inactive can_manage_finance permission are NEVER granted
+-- here — zero operational behavior (guardrail).
 insert into public.role_permissions (role_id, permission_id, granted)
 select r.id, p.id, true
 from (values

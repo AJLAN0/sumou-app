@@ -29,8 +29,17 @@ unless the project owner explicitly reverses an exclusion in writing.
   transfer, invoice, or finance report.
 - `NotificationRepository` stays **interface-only, empty** in Flutter — no
   methods, no implementation, no provider, no backend counterpart.
-- The `finance` / `wedding_finance` roles may exist as **inert role labels**
-  for fidelity only — no finance tables, data, RPCs, or logic attach to them.
+- **Inert legacy placeholders (allowed for future compatibility):** the
+  `finance` / `wedding_finance` role codes and the `can_manage_finance`
+  permission code may exist in the backend catalog **and** legacy Flutter enum
+  values may remain. They MUST be marked **inactive/reserved** where supported
+  (`is_active = false`), and MUST NOT be granted, assigned to users, or wired to
+  any table, RLS grant, RPC, Edge Function, screen, workflow, repository, or
+  integration. They have **zero operational behavior**. Existing placeholder
+  navigation may remain inert. Do **not** delete legacy Flutter enum values
+  solely because the feature is out of scope. The permanent **functional**
+  exclusions (finance implementation, payments, Rekaz, notifications, FCM, push,
+  reminders) remain fully in force.
 
 ## How to enforce
 

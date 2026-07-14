@@ -6,7 +6,8 @@
 -- When the schema is implemented (a later, explicitly approved step), seeds
 -- will populate ONLY lookup/reference data and dev fixtures, e.g.:
 --   * roles                (incl. 'marketing' — decision D1)
---   * permissions          (feature codes, EXCLUDING can_manage_finance)
+--   * permissions          (feature codes; can_manage_finance kept INACTIVE as
+--                           an inert reserved placeholder, never granted)
 --   * role_permissions     (role defaults — decision D5)
 --   * photographer_types   (decision D3)
 --   * dev staff/projects mirrored from lib/data/repositories/mock/*

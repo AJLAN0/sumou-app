@@ -1,0 +1,6 @@
+# Keeps the migrations directory tracked while empty.
+#
+# Sprint 9 Step 1: NO migrations yet. The application schema (tables, RLS, RPCs)
+# is NOT created in this step. When implementation begins (a later, explicitly
+# approved step), each migration is timestamped and covers one logical domain.
+# See docs/SUPABASE_DEV_SETUP.md → "Migration conventions".

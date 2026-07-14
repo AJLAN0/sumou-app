@@ -1,162 +1,212 @@
-# Supabase RLS Plan — Sprint 8
+# Supabase RLS Plan — Sprint 8 (Decisions Frozen)
 
-**Status:** DRAFT for review. **Not applied this sprint.** Policies below are reference to align on access rules; they become real policies in a later approved sprint.
-**Principle:** RLS **enabled on every table**, **default deny**. Access is granted by explicit policies keyed on the caller's roles + project ownership/assignment. Sensitive actions additionally check feature flags.
+**Status:** DRAFT for review, aligned to `SUPABASE_CORE_PLAN.md` §1. **Not applied this sprint.**
+**Principle:** RLS **enabled on every table**, **default deny**. Access is granted by explicit policies keyed on the caller's roles (D1) + ownership/assignment, with **soft-delete filtering** (D6) and **server-enforced permissions** (D5). Public clients reach data only through `security definer` RPCs (D4).
 
-**Excluded (no policies, because no tables):** finance, payments, Rekaz, notifications, FCM, push, reminders.
+**Excluded (no tables → no policies):** finance, payments, Rekaz, notifications, FCM, push, reminders.
 
 ---
 
-## 1. How identity & access are resolved
+## 1. Identity, roles & permission resolution
 
-- Caller identity = `auth.uid()` (Supabase Auth).
-- `auth.uid()` → `profiles` (must be `active = true` and `deleted_at is null`).
-- Roles → `user_roles`; feature flags → `user_permissions.features` (jsonb).
-- **Public client** = `anon` (no `auth.uid()`); reaches data **only** through `security definer` RPCs (never direct table access).
+- Caller = `auth.uid()` → `profiles` (must be `is_active = true` and `deleted_at is null`).
+- Roles via `user_roles` → `roles.code` (**lookup, not enum** — D1).
+- Effective permission (D5) = **user override if present, else OR of role defaults** across the user's roles.
+- Public client = `anon` → RPC only.
 
 ### Helper functions (SQL, `security definer`, `stable`)
 
 ```sql
--- DRAFT helpers
-create function current_uid() returns uuid language sql stable
-  as $$ select auth.uid() $$;
+-- DRAFT helpers (frozen-decision aligned)
 
 create function is_active_user() returns boolean language sql stable as $$
   select exists(select 1 from profiles p
-    where p.id = auth.uid() and p.active and p.deleted_at is null) $$;
+    where p.id = auth.uid() and p.is_active and p.deleted_at is null) $$;
 
-create function has_role(r role_type) returns boolean language sql stable as $$
-  select exists(select 1 from user_roles ur where ur.user_id = auth.uid() and ur.role = r) $$;
+-- role by CODE via the roles lookup (D1)
+create function has_role(role_code text) returns boolean language sql stable as $$
+  select exists(
+    select 1 from user_roles ur join roles r on r.id = ur.role_id
+    where ur.user_id = auth.uid() and r.code = role_code and r.is_active) $$;
 
 create function is_admin() returns boolean language sql stable as $$
   select has_role('admin') $$;
 
-create function has_feature(feature text) returns boolean language sql stable as $$
-  select coalesce((select (features ->> feature)::boolean
-                   from user_permissions where user_id = auth.uid()), false) $$;
+-- normalized permission resolution (D5): user override wins, else OR of role defaults
+create function has_feature(perm_code text) returns boolean language sql stable as $$
+  with p as (select id from permissions where code = perm_code)
+  select coalesce(
+    (select up.granted from user_permissions up join p on p.id = up.permission_id
+      where up.user_id = auth.uid()),
+    (select bool_or(rp.granted) from role_permissions rp
+      join p on p.id = rp.permission_id
+      join user_roles ur on ur.role_id = rp.role_id
+      where ur.user_id = auth.uid()),
+    false) $$;
 
 create function manages_project(pid uuid) returns boolean language sql stable as $$
-  select exists(select 1 from projects p where p.id = pid and p.manager_id = auth.uid()) $$;
+  select exists(select 1 from projects p
+    where p.id = pid and p.manager_id = auth.uid() and p.deleted_at is null) $$;
 
 create function assigned_to_project(pid uuid) returns boolean language sql stable as $$
-  select exists(select 1 from project_team_roles t
-                where t.project_id = pid and t.user_id = auth.uid()) $$;
+  select exists(select 1 from project_team_members t
+    where t.project_id = pid and t.user_id = auth.uid()) $$;
+
+-- Marketing availability exemption (D1): marketing users bypass same-date conflicts;
+-- everyone else is subject to overlapping-project (and, later, leave) conflicts.
+create function is_available(uid uuid, on_date date) returns boolean language sql stable as $$
+  select case
+    when exists (select 1 from user_roles ur join roles r on r.id = ur.role_id
+                 where ur.user_id = uid and r.code = 'marketing') then true
+    else not exists (
+      select 1 from project_team_members t
+      join projects p on p.id = t.project_id
+      where t.user_id = uid and t.date = on_date
+        and p.status in ('active','in_progress','pending_closure')
+        and p.deleted_at is null)
+    -- NOTE: leave-conflict data source is deferred/mock (not a notifications concern).
+  end $$;
 ```
 
 > `has_feature('can_manage_finance')` is intentionally never used — finance is out of scope.
 
 ---
 
-## 2. RLS matrix (per table × role × operation)
+## 2. Soft-delete filtering (D6)
 
-Legend: **A**=Admin, **M**=Manager (owns the project), **P**=Photographer (assigned), **anon**=public client (RPC only). ✅ allowed · ⛔ denied · *(feature)* = also requires that feature flag.
+Every **SELECT** policy (and every read view) on soft-deletable tables adds `is_active AND deleted_at IS NULL`:
+- `profiles`, `projects`, `project_links`.
+
+Retained-history tables (`project_stages`, `closure_requests`, `client_reviews`, `audit_logs`) are **never deleted**; visibility is scoped by their parent project's policies.
+
+---
+
+## 3. RLS matrix (per table × role × operation)
+
+Legend: **A**=Admin · **M**=Manager (owns project) · **P**=Photographer (assigned) · **MK**=Marketing · **anon**=public (RPC only). ✅ allowed · ⛔ denied · *(feature)* = also requires that permission via `has_feature()`.
+
+### `roles`, `permissions` (lookups)
+| Op | A | others | anon |
+|---|---|---|---|
+| select | ✅ | ✅ (read-only reference) | ⛔ |
+| insert/update/delete | ✅ *(can_manage_permissions)* | ⛔ | ⛔ |
 
 ### `profiles`
-| Op | A | M | P | anon |
-|---|---|---|---|---|
-| select | ✅ all | ✅ self + (project teammates) | ✅ self + teammates | ⛔ |
-| insert | ✅ *(can_manage_users)* | ⛔ | ⛔ | ⛔ |
-| update | ✅ *(can_manage_users)* | ✅ self (profile fields only) | ✅ self | ⛔ |
-| delete | ✅ soft-delete *(can_manage_users)* | ⛔ | ⛔ | ⛔ |
+| Op | A | M / P / MK | anon |
+|---|---|---|---|
+| select | ✅ all (non-deleted) | ✅ self + teammates | ⛔ |
+| insert | via `admin_create_user` Edge Function | ⛔ | ⛔ |
+| update | ✅ *(can_manage_users)* | ✅ self (profile fields) | ⛔ |
+| delete | ✅ **soft-delete** *(can_manage_users)* | ⛔ | ⛔ |
 
-### `user_roles` / `user_permissions`
-| Op | A | M | P | anon |
+### `user_roles`, `role_permissions`, `user_permissions`
+| Op | A | others | anon |
+|---|---|---|---|
+| select | ✅ | ✅ self | ⛔ |
+| insert/update/delete | ✅ *(can_manage_permissions)* | ⛔ | ⛔ |
+
+*(The "apply role permissions" action runs through the `apply_role_permissions` RPC, admin-gated.)*
+
+### `photographer_types`, `user_photographer_types`
+| Op | A | M/MK | P | anon |
 |---|---|---|---|---|
-| select | ✅ all | ✅ self | ✅ self | ⛔ |
-| insert/update/delete | ✅ *(can_manage_permissions)* | ⛔ | ⛔ | ⛔ |
+| select | ✅ | ✅ | ✅ self | ⛔ |
+| write | ✅ *(can_manage_users)* | ⛔ | ⛔ | ⛔ |
 
 ### `projects`
-| Op | A | M | P | anon |
-|---|---|---|---|---|
-| select | ✅ all | ✅ `manager_id = uid` | ✅ assigned | ⛔ (RPC only) |
-| insert | ✅ | ✅ *(can_add_project)*, `manager_id = uid` | ⛔ | ⛔ |
-| update | ✅ | ✅ own *(can_edit_project)* | ⛔ | ⛔ |
-| delete | ✅ soft-delete | ⛔ | ⛔ | ⛔ |
+| Op | A | M | P | MK | anon |
+|---|---|---|---|---|---|
+| select | ✅ all | ✅ own | ✅ assigned | ✅ assigned | ⛔ (RPC) |
+| insert | ✅ | ✅ *(can_add_project)*, `manager_id=uid` | ⛔ | *(per perms)* | ⛔ |
+| update | ✅ | ✅ own *(can_edit_project)* | ⛔ | ⛔ | ⛔ |
+| delete | ✅ **soft-delete** | ⛔ | ⛔ | ⛔ | ⛔ |
 
-### `project_team_roles`
-| Op | A | M | P | anon |
+### `project_team_members` + `project_team_types`
+| Op | A | M | P/MK | anon |
 |---|---|---|---|---|
-| select | ✅ | ✅ own project | ✅ own assignments + teammates on shared projects | ⛔ |
-| insert/update/delete | ✅ | ✅ own project *(can_assign_photographers)* | ⛔ | ⛔ |
+| select | ✅ | ✅ own project | ✅ own/teammates | ⛔ |
+| write | ✅ | ✅ own *(can_assign_photographers)* | ⛔ | ⛔ |
 
-*(Writes normally go through the `assign_team_roles` RPC, which replaces the set atomically.)*
+*(Writes go through `assign_team_roles` RPC, which replaces the member + its types atomically and applies the `is_available` guard — marketing exempt, D1.)*
 
 ### `project_stages`
-| Op | A | M | P | anon |
+| Op | A | M | P/MK | anon |
 |---|---|---|---|---|
-| select | ✅ | ✅ own project | ✅ assigned project | ⛔ |
+| select | ✅ | ✅ own | ✅ assigned | ⛔ |
 | update | ✅ | ✅ own *(can_update_stages)* | ✅ assigned *(can_update_stages)* | ⛔ |
-| insert/delete | ✅ (via project creation RPC) | seeded by RPC | ⛔ | ⛔ |
-
-*(Stage transitions go through the `update_project_stage` RPC.)*
+| insert/delete | via project-create RPC | seeded | ⛔ | ⛔ |
 
 ### `closure_requests`
 | Op | A | M | P | anon |
 |---|---|---|---|---|
 | select | ✅ | ✅ own project | ✅ own submissions | ⛔ |
-| insert | ✅ | ⛔ (managers approve, don't submit) | ✅ assigned *(can_request_closure)* | ⛔ |
-| update (approve/reject) | ✅ | ✅ own project *(can_approve_closure)* | ⛔ | ⛔ |
-| delete | ✅ | ⛔ | ⛔ | ⛔ |
+| insert | ✅ | ⛔ | ✅ assigned *(can_request_closure)* | ⛔ |
+| update (approve/reject) | ✅ | ✅ own *(can_approve_closure)* | ⛔ | ⛔ |
+| delete | ⛔ (retained history) | ⛔ | ⛔ | ⛔ |
 
-*(Submit/approve/reject go through RPCs that also flip project status — see below.)*
-
-### `project_deliverables`
-| Op | A | M | P | anon |
+### `project_links` (D4, D6)
+| Op | A | M | P/MK | anon |
 |---|---|---|---|---|
-| select | ✅ | ✅ own project | ✅ assigned project | ⛔ (only via tracking RPC, approved only) |
-| insert/update (incl. approve) | ✅ | ✅ own project | ⛔ | ⛔ |
-| delete | ✅ | ✅ own project | ⛔ | ⛔ |
+| select | ✅ | ✅ own project | ✅ assigned project | ⛔ (tracking RPC, approved+client-visible only) |
+| insert/update (approve, set visibility) | ✅ | ✅ own project | ⛔ | ⛔ |
+| delete | ✅ **soft-delete** | ✅ own project **soft-delete** | ⛔ | ⛔ |
 
 ### `client_reviews`
-| Op | A | M | P | anon |
+| Op | A | M | P/MK | anon |
 |---|---|---|---|---|
 | select | ✅ | ✅ own project | ⛔ | ⛔ |
-| insert | via RPC | via RPC | ⛔ | ✅ **via `submit_review` RPC only** |
+| insert | via RPC | via RPC | ⛔ | ✅ **`submit_review` RPC only** |
+
+### `audit_logs`
+| Op | A | others | anon |
+|---|---|---|---|
+| select | ✅ | ⛔ | ⛔ |
+| insert | via RPCs/triggers (system) | — | ⛔ |
+| update/delete | ⛔ (immutable history) | ⛔ | ⛔ |
 
 ---
 
-## 3. Public (anon) access = RPC only
+## 4. Public (anon) access — RPC only (D4)
 
-Public clients have **no direct table grants**. Two `security definer` RPCs expose exactly what the client screen needs:
+No direct table grants to `anon`. Two `security definer` RPCs:
 
 ```sql
--- DRAFT signatures (security definer, granted to anon)
--- Returns project public status + ONLY approved deliverable links for a serial.
+-- track_by_serial: project public status + ONLY approved & client-visible links,
+-- for a non-deleted project. Never exposes team, fees, notes, or manager identity.
 create function track_by_serial(p_serial text) returns jsonb ...;
+-- returns links where is_approved and is_client_visible and is_active and deleted_at is null
 
--- Inserts a client review (rating 1..5 + optional message) resolved by serial.
+-- submit_review: insert rating (1..5) + optional message, resolved by serial.
 create function submit_review(p_serial text, p_rating int, p_message text) returns void ...;
 ```
 
-Rules baked into these RPCs:
-- Resolve `serial → project`; return `null`/empty when unknown.
-- **Never** expose team, fees, internal notes, manager identity, or unapproved links.
-- `submit_review` validates `rating between 1 and 5`.
-- Rate-limit / basic abuse protection considered at the gateway (not a notification concern).
+Rules baked in: unknown serial → empty; deleted project → empty; validate `rating between 1 and 5`; expose nothing beyond public status + eligible links.
 
 ---
 
-## 4. Write RPCs & the status invariants they protect
+## 5. Write RPCs & invariants (server-enforced)
 
-These enforce business rules that plain RLS can't (multi-row, multi-table transactions). All run `security definer` but **re-check the caller's role/feature inside** before mutating:
+All run `security definer` but **re-check role/feature inside** before mutating:
 
 | RPC | Guard | Effect |
 |---|---|---|
-| `create_project(...)` | `is_admin() OR (has_role('manager') AND has_feature('can_add_project'))` | insert project + allocate serial + seed stages |
-| `assign_team_roles(pid, rows)` | admin OR (manages_project(pid) AND `can_assign_photographers`) | replace team atomically |
-| `update_project_stage(pid, sid, ...)` | admin OR ((manages_project OR assigned_to_project) AND `can_update_stages`) | cascade stage statuses |
-| `submit_closure_request(pid, ...)` | assigned_to_project(pid) AND `can_request_closure`; reject if a pending one exists | insert + project → `pending_closure` |
-| `approve_closure_request(rid)` | admin OR (manages own project AND `can_approve_closure`) | approve + project `completed` + all stages `done` |
-| `reject_closure_request(rid, reason)` | same as approve | reject + project → `active` |
+| `create_project` | `is_admin() OR (has_role('manager') AND has_feature('can_add_project'))` | project + serial + seed stages |
+| `assign_team_roles` | admin OR (manages_project AND `can_assign_photographers`); per-member `is_available(user,date)` (marketing exempt) | replace members + types atomically |
+| `update_project_stage` | admin OR ((manages_project OR assigned_to_project) AND `can_update_stages`) | cascade stage statuses |
+| `submit_closure_request` | assigned_to_project AND `can_request_closure`; reject if a pending exists | insert + project → `pending_closure` |
+| `approve_closure_request` | admin OR (manages own project AND `can_approve_closure`) | approve + project `completed` + all stages `done` |
+| `reject_closure_request` | same as approve | reject + project → `active` |
+| `apply_role_permissions` | admin *(can_manage_permissions)* | copy `role_permissions` → `user_permissions` overrides (D5) |
+
+**Account creation / password flows (D2):** `admin_create_user` is an **Edge Function** (service role, not RLS-bound) that creates the Auth user with the internal email, no email confirmation, then seeds `profiles`/`user_roles`/`user_permissions`. Admin password reset/change is a **secure internal/admin flow**. Documented only.
 
 ---
 
-## 5. Enablement checklist (for the future apply-sprint)
+## 6. Enablement checklist (future apply-sprint)
 
-- `alter table <t> enable row level security;` on **all** tables.
-- Add a **default-deny** posture (no policy = no access) and then add the grants above.
-- Create helper functions first (they're referenced by policies).
-- Grant `execute` on public RPCs to `anon`; keep all other tables ungranted to `anon`.
-- Verify with a **policy test matrix** (one test per row of §2) before pointing the app at it.
+- `enable row level security` on **all** tables; default-deny posture.
+- Create `roles`/`permissions`/`role_permissions` seed rows first, then helper functions, then policies, then RPCs, then the `admin_create_user` Edge Function.
+- Grant `execute` on `track_by_serial` + `submit_review` to `anon`; grant nothing else to `anon`.
+- Verify with a **policy test matrix** (one case per row of §3) including soft-deleted-row invisibility and the marketing availability exemption, before pointing the app at it.
 
-**Reminder:** this sprint documents the rules only. No RLS is enabled, no SQL is run.
+**This sprint documents rules only. No RLS enabled, no SQL run.**

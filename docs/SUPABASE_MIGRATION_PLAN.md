@@ -1,142 +1,141 @@
-# Supabase Migration Plan — Sprint 8
+# Supabase Migration Plan — Sprint 8 (Decisions Frozen)
 
-**Status:** Planning only. **No Supabase connection, no migrations, no Flutter changes, no packages this sprint.**
-**Principle:** migrate **behind the repository interfaces**, one interface at a time, keeping the mock as a fallback until each phase is verified. The UI/providers/models never change.
+**Status:** Planning only, aligned to `SUPABASE_CORE_PLAN.md` §1. **No Supabase connection, no migrations, no SQL migration files, no Flutter changes, no packages this sprint. Sprint 9 not started.**
+**Principle:** migrate **behind the repository interfaces**, one interface at a time, keeping mocks as fallback until each phase is verified. UI/providers/models never change.
 
 **Excluded (never migrated):** finance, payments, Rekaz, notifications, FCM, push, reminders. `NotificationRepository` stays empty.
 
 ---
 
-## 1. Strategy overview
+## 1. Strategy
 
-1. Backend is introduced as **new implementations** of the existing interfaces (`SupabaseAuthRepository`, `SupabaseUserRepository`, `SupabaseProjectRepository`, `SupabaseTrackingRepository`, `SupabasePermissionRepository`).
-2. The **only wiring change** is in `lib/core/providers/repository_providers.dart` (swap the concrete class, or override in a `ProviderScope`). Everything above the repository layer is untouched.
-3. Swap **incrementally**: a repository can point at Supabase while others still use mocks, so the app stays runnable throughout.
-4. Keep mocks in the tree as a **fallback / test double** (widget tests keep using mocks via `UncontrolledProviderScope`).
-
-> The actual DDL + RLS + RPCs (from the schema/RLS drafts) are created in a **separate, explicitly-approved apply-sprint**. This plan sequences that work; it does not perform it.
+1. New implementations of existing interfaces (`SupabaseAuthRepository`, `SupabaseUserRepository`, `SupabaseProjectRepository`, `SupabaseTrackingRepository`, `SupabasePermissionRepository`).
+2. Only wiring change: `lib/core/providers/repository_providers.dart` (swap concrete class or override in a `ProviderScope`).
+3. Swap incrementally; the app stays runnable throughout. Mocks remain as test doubles.
+4. DDL + RLS + RPCs + the `admin_create_user` Edge Function are created in a **separate approved apply-sprint**; this plan sequences that work.
 
 ---
 
 ## 2. Phased plan
 
-### Phase 0 — Prerequisites (planning/setup, no app code)
-- Create the Supabase project (out-of-repo, owner-driven).
-- Store URL + anon key in **environment config** (never hardcoded; matches the security rule). Decide config mechanism (`--dart-define` / env file) — documented, not added this sprint.
-- Freeze the schema (schema draft) and RLS (RLS plan) after the §6 open decisions in the core plan are answered.
+### Phase 0 — Prerequisites (no app code)
+- Create the Supabase project (owner-driven). Put URL + anon key in **environment config** (never hardcoded).
+- Confirm the non-blocking items in core plan §6 (leave source stays mock; env mechanism; audit granularity).
 
-### Phase 1 — Schema & policies (DB only)
-- Apply enums + tables + indexes + constraints (from `SUPABASE_SCHEMA_DRAFT.md`).
-- Create helper functions, then RLS policies, then RPCs (from `SUPABASE_RLS_PLAN.md`).
-- Run the policy test matrix. **No app involvement yet.**
+### Phase 1 — Schema, seeds & policies (DB only)
+- Apply enums + tables + indexes + constraints (`SUPABASE_SCHEMA_DRAFT.md`).
+- **Seed lookups:** `roles` (incl. `marketing`, D1), `permissions`, `role_permissions` (role defaults, D5), `photographer_types` (D3).
+- Create helper functions → RLS policies → RPCs (`SUPABASE_RLS_PLAN.md`). Run the policy test matrix (incl. soft-delete invisibility + marketing exemption). **No app involvement.**
 
-### Phase 2 — Identity & auth (`AuthRepository` + `profiles`)
-- Seed staff accounts (from `MockUsers`) into Auth + `profiles` + `user_roles` + `user_permissions`.
-- Implement `SupabaseAuthRepository`: username→login, `currentUser`, `logout`, `changePassword`, **disabled-account block**.
-- Swap only the auth provider; keep the rest on mocks. Verify login/role-selection/logout for admin/manager/photographer + disabled user.
+### Phase 2 — Identity & auth (`AuthRepository` + `profiles`, D2)
+- Seed staff (from `MockUsers`) via the `admin_create_user` **Edge Function**: internal email `normalized_username@users.sumou.internal`, no email confirmation, then `profiles` + `user_roles` + `user_permissions` overrides (where they differ from role defaults).
+- Implement `SupabaseAuthRepository`: `username → normalize → internal email → signInWithPassword`, then **block `is_active = false`**; `currentUser`, `logout`, `changePassword` (secure internal/admin flow).
+- Swap only the auth provider. Verify login/role-selection/logout for admin/manager/photographer/marketing + disabled user. Confirm the internal email is **never shown**.
 
-### Phase 3 — Read paths (`UserRepository` + `PermissionRepository` reads, `ProjectRepository` reads)
-- Implement reads: `getUsers`, `getUserById/ByUsername`, `getPermissions`; `getProjects`, `getProjectById`, `getProjectsForManager/Photographer`, `getCompletedProjects`, `searchProjects`, `filterProjects`, `getClosureRequests`.
-- Back reads with the **join views** (`v_projects`, `v_closure_requests`) so denormalized display names (`managerName`, `projectName`, `submittedByName`) resolve in one query.
-- Swap read providers; write paths still mock. Verify all list/detail screens render real data.
+### Phase 3 — Read paths
+- `UserRepository` reads (`getUsers`, `getUserById/ByUsername`), `PermissionRepository` reads, `ProjectRepository` reads (`getProjects`, `getProjectById`, `getProjectsForManager/Photographer`, `getCompletedProjects`, `searchProjects`, `filterProjects`, `getClosureRequests`).
+- Back reads with **views** (`v_projects`, `v_closure_requests`, `v_team`) that join display names, aggregate `project_team_members`+`project_team_types` into the app's `ProjectTeamRole` shape (D3), and **pre-filter soft-deleted** rows (D6).
+- Swap read providers. Verify all list/detail screens render real data.
 
-### Phase 4 — Write paths (`ProjectRepository` writes + `UserRepository` writes)
-- Implement via RPCs: `createProject`, `assignTeamRoles`, `updateProjectStage`, `submitClosureRequest`, `approveClosureRequest`, `rejectClosureRequest`, `updateProjectBasics`, `setProjectManager`.
-- Implement user writes: `setUserActive`, `updateUserRoles`, `updateUserPermissions`, `createUser`, `updateUser`, `deleteUser` (soft-delete).
-- Verify the full manager/admin/photographer flows end-to-end against RLS.
+### Phase 4 — Write paths
+- `ProjectRepository` writes via RPCs: `create_project`, `assign_team_roles` (member + types + availability guard), `update_project_stage`, `submit_closure_request`, `approve_closure_request`, `reject_closure_request`, plus `updateProjectBasics`, `setProjectManager`.
+- `UserRepository` writes: `setUserActive`, `updateUserRoles`, `updateUserPermissions` (overrides), `createUser` (→ Edge Function), `updateUser`, `deleteUser` (**soft-delete**, D6). Wire the **"apply role permissions"** action to `apply_role_permissions` (D5).
+- Verify full manager/admin/photographer/marketing flows against RLS.
 
-### Phase 5 — Public tracking (`TrackingRepository`)
-- Implement `trackBySerial` + `submitReview` via the anon `security definer` RPCs.
-- Verify the public client screen shows only approved links and can submit a review.
+### Phase 5 — Public tracking (`TrackingRepository`, D4)
+- Implement `trackBySerial` + `submitReview` via the anon `security definer` RPCs (approved **and** client-visible links only; non-deleted projects).
+- Verify the public client screen exposes nothing beyond eligible links + can submit a review.
 
 ### Phase 6 — Cutover & cleanup
-- All providers point at Supabase. Mocks remain for tests only.
-- Remove any temporary dual-wiring. Final regression pass across all roles.
-- Confirm no excluded domain leaked in.
+- All providers point at Supabase; mocks remain for tests. Remove temporary dual-wiring. Regression pass across all roles. Confirm no excluded domain leaked in.
 
 ---
 
-## 3. Per-method mapping (interface → backend mechanism)
+## 3. Per-method mapping (interface → backend)
 
-### AuthRepository
+### AuthRepository (D2)
 | Method | Mechanism |
 |---|---|
-| `login` | resolve username→email, `signInWithPassword`, then block if `profiles.active=false` |
+| `login` | normalize username → internal email → `signInWithPassword` → block if `is_active=false` |
 | `logout` | `signOut` |
-| `currentUser` | `auth.uid()` → `v_profile` |
-| `changePassword` | re-auth + `updateUser({password})` |
+| `currentUser` | `auth.uid()` → `v_profile` (roles + effective permissions) |
+| `changePassword` | secure internal/admin flow (re-auth + `updateUser({password})`) |
 
-### UserRepository
+### UserRepository (D5, D6)
 | Method | Mechanism |
 |---|---|
-| `getUsers` / `getUserById` / `getUserByUsername` | select `profiles` (+roles/permissions) |
-| `setUserActive` | update `profiles.active` |
-| `updateUserRoles` | replace `user_roles` (+ set `default_role`) — RPC or txn |
-| `updateUserPermissions` | update `user_permissions.features` |
-| `createUser` | RPC: create Auth user + `profiles` + roles + permissions |
-| `updateUser` | update `profiles` (+roles/photo types) |
-| `deleteUser` | soft-delete `profiles.deleted_at` |
+| `getUsers` / `getUserById` / `getUserByUsername` | select `profiles` (+roles, effective permissions, photographer types) |
+| `setUserActive` | update `profiles.is_active` |
+| `updateUserRoles` | replace `user_roles` (+ `default_role_id`) — RPC/txn |
+| `updateUserPermissions` | upsert `user_permissions` overrides |
+| `createUser` | **`admin_create_user` Edge Function** |
+| `updateUser` | update `profiles` (+ `user_photographer_types`) |
+| `deleteUser` | **soft-delete** (`is_active=false`, `deleted_at`, `deleted_by`) |
+| "apply role permissions" | `apply_role_permissions` RPC (copy `role_permissions` → `user_permissions`) |
 
-### ProjectRepository
+### ProjectRepository (D3, D4, D6)
 | Method | Mechanism |
 |---|---|
-| `getProjects` / `getProjectById` | select `v_projects` |
-| `getProjectsForManager` / `getProjectsForPhotographer` | select filtered by `manager_id` / assignment |
+| `getProjects` / `getProjectById` | select `v_projects` (non-deleted) |
+| `getProjectsForManager` / `getProjectsForPhotographer` | filtered by `manager_id` / assignment |
 | `getCompletedProjects` / `searchProjects` / `filterProjects` | select with predicates |
 | `getClosureRequests` | select `v_closure_requests` |
 | `createProject` | **RPC** (project + serial + stages) |
-| `assignTeamRoles` | **RPC** (replace team) |
+| `assignTeamRoles` | **RPC** (replace `project_team_members` + `project_team_types`; availability guard, marketing exempt) |
 | `updateProjectStage` | **RPC** (cascade) |
-| `updateProjectBasics` | update `projects` (basic fields) |
+| `updateProjectBasics` | update `projects` basic fields |
 | `setProjectManager` | update `projects.manager_id` |
 | `submitClosureRequest` | **RPC** (insert + status flip, one-pending rule) |
 | `approveClosureRequest` | **RPC** (approve + complete + stages done) |
 | `rejectClosureRequest` | **RPC** (reject + back to active) |
+| delivery links | `project_links` writes (approve / set client-visible / soft-delete) |
 
 ### TrackingRepository / PermissionRepository
 | Method | Mechanism |
 |---|---|
-| `trackBySerial` | anon RPC `track_by_serial` |
+| `trackBySerial` | anon RPC `track_by_serial` (approved + client-visible + non-deleted) |
 | `submitReview` | anon RPC `submit_review` |
-| `getAllPermissions` / `getPermissions` / `updatePermissions` | select/update `user_permissions` |
+| `getAllPermissions` / `getPermissions` / `updatePermissions` | resolve/upsert normalized permission tables (D5) |
 
 ### NotificationRepository
-🚫 **Not migrated.** Interface stays empty; no table, RPC, or provider.
+🚫 **Not migrated.** Interface stays empty; no table, RPC, Edge Function, or provider.
 
 ---
 
 ## 4. Data migration (seed)
 
-- Source of truth today: `MockUsers` (5 accounts) and `MockProjects` (projects + stages + one seeded closure request).
-- **IDs:** app uses string ids (`u-manager`, `p-1`, …); DB uses `uuid`. Seed script assigns real UUIDs and keeps a **name/username/serial mapping** so relationships (manager_id, team.user_id, closure.project_id) resolve correctly.
-- **Passwords:** the mock `dev-only-1234` is **not** migrated as a real credential — real passwords are set per account at seed time (owner-provided) and never hardcoded.
-- **Serials:** preserve existing serial format; enforce uniqueness at insert.
+- **Lookups first:** `roles` (with `marketing`), `permissions`, `role_permissions` (defaults per `FeaturePermissions.defaultsFor`), `photographer_types`.
+- **Accounts:** `MockUsers` → `admin_create_user` (internal emails). Real passwords set at seed time (owner-provided), never hardcoded; the mock `dev-only-1234` is **not** migrated.
+- **Projects:** `MockProjects` → projects + `project_team_members`/`project_team_types` + stages + the seeded closure request.
+- **IDs:** app string ids (`u-manager`, `p-1`, …) → real `uuid`; keep a username/serial mapping so `manager_id`, `team.user_id`, `closure.project_id` resolve.
+- **Permissions:** seed only **overrides** where a user differs from role defaults; everything else resolves from `role_permissions`.
 
 ---
 
 ## 5. Testing & rollback
 
-- **Per phase:** run the existing widget/unit suite against mocks (unchanged), plus a manual smoke pass of the swapped area against Supabase (dev project).
-- **RLS matrix tests** (from the RLS plan) gate Phase 1 before any app swap.
-- **Rollback:** because each phase swaps one provider, reverting a phase = pointing that provider back at its mock. No data loss risk to the app (state was already ephemeral).
-- Keep a short-lived **feature switch** in `repository_providers.dart` (mock ⇄ supabase) during the transition, removed at Phase 6.
+- **Per phase:** existing widget/unit suite runs on mocks (unchanged) + a manual smoke pass of the swapped area on a dev Supabase project.
+- **Phase 1 gate:** RLS policy matrix (incl. soft-delete invisibility + marketing exemption + tracking exposure) before any app swap.
+- **Rollback:** each phase swaps one provider; revert = point it back at its mock. App state was already ephemeral, so no data-loss risk to the app.
+- Keep a short-lived **mock ⇄ supabase switch** in `repository_providers.dart` during transition; remove at Phase 6.
 
 ---
 
 ## 6. Risks & watch-items
 
-- **Username↔email** mapping must be settled before Phase 2 (see core plan §4).
-- **Disabled-account** enforcement needs both a login-time check and RLS (`active` gate) — easy to miss one.
-- **Denormalized names** (`managerName`, etc.) must come from views, or reads become N+1.
-- **One-pending-closure** rule must be a DB constraint (partial unique index) + RPC guard, not just app logic.
-- **Marketing role** decision (core plan §6.1) affects `role_type` enum and availability rules — resolve before freezing the enum.
-- **Availability/leave** is still mock (`MockLeave`); a real source is a **later** decision, not part of this migration, and must not pull in notifications/reminders.
+- **Team shape (D3):** the read layer must aggregate `project_team_members` + `project_team_types` back into per-(person,type) `ProjectTeamRole` so Flutter models don't change.
+- **Permission resolution (D5):** override-then-role-default must be server-enforced (`has_feature`), not re-implemented client-side as the source of truth.
+- **Soft-delete (D6):** every read/policy/view must filter `is_active AND deleted_at IS NULL`; easy to miss one.
+- **Disabled accounts (D2):** enforce at login **and** in RLS (`is_active`).
+- **Internal email (D2):** must never surface in UI or logs.
+- **Marketing exemption (D1):** live once the Flutter `RoleType` gains `marketing` (a later Flutter sprint) and the `roles` seed includes it; the availability rule is enforced in `assign_team_roles`.
+- **Leave conflicts:** data source stays mock/deferred — must not introduce notifications/reminders.
 
 ---
 
 ## 7. What this sprint delivered
 
-The four planning docs only:
+The four planning docs, now **decision-frozen and consistent**:
 `SUPABASE_CORE_PLAN.md` · `SUPABASE_SCHEMA_DRAFT.md` · `SUPABASE_RLS_PLAN.md` · `SUPABASE_MIGRATION_PLAN.md`.
 
-**No Supabase link · no migrations · no Flutter edits · no new packages.** Implementation begins only in a later, explicitly-approved apply-sprint.
+**No Supabase link · no migrations · no SQL files · no Flutter edits · no new packages · Sprint 9 not started.** Implementation begins only in a later, explicitly-approved apply-sprint.

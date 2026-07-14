@@ -1,123 +1,125 @@
 # Supabase Core Plan — Sprint 8 (Backend Planning & Contracts)
 
-**Status:** Planning only. **No Supabase connection, no migrations, no Flutter changes, no packages in this sprint.**
-**Goal:** understand the current app and lock the backend design before writing any migration.
+**Status:** Planning only — **DECISIONS FROZEN**. No Supabase connection, no migrations, no SQL migration files, no Flutter changes, no packages.
+**Goal:** understand the current app and lock the backend design before any migration.
 **Companion docs:** `SUPABASE_SCHEMA_DRAFT.md`, `SUPABASE_RLS_PLAN.md`, `SUPABASE_MIGRATION_PLAN.md`.
 
 ---
 
 ## 0. Hard guardrails (permanent exclusions)
 
-These are **permanently out of scope** and apply to **every layer** — database, Supabase, tables & migrations, RPC & Edge Functions, repositories, screens & navigation, and **any future sprint**:
+Permanently out of scope at **every layer** — database, Supabase, tables & migrations, RPC & Edge Functions, repositories, documentation, screens & navigation, and **any future sprint**:
 
-🚫 No Finance · 🚫 No Payments · 🚫 No Payment Requests · 🚫 No Finance Reports · 🚫 No Rekaz (config or integration) · 🚫 No Notifications · 🚫 No FCM · 🚫 No Push Notifications · 🚫 No Reminders
+🚫 No Finance · 🚫 No Payments · 🚫 No Payment Requests · 🚫 No Finance Reports · 🚫 No Rekaz · 🚫 No Notifications · 🚫 No FCM · 🚫 No Push Notifications · 🚫 No Reminders
 
-**Consequences for the backend design:**
-- No `finance_*`, `payments`, `transfers`, `rekaz_*`, `notifications`, `reminders`, or `devices/fcm_tokens` tables.
-- No RPC / Edge Functions for finance, payments, Rekaz, or notifications.
-- No RLS policies for excluded domains (the tables simply won't exist).
-- `NotificationRepository` stays **interface-only with no methods** (as it is today).
-- The `finance` / `wedding_finance` roles and the `can_manage_finance` permission flag may exist as **inert labels** for role fidelity, but they get **no tables, no data, and no logic**.
+**Consequences:** no `finance_*` / `payments` / `transfers` / `rekaz_*` / `notifications` / `reminders` / `devices|fcm_tokens` tables, RPCs, Edge Functions, or RLS. `NotificationRepository` stays interface-only with no methods. `finance` / `wedding_finance` roles and any finance permission are **inert labels only** — no tables, data, or logic.
 
 ---
 
-## 1. Why the app is backend-ready
+## 1. Backend Decisions — Frozen
 
-The UI never talks to a data source directly. Every screen goes through **Riverpod providers → repository interfaces**, and the current data comes from in-memory `Mock*Repository` classes. Swapping to Supabase means writing new implementations of the same interfaces and changing one wiring file (`lib/core/providers/repository_providers.dart`). The widgets, providers, and models do not change.
+The following decisions are **approved and frozen**. All schema/RLS/migration docs conform to them.
 
-**The contract to preserve (interfaces = the backend spec):**
+### D1 — Marketing role (real, first-class)
+- **Decision:** Add **Marketing** as a real supported role, code `marketing`. Do **not** map Marketing to Designer or any other role. Marketing users **may be assigned to overlapping projects**; all other users remain subject to **project-date and leave conflicts**. Role codes live in a **`roles` lookup table**, not a rigid Postgres enum.
+- **Reasoning:** Marketing genuinely needs cross-project, same-date assignment (the availability exemption). A lookup table lets us add/adjust roles without an enum migration.
+- **Impact:** `roles` lookup replaces the `role_type` enum; `user_roles` FKs to `roles`. RLS `has_role('marketing')` drives the availability exemption in the assignment path. The Flutter `RoleType` must gain a `marketing` value in a **later Flutter sprint** (not this one) for the exemption to go live end-to-end; the currently-inert `isMarketingExempt` hook becomes active then.
 
-| Interface | Responsibility | Backend note |
+### D2 — Username login + internal Supabase Auth email
+- **Decision:** Keep **username-based login** in the Flutter UX. Store `username` as a **unique, normalized** field on `profiles` (lowercase, trimmed, validated). Back each account with an **internal generated** Supabase Auth email `normalized_username@users.sumou.internal` that is **never displayed** in the app. **Email confirmation not required** for internal accounts. **Admin user creation** later uses a **secure Edge Function** (service role). **Password reset/change** uses a **secure internal/admin flow**. **Document only — do not implement yet.**
+- **Reasoning:** Supabase Auth is email-first; a deterministic internal email preserves the username UX without exposing a fake email, and keeps account creation server-controlled.
+- **Impact:** `profiles.username` unique + normalized; auth email is an internal implementation detail on `auth.users`. Adds one Edge Function (`admin_create_user`) and an admin password-reset flow to the plan (see §5). Login resolves `username → internal email → signInWithPassword`, then blocks disabled accounts.
+
+### D3 — Photographer types (normalized, many-to-many)
+- **Decision:** Normalized lookup + relations: **`photographer_types`**, **`user_photographer_types`**, **`project_team_types`**. Support **multiple types per user** and **multiple assignment types per project team member**.
+- **Reasoning:** Photo types are shared vocabulary and a member can hold several on one project; free-text drifts.
+- **Impact:** Replaces the free-text `type` on team rows. The team base row becomes **`project_team_members`** (one per person per project) with types in `project_team_types`. `assignTeamRoles` writes a member + its types. `user_photographer_types` carries a user's skills.
+
+### D4 — Delivery links (URL only, approval + visibility)
+- **Decision:** First backend version stores **URL-based delivery links only**, in **`project_links`** with **`is_approved`** and **`is_client_visible`**. **Public tracking exposes only links that are both approved and client-visible.** Supabase **Storage/file uploads are deferred** (not in the initial backend).
+- **Reasoning:** Links cover the delivery need now; Storage adds ops surface we don't need yet (and no report *generation* — that's finance-adjacent and excluded).
+- **Impact:** Replaces the draft `project_deliverables`. `report_file_url` stays plain text/URL. Tracking RPC filters `is_approved AND is_client_visible`.
+
+### D5 — Permissions (normalized tables, server-enforced)
+- **Decision:** Normalized **`permissions`**, **`role_permissions`** (role defaults), **`user_permissions`** (user-specific overrides) — **not** jsonb. Resolution is **server-enforced**. The existing **"apply role permissions"** action later **copies/applies role defaults** safely.
+- **Reasoning:** Auditable, queryable, and enforceable in RLS/RPC; overrides layer cleanly on top of role defaults.
+- **Impact:** Effective permission = user override if present, else OR of role defaults across the user's roles. `has_feature()` reads these tables. `updateUserPermissions` writes overrides; the "apply role defaults" action is an RPC that copies `role_permissions` → `user_permissions`.
+
+### D6 — Soft delete / deactivation
+- **Decision:** Use **soft delete/deactivation** (`is_active`, `deleted_at`, `deleted_by` where relevant), primarily on **`profiles`**, **`projects`**, **`project_links`**. **No hard delete** for operational records. **`project_stages`, `closure_requests`, and audit logs are retained** as operational history.
+- **Reasoning:** Preserves history and referential integrity; avoids destructive loss of operational records.
+- **Impact:** Every read/RLS SELECT filters out soft-deleted rows. `deleteUser`/project delete become soft-deletes. Stages/closures are never deleted (status changes only).
+
+---
+
+## 2. Why the app is backend-ready
+
+The UI never touches a data source directly: **Riverpod providers → repository interfaces → `Mock*Repository`**. Moving to Supabase means new implementations of the same interfaces and one wiring change (`lib/core/providers/repository_providers.dart`). Widgets, providers, and models are unchanged.
+
+| Interface | Responsibility | Backend home |
 |---|---|---|
-| `AuthRepository` | login / logout / currentUser / changePassword | Supabase Auth + `profiles` |
-| `UserRepository` | staff CRUD, roles, permissions, active flag | `profiles` + `user_permissions` |
-| `ProjectRepository` | projects, team, stages, closures | core tables + RPC |
-| `TrackingRepository` | public serial lookup + client review | security-definer RPC (anon) |
-| `PermissionRepository` | per-user permission record | `user_permissions` |
+| `AuthRepository` | login / logout / currentUser / changePassword | Supabase Auth + `profiles` (D2) |
+| `UserRepository` | staff CRUD, roles, permissions, active flag | `profiles` + roles/permissions tables (D5, D6) |
+| `ProjectRepository` | projects, team, stages, closures | core tables + RPC (D3, D4) |
+| `TrackingRepository` | public serial lookup + client review | security-definer RPC (D4) |
+| `PermissionRepository` | per-user permission record | `permissions` tables (D5) |
 | `NotificationRepository` | — | 🚫 out of scope, stays empty |
 
 ---
 
-## 2. Data domains (in scope)
+## 3. Data domains (in scope)
 
-1. **Identity & access** — staff accounts, roles (multi-role), feature permissions, photo types, active/disabled.
-2. **Projects** — core project record, serial, type (field/social/wedding), status lifecycle, dates, notes, manager.
-3. **Team assignments** — photographers/roles on a project, photo type(s), optional value/fee (metadata only), assignment date.
-4. **Stages** — ordered workflow per project (3-stage vs 7-stage), status (pending/current/done), notes, who advanced it.
-5. **Closure requests** — photographer submits; manager approves (completes project) or rejects (returns to active).
-6. **Deliverables** — approved deliverable links shown to the client (currently URLs; `report_file_url` is plain text today).
-7. **Client tracking & reviews** — public read of a project by secret serial; optional client rating (1–5) + message.
+Identity & access (D2, D5) · Roles (D1) · Photographer types (D3) · Projects · Team assignments (metadata-only fee) · Stages · Closure requests · Delivery links (D4) · Client tracking & reviews.
 
-> The **"value/fee"** on a team assignment is **assignment metadata only** — it is **not** a finance record and must never drive payments, transfers, or reports (see guardrails).
+> A team member's **value/fee** is **assignment metadata only** — never a finance record, payment, transfer, or report (guardrail).
 
 ---
 
-## 3. Per-role data map
+## 4. Per-role data map
 
-Resolved from `auth.uid()` → `profiles` → `roles[]` + `user_permissions`. (Roles gate navigation; feature flags gate actions.)
+Resolved from `auth.uid()` → `profiles` (active) → `user_roles` → `roles`, plus effective permissions (D5). Roles gate navigation; permissions gate actions.
 
 | Role | Reads | Writes | Notes |
 |---|---|---|---|
-| **Admin** | Everything (all users, projects, team, stages, closures, deliverables, reviews) | Users CRUD, roles & permissions, project basics/manager/team/stage oversight | System-wide; not scoped to ownership |
-| **Manager** | Own projects (+their team, stages, closures) | Create projects; edit basics; manage team & stage; approve/reject closures on own projects | Scoped by `projects.manager_id = uid` |
-| **Photographer** | Projects they're assigned to | Update stage; submit closure request (assigned + permitted) | Scoped by team assignment |
-| **Marketing** *(proposed — not in app yet)* | Same domain as social/marketing projects | TBD (assignment-focused) | ⚠️ No `marketing` role in `RoleType` today; see §6 |
-| **Public Client** *(anon)* | One project's public status + approved links by **serial only** | Submit a review (rating + message) | Via security-definer RPC; no table access |
+| **Admin** | Everything | Users CRUD (soft-delete), roles & permissions, project oversight | System-wide |
+| **Manager** | Own projects (+team, stages, closures, links) | Create projects; edit basics; team & stage; approve/reject closures on own projects; manage links | `projects.manager_id = uid` |
+| **Photographer** | Assigned projects | Update stage; submit closure request (assigned + permitted) | via team assignment |
+| **Marketing** | Same project domain; **assignable to overlapping projects** | Assignment-focused (per granted permissions) | **D1** — availability exemption |
+| **Public Client** *(anon)* | One project's public status + **approved & client-visible** links, by serial | Submit review (rating + message) | RPC only (D4) |
 
-**Other roles present in the enum** (`designer`, `attendance`, `personal_photo`, `finance`, `wedding_admin`, `wedding_finance`) are **placeholder roles** for later sprints. Only admin/manager/photographer are fully exercised today. `finance` / `wedding_finance` get **no finance data** (guardrail).
-
----
-
-## 4. Auth strategy (username-based app → Supabase Auth)
-
-The app authenticates by **username + password**, not email. Recommended mapping:
-
-- Use **Supabase Auth** as the credential store. Because Auth is email-first, map each staff username to a **synthetic email** (e.g. `username@staff.sumou.local`) at account-creation time, OR store a `username` column on `profiles` and resolve `username → email` before `signInWithPassword`.
-- A **`profiles`** table (PK = `auth.users.id`) holds `username`, `full_name`, `email?`, `avatar_initials?`, `active`, plus role/permission joins.
-- `currentUser()` = `auth.uid()` → `profiles` (+ roles/permissions).
-- `changePassword()` = Supabase Auth `updateUser({ password })` after re-auth.
-- **Disabled accounts:** `profiles.active = false` must block login. Enforce in a **login RPC / post-login check** (Auth alone won't block a disabled profile) and in RLS (`active` gate on sensitive reads).
-
-**Decision to confirm with the team:** synthetic-email mapping vs. a custom username login RPC. (Documented, not implemented.)
+Placeholder roles (`designer`, `attendance`, `personal_photo`, `wedding_admin`, and inert `finance`/`wedding_finance`) exist in `roles` for fidelity; only admin/manager/photographer (and now marketing) are exercised.
 
 ---
 
-## 5. Operations that need RPC / Edge Functions
+## 5. Operations needing RPC / Edge Functions
 
-Anything that is **multi-step / transactional / must run atomically or with elevated rights** should be a Postgres **RPC (`security definer`)** rather than multiple client writes. No Edge Functions are strictly required for the in-scope features (all logic is DB-local); RPCs suffice.
+Multi-step/transactional or privileged operations are Postgres **RPC (`security definer`)**; account creation needs an **Edge Function** (service role).
 
-| Operation | Why RPC | Mechanism |
+| Operation | Type | Why |
 |---|---|---|
-| `createProject` | Insert project **+ generate serial + seed stages** atomically | RPC returns the full project |
-| `updateProjectStage` | Cascade: earlier→done, target→current, later→pending | RPC (single transaction) |
-| `submitClosureRequest` | Insert request **+** flip project → `pendingClosure`, enforce "one pending per project" | RPC |
-| `approveClosureRequest` | Mark approved **+** complete project **+** mark all stages done | RPC |
-| `rejectClosureRequest` | Mark rejected **+** return project → `active` | RPC |
-| `assignTeamRoles` | Replace whole team (delete + re-insert, re-keyed) | RPC |
-| Serial allocation | Uniqueness + format ownership (`PREFIX-XXXX-XX`) | RPC / DB default |
-| **Public tracking** (`trackBySerial`) | Anon read of **only** approved links for a serial, no table exposure | `security definer` RPC |
-| **Client review** (`submitReview`) | Anon insert of rating/message tied to a serial | `security definer` RPC |
-
-Everything else (list/get/search/filter, user reads, permission reads) is plain **table select/insert/update** guarded by RLS.
-
----
-
-## 6. Open decisions (to confirm before schema is frozen)
-
-1. **Marketing role** — the per-role plan mentions "Marketing", but `RoleType` has **no `marketing` value** today (social projects are labeled "social/marketing"). Options: (a) add a `marketing` role in a later Flutter sprint and to the DB `role_type` enum; (b) treat marketing as the social project domain and skip a dedicated role. **Recommend (a)** if marketing users truly need cross-project same-date assignment (the availability exemption). Until decided, the schema includes `marketing` as a **reserved, unused enum value**.
-2. **Photo types** — lookup table vs. free text. Currently free strings on users and team roles. **Recommend** a `photo_types` lookup for consistency, with text kept for legacy.
-3. **Deliverables/report files** — today `report_file_url` and delivery links are plain text. Decide whether to adopt **Supabase Storage** for real files, or keep URL text for now. **Recommend** URL text first; Storage later (still no finance/report *generation*).
-4. **Username↔email** mapping approach (see §4).
-5. **Permissions storage** — normalized boolean columns vs. `features jsonb`. **Recommend `jsonb`** to avoid enumerating (and to naturally exclude finance flags), with a `has_feature()` helper for policies.
-6. **Soft-delete** for users/projects vs. hard delete (Users CRUD currently hard-deletes). **Recommend** soft-delete (`deleted_at`) for auditability.
+| `create_project` | RPC | project + serial + seed stages, atomic |
+| `assign_team_roles` | RPC | replace member(s) + their `project_team_types` atomically; availability guard (D1) |
+| `update_project_stage` | RPC | cascade earlier→done / target→current / later→pending |
+| `submit_closure_request` | RPC | insert + project → `pending_closure`; one-pending rule |
+| `approve_closure_request` | RPC | approve + project `completed` + all stages `done` |
+| `reject_closure_request` | RPC | reject + project → `active` |
+| `apply_role_permissions` | RPC | copy `role_permissions` → `user_permissions` overrides (D5) |
+| `track_by_serial` | RPC (anon, security definer) | public read of approved + client-visible links only (D4, D6) |
+| `submit_review` | RPC (anon, security definer) | client rating/message by serial |
+| **`admin_create_user`** | **Edge Function** (service role) | create Auth user w/ internal email, no email confirm, set profile/roles/permissions (D2) |
+| **admin password reset/change** | **secure internal/admin flow** | server-controlled (D2) — documented only |
 
 ---
 
-## 7. Sprint 8 deliverables (this sprint)
+## 6. Remaining (non-blocking) items to confirm during the apply-sprint
 
-- ✅ `docs/SUPABASE_CORE_PLAN.md` (this file)
-- ✅ `docs/SUPABASE_SCHEMA_DRAFT.md` — tables, columns, relations, enums, ERD, model→column mapping
-- ✅ `docs/SUPABASE_RLS_PLAN.md` — role resolution, helper functions, RLS matrix
-- ✅ `docs/SUPABASE_MIGRATION_PLAN.md` — phased Mock→Supabase transition + per-method mapping
+All six core decisions are frozen. Minor items to finalize when implementation starts (none block the schema freeze):
+1. **Leave/attendance data source** for the availability rule stays **mock (`MockLeave`) / deferred** — marketing exemption (D1) is real, but leave-conflict data is not part of the initial backend and must not pull in notifications/reminders.
+2. **Environment config** mechanism for URL/anon key (`--dart-define` vs env file) — a later Flutter/infra choice; documented, not added.
+3. **Audit log** granularity/retention (which mutations to log) — table reserved (D6); scope decided at apply time.
 
-**Not in this sprint:** connecting Supabase, writing/running migrations, editing Flutter, adding packages.
+---
+
+## 7. Sprint 8 deliverables
+
+`SUPABASE_CORE_PLAN.md` (this) · `SUPABASE_SCHEMA_DRAFT.md` · `SUPABASE_RLS_PLAN.md` · `SUPABASE_MIGRATION_PLAN.md`. **Not in this sprint:** connecting Supabase, writing/running migrations, editing Flutter, adding packages, or starting Sprint 9.

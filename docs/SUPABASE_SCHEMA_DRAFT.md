@@ -95,16 +95,35 @@ PK links 1:1 to `auth.users`.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `code` | `text` unique | stable key |
+| `code` | `text` unique | stable key (`photo`,`video`,`instagram`,`design`) |
 | `name_ar` | `text` unique | «مصور فوتوغرافي», «مصور فيديو», «انستقرام», «تصميم» |
 | `is_active` | `boolean` default true | |
+
+Seeded reference values (Step 3): `photo`→«مصور فوتوغرافي», `video`→«مصور فيديو», `instagram`→«انستقرام», `design`→«تصميم».
 
 ### 3.2 `user_photographer_types` (a user's skills — many-to-many)
 | Column | Type | Notes |
 |---|---|---|
-| `user_id` | `uuid` → `profiles(id)` | |
-| `photographer_type_id` | `uuid` → `photographer_types(id)` | |
-| PK | (`user_id`,`photographer_type_id`) | |
+| `user_id` | `uuid` → `profiles(id)` | on delete cascade |
+| `photographer_type_id` | `uuid` → `photographer_types(id)` | on delete restrict |
+| PK | (`user_id`,`photographer_type_id`) | prevents duplicates |
+
+### 3.3 `user_unavailability` (leave / permission periods)
+Backs the availability rule (replaces the mock `MockLeave`). Retained history — cancel via `is_active=false`, never hard-delete. **No notifications/reminders.**
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `user_id` | `uuid` → `profiles(id)` | on delete cascade |
+| `starts_at` | `timestamptz` not null | period start |
+| `ends_at` | `timestamptz` not null | check `ends_at >= starts_at` |
+| `kind` | `text` null | reason/type (e.g. leave/permission; free-form for now) |
+| `notes` | `text` null | |
+| `is_active` | `boolean` not null default true | false = cancelled (history kept) |
+| `created_by` | `uuid` → `profiles(id)` | on delete set null |
+| `created_at` / `updated_at` | `timestamptz` default now() | `updated_at` via `set_updated_at` trigger |
+
+Index: `(user_id, starts_at, ends_at) where is_active` — supports "is user X unavailable overlapping date D" checks.
 
 ---
 
@@ -309,10 +328,43 @@ time (consistent with, and refining, this draft):
   holds) is enforced by a **composite `DEFERRABLE INITIALLY DEFERRED` FK**
   `profiles(id, default_role_id) → user_roles(user_id, role_id)`, so a profile
   and its default `user_roles` row are inserted in one transaction.
-- **Finance exclusion is enforced in-DB** via `permissions_no_finance_chk`
-  (`code <> 'can_manage_finance'`), so the excluded permission can never be added.
+- **Finance kept inert (revised):** `can_manage_finance` is stored as an
+  **inactive** catalog row (`is_active = false`) and is never granted — no
+  blocking CHECK. `finance`/`wedding_finance` roles are likewise inactive with no
+  defaults. (Inert-placeholder decision; supersedes the earlier "excluded from
+  catalog" approach.)
 - **Normalized username** enforced by check `^[a-z0-9._-]{2,50}$` (lowercase,
   trimmed, no spaces, non-blank).
 - **`updated_at`** maintained by a generic `public.set_updated_at()` trigger
   (only `profiles` has `updated_at` in this domain).
 - **RLS enabled, no policies** on all 7 tables → access denied until Step 6.
+
+---
+
+## 10. Step 3 implementation notes (photographer types & availability)
+
+Migration `supabase/migrations/20260714130000_photographer_types_and_availability.sql`
+implements §3 (`photographer_types`, `user_photographer_types`, `user_unavailability`).
+Runs after the Step 2 migration.
+
+- **photographer_types** seeded with 4 canonical types (codes `photo`/`video`/
+  `instagram`/`design`) from the frozen schema + Flutter `_kPhotoTypes`; idempotent
+  upsert. Code format check `^[a-z][a-z_]*$`; `code` and `name_ar` both unique.
+- **user_photographer_types** — M:N, PK `(user_id, photographer_type_id)` dedupes;
+  `user_id` cascade, `photographer_type_id` restrict; index on the type for reverse
+  lookups.
+- **user_unavailability** — new table (not in the original draft) that backs the
+  leave/permission side of the availability rule, replacing mock `MockLeave`.
+  Fields: `starts_at`/`ends_at` (`timestamptz`, check `ends_at >= starts_at`),
+  `kind`, `notes`, `is_active` (cancel = false, history retained), `created_by`,
+  `created_at`/`updated_at` (trigger). No notifications/reminders.
+- **Availability support:** a same-date/leave check is a range-overlap query,
+  `user_id = X AND starts_at <= D_end AND ends_at >= D_start AND is_active`,
+  served by the partial index `(user_id, starts_at, ends_at) where is_active`.
+- **Marketing prep only:** membership is derivable via `user_roles` →
+  `roles.code = 'marketing'`. The overlap **exemption is NOT implemented** — it
+  belongs to the later project-team assignment RPC/business-rule step.
+- **RLS enabled, no policies** on all 3 tables → access denied until Step 6;
+  availability is never public.
+- **Not created:** no project/project-team tables (Step 4), no RPCs, no Edge
+  Functions, no assignment/overlap logic.

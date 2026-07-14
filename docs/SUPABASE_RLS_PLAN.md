@@ -64,7 +64,9 @@ create function is_available(uid uuid, on_date date) returns boolean language sq
       where t.user_id = uid and t.date = on_date
         and p.status in ('active','in_progress','pending_closure')
         and p.deleted_at is null)
-    -- NOTE: leave-conflict data source is deferred/mock (not a notifications concern).
+    -- Leave/permission conflicts read public.user_unavailability (Step 3):
+    --   overlap on `on_date` where is_active. (Enforced in the assignment RPC in
+    --   the project-team step; not a notifications concern.)
   end $$;
 ```
 

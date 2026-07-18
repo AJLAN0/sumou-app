@@ -420,3 +420,54 @@ migrations.
   `client_reviews`, no client-tracking tables/RPCs, no `closure_status` enum. No
   RPCs, Edge Functions, serial generation, stage seeding, or availability/overlap
   enforcement in this step. No Flutter or package changes.
+
+## 12. Step 5 implementation notes (closure requests & project links)
+
+Migration `supabase/migrations/20260714150000_closure_requests_and_project_links.sql`
+implements §4.5 (`closure_requests`) and §4.6 (`project_links`) plus the
+`closure_status` enum from §1. Runs after Steps 2, 3, and 4.
+
+- **closure_status enum** (`pending`/`approved`/`rejected`) — verified 1:1 against
+  `ClosureRequestStatus` in `lib/core/models/closure_request_model.dart`. Deferred
+  out of Step 4; created here. No statuses invented.
+- **closure_requests (retained history):** exact frozen §4.5 fields — `id`,
+  `project_id`→projects (cascade), `submitted_by`→profiles (**restrict**, keeps
+  history intact; profiles soft-delete under D6), `status` (default `pending`),
+  `delivery_link`, `report_file_url` (**plain text URL, Storage deferred — not a
+  file upload**), `notes`, `reject_reason`, `reviewed_at`, `created_at`. **No
+  `reviewed_by` and no `updated_at`** — neither is in the frozen schema or the
+  Flutter contract, so neither (nor an updated_at trigger) was added. No
+  soft/hard-delete columns → approved/rejected rows are retained history. **No**
+  automatic project-status change and **no** submit/approve/reject RPC in this
+  step.
+- **Duplicate pending prevention:** partial unique index
+  `closure_requests_one_pending_per_project_uidx on (project_id) where status =
+  'pending'`. A second `pending` row for the same project violates it; approved/
+  rejected rows are unconstrained, so history accumulates and a project may
+  re-request after a rejection.
+- **project_links (D4/D6, URL-only):** exact frozen §4.6 fields — `id`,
+  `project_id`→projects (cascade), `label` (not blank), `url` (not blank + safe
+  `^https?://` check; **no Storage, no file-upload field**), `is_approved`
+  (default false), `is_client_visible` (default false), `is_active` (default
+  true), `created_at`, `deleted_at`, `deleted_by`→profiles (set null). Plus
+  **`created_by`**→profiles (set null), included per the Step 5 instruction
+  (symmetric with `deleted_by`; extends the §4.6 draft). No `updated_at` (not in
+  the frozen schema).
+- **Client-visible link protection before Step 6:** eligibility (`is_approved AND
+  is_client_visible AND is_active AND deleted_at IS NULL`) is only **data** here.
+  RLS is enabled with **no policies** and there is **no anon/public SELECT and no
+  `track_by_serial` RPC**, so no client (or any role) can read these rows yet.
+  Public exposure will happen solely through the restricted security-definer RPC
+  in Step 6, keyed on the project serial, excluding staff names/identities,
+  internal notes, assignment `value`, roles/permissions, and review internals.
+- **Indexes:** closure — `(project_id)`, `(status)`, + the pending partial
+  unique. links — `(project_id)`, + partial `(project_id) where is_approved and
+  is_client_visible` (frozen §4.6). No speculative indexes.
+- **client_reviews:** **DEFERRED** (not created). No standalone Flutter
+  ClientReview contract exists (rating/message live on `ClientTrackingModel`, via
+  the future anon `submit_review` RPC), and Step 5 is scoped to closure + links.
+  Remains deferred to the tracking/RPC step. Nothing invented.
+- **RLS enabled, no policies** on both tables → default-deny until Step 6. **No**
+  RPCs, Edge Functions, RLS policies, Storage buckets, roles/permissions changes,
+  seed data, or Flutter/package changes. Reproducible from empty (enum before
+  table; Step 2 `profiles` + Step 4 `projects` deps present).

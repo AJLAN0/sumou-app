@@ -29,19 +29,31 @@ When Flutter integration begins (a later step), values are injected at build tim
 
 ---
 
-## 2. Project environments
+## 2. Project environments — DEV + PROD (owner-approved)
 
-| Environment | Purpose | Status now |
-|---|---|---|
-| **Local** | `supabase start` on a developer machine; fast, disposable | scaffolded (this step) |
-| **Development (remote)** | shared Supabase DEV project for integration | **not created / not linked** |
-| **Production (remote)** | live project | **not configured, not linked** |
+Two separate Supabase **cloud** projects, plus an optional local stack for fast
+iteration. **The same tracked migrations** flow through all of them — the schema
+is defined once, in `supabase/migrations/`, and promoted forward-only.
+
+| Environment | Supabase project | Purpose | Notes |
+|---|---|---|---|
+| **Local** (optional) | none (containers) | fast, disposable inner loop | needs Docker **or** Colima/OrbStack; skip if Docker is unavailable |
+| **Development** | `sumou-dev` | integration / testing | apply here first, verify |
+| **Production** | `sumou-prod` | live | apply the **identical** migrations after DEV is verified |
+
+Each project has its **own** ref, URL, anon key, DB password, and service_role.
 
 **Rules:**
-- Do **not** configure Production yet.
-- Do **not** link to Production.
-- Do **not** apply anything remotely (local or dev) **without explicit owner approval**.
-- Promotion path (later): local → DEV (apply migrations) → PROD (apply the *same* migrations), forward-only.
+- **Same migrations everywhere** — never hand-edit a remote DB; the migration
+  files are the single source of truth (see §3).
+- **Promotion is forward-only:** local/DEV → verify → PROD. Never push an
+  unverified migration straight to PROD.
+- **PROD is deliberate:** link/push to `sumou-prod` only as an intentional,
+  reviewed action (ideally via CI — see §5b). Never point local dev tooling at
+  PROD by accident.
+- **Secrets are per-project and never committed:** service_role is server-only
+  (never in Flutter); URL + anon key per environment live in local `.env*`
+  (gitignored) or CI secrets.
 
 ---
 
@@ -115,6 +127,37 @@ supabase db push                                 # apply Step 2 + Step 3 to DEV
   `.env` (gitignored).
 - Do not use the Supabase MCP `apply_migration` for this — always go through the
   tracked migration files + `db push` so the schema stays reproducible.
+
+### 5b. Promotion: DEV → PROD (same migrations, forward-only)
+
+The CLI links to **one** project at a time (stored in `supabase/.temp/`), so you
+switch by re-linking. Apply to DEV first, verify, then apply the **identical**
+migrations to PROD.
+
+```bash
+# --- DEV ---
+supabase link --project-ref <SUMOU_DEV_REF>
+supabase db push
+# ...verify in the DEV dashboard (tables + seeds)...
+
+# --- PROD (deliberate) ---
+supabase link --project-ref <SUMOU_PROD_REF>
+supabase migration list      # confirm exactly the intended migrations are pending
+supabase db push             # applies the SAME files to PROD
+```
+
+**Recommended (long term): automate with CI** so PROD is never a manual laptop
+push. A GitHub Actions job using `supabase/setup-cli` can run `db push` against
+DEV on a dev branch and against PROD on `main`, with each project's ref + DB
+password stored as **CI secrets** (never in the repo). Ask and I can scaffold the
+workflow file (with placeholder secret names — no real values).
+
+### 5c. Flutter env separation (later, when the app connects)
+
+Per-environment `SUPABASE_URL` + anon key via `--dart-define-from-file`:
+`flutter run --dart-define-from-file=env/dev.json` (and `env/prod.json` for
+release builds). Keep `env/*.json` gitignored; commit only `*.example` templates.
+**service_role never appears in any Flutter build.**
 
 ---
 

@@ -88,7 +88,33 @@ supabase stop
 cp .env.example .env   # .env is gitignored — never commit it
 ```
 
-**Do not** run `supabase link`, `supabase db push`, or any remote/prod command in this step. Remote actions require explicit approval.
+**Local** commands above need Docker (or a Docker-compatible runtime: Colima /
+OrbStack). If you can't run Docker, use the remote DEV path below.
+
+### 5a. Remote DEV apply — Docker-free (owner-approved, **DEV only**)
+
+`supabase db push` connects **directly to the remote Postgres over the network**,
+so it needs **no local container runtime**. A real Supabase project provides the
+`auth` schema, so the `profiles → auth.users` FK works (a bare local Postgres
+would not).
+
+```bash
+# 0) One-time: create a DEV project at https://supabase.com/dashboard
+#    Copy its Project Ref (Settings → General) and DB password (Settings → Database).
+
+supabase login                                   # browser access-token flow
+supabase link --project-ref <YOUR_DEV_PROJECT_REF>   # prompts for the DB password
+supabase migration list                          # preview local vs remote
+supabase db push                                 # apply Step 2 + Step 3 to DEV
+```
+
+**Rules (still enforced):**
+- 🟢 **DEV only — never `link` or `push` to Production.**
+- 🔒 `supabase link` writes to `supabase/.temp/` (gitignored). Never commit the DB
+  password, access token, or any key. The app's URL + anon key go in a local
+  `.env` (gitignored).
+- Do not use the Supabase MCP `apply_migration` for this — always go through the
+  tracked migration files + `db push` so the schema stays reproducible.
 
 ---
 

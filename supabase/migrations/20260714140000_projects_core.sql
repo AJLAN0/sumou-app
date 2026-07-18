@@ -76,10 +76,11 @@ create table public.projects (
   updated_at  timestamptz not null default now(),
   deleted_at  timestamptz,
   deleted_by  uuid references public.profiles (id) on delete set null,
-  -- Matches ProjectSerial exactly: 3-letter prefix (FLD/SOC/WED) + 4- and
+  -- Matches ProjectSerial exactly: only the canonical prefixes FLD/SOC/WED
+  -- (field/social/wedding via ProjectSerial.prefixFor / ProjectType) + 4- and
   -- 2-char blocks over [A-Z0-9]. See lib/core/models/project_serial.dart.
   constraint projects_serial_format_chk
-    check (serial ~ '^[A-Z]{3}-[A-Z0-9]{4}-[A-Z0-9]{2}$'),
+    check (serial ~ '^(FLD|SOC|WED)-[A-Z0-9]{4}-[A-Z0-9]{2}$'),
   constraint projects_name_not_blank_chk check (char_length(btrim(name)) > 0),
   constraint projects_client_name_not_blank_chk check (char_length(btrim(client_name)) > 0),
   constraint projects_date_range_chk check (end_date >= start_date)

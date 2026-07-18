@@ -440,6 +440,22 @@ implements §4.5 (`closure_requests`) and §4.6 (`project_links`) plus the
   soft/hard-delete columns → approved/rejected rows are retained history. **No**
   automatic project-status change and **no** submit/approve/reject RPC in this
   step.
+- **Rejection field name (single canonical name):** SQL/frozen §4.5/docs all use
+  **`reject_reason`**; `ClosureRequestModel` uses `rejectReason`. This is the
+  standard Dart camelCase ↔ Postgres snake_case serialization mapping
+  (`rejectReason` ⇄ `reject_reason`), not a divergence — the future read/write
+  mapping serializes between the two. Flutter is not renamed in this step.
+- **Reviewer identity (deferred to audit, not a column):** `reviewed_by` is
+  intentionally absent (not in frozen §4.5 or `ClosureRequestModel`), so it is
+  NOT added. When the approve/reject RPCs are built (Step 6), they must record
+  the reviewer's identity in **`audit_logs`** (actor_id + action e.g.
+  `closure.approve` / `closure.reject`, entity `closure_requests`), which already
+  exists from Step 2. Audit logging is **not implemented in this step**.
+- **Project deletion is soft (D6):** `projects` carry `is_active`/`deleted_at`/
+  `deleted_by` (Step 4), so `closure_requests.project_id → projects on delete
+  cascade` (frozen §4.5) is a physical-integrity backstop that never fires in
+  normal operation. Future app/RPC behavior must **soft-delete** projects and
+  must **never hard-delete** one (that would erase retained closure history).
 - **Duplicate pending prevention:** partial unique index
   `closure_requests_one_pending_per_project_uidx on (project_id) where status =
   'pending'`. A second `pending` row for the same project violates it; approved/
@@ -453,6 +469,12 @@ implements §4.5 (`closure_requests`) and §4.6 (`project_links`) plus the
   **`created_by`**→profiles (set null), included per the Step 5 instruction
   (symmetric with `deleted_by`; extends the §4.6 draft). No `updated_at` (not in
   the frozen schema).
+- **Client-visible link partial index (complete eligibility predicate):**
+  `project_links_public_idx on (project_id) where is_approved and
+  is_client_visible and is_active and deleted_at is null` — the full
+  client-tracking eligibility rule, so a soft-deleted or inactive link is
+  excluded from the index and can never qualify for tracking. (Hardened beyond
+  the narrower §4.6 draft index, which listed only the first two conditions.)
 - **Client-visible link protection before Step 6:** eligibility (`is_approved AND
   is_client_visible AND is_active AND deleted_at IS NULL`) is only **data** here.
   RLS is enabled with **no policies** and there is **no anon/public SELECT and no
@@ -462,7 +484,8 @@ implements §4.5 (`closure_requests`) and §4.6 (`project_links`) plus the
   internal notes, assignment `value`, roles/permissions, and review internals.
 - **Indexes:** closure — `(project_id)`, `(status)`, + the pending partial
   unique. links — `(project_id)`, + partial `(project_id) where is_approved and
-  is_client_visible` (frozen §4.6). No speculative indexes.
+  is_client_visible and is_active and deleted_at is null` (complete eligibility
+  predicate). No speculative indexes.
 - **client_reviews:** **DEFERRED** (not created). No standalone Flutter
   ClientReview contract exists (rating/message live on `ClientTrackingModel`, via
   the future anon `submit_review` RPC), and Step 5 is scoped to closure + links.

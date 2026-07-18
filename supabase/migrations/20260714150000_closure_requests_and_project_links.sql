@@ -116,11 +116,13 @@ comment on table public.project_links is
 
 -- Reads: all links for a project (staff management).
 create index project_links_project_idx on public.project_links (project_id);
--- Supports the future public-eligibility lookup (frozen §4.6 index). The RPC
--- additionally filters is_active AND deleted_at IS NULL at query time.
+-- Supports the future public-eligibility lookup. The partial predicate is the
+-- COMPLETE client-tracking eligibility rule, so a soft-deleted or inactive link
+-- is excluded from this index and can never qualify for tracking:
+--   is_approved AND is_client_visible AND is_active AND deleted_at IS NULL.
 create index project_links_public_idx
   on public.project_links (project_id)
-  where is_approved and is_client_visible;
+  where is_approved and is_client_visible and is_active and deleted_at is null;
 
 -- ---------------------------------------------------------------------------
 -- Enable RLS (default-deny). NO policies yet → anon and authenticated have NO

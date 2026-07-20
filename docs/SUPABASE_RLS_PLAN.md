@@ -212,3 +212,67 @@ All run `security definer` but **re-check role/feature inside** before mutating:
 - Verify with a **policy test matrix** (one case per row of §3) including soft-deleted-row invisibility and the marketing availability exemption, before pointing the app at it.
 
 **This sprint documents rules only. No RLS enabled, no SQL run.**
+
+---
+
+## 7. Step 6.1 implementation notes (helpers + identity/access READ RLS)
+
+Migration `supabase/migrations/20260714160000_identity_access_rls.sql` implements
+the shared security helpers and the identity/access **read** policies. Runs after
+Steps 2–5. Statically reviewed, **not** applied. This is a **subset** of §3
+(reads only); writes and the project/closure/tracking layers come later.
+
+**Helper functions** (SQL, `stable`, schema-qualified, `set search_path = ''`;
+default PUBLIC execute revoked, `execute` granted to `authenticated` only —
+never `anon`):
+
+| Function | Security | Reads | Purpose |
+|---|---|---|---|
+| `current_profile_id()` | **invoker** | — (`auth.uid()`) | caller's profile id; no table access |
+| `is_active_user()` | **definer** | `profiles` | caller is active + not soft-deleted |
+| `has_role(text)` | **definer** | `user_roles`,`roles` | holds an **active** role by code |
+| `is_admin()` | **definer** | (via `has_role`) | holds active `admin` |
+| `has_feature(text)` | **definer** | `permissions`,`user_permissions`,`role_permissions`,`user_roles`,`roles` | effective permission (D5) |
+
+`SECURITY DEFINER` on the table-reading helpers is deliberate: called inside a
+policy they **bypass RLS** on the tables they read, so a policy on
+`profiles`/`user_roles` never re-enters those tables' policies → **no RLS
+recursion**. `current_profile_id()` reads nothing, so it stays `invoker`.
+
+**Hardening vs the §1 draft:** `has_feature()` counts **active permissions only**
+(`permissions.is_active`) and **active roles only** for role defaults; `has_role()`
+already requires `roles.is_active`. So `can_manage_finance` (inactive) and the
+`finance`/`wedding_finance` roles resolve to **false / never match** — zero
+behavior. `has_feature()` does **not** copy role defaults into `user_permissions`.
+
+**Policies added — all `FOR SELECT TO authenticated` (no anon, no writes):**
+
+| Table | Self / active-user read | Admin read |
+|---|---|---|
+| `profiles` | own row, `is_active AND deleted_at IS NULL` | all non-deleted (active+inactive), active admin |
+| `roles` | active rows | + inactive (oversight) |
+| `permissions` | active rows | + inactive (oversight) |
+| `user_roles` | own `user_id` | all |
+| `role_permissions` | defaults for the caller's own roles | all |
+| `user_permissions` | own `user_id` | all |
+| `photographer_types` | active rows | + inactive (oversight) |
+| `user_photographer_types` | own `user_id` | all |
+| `audit_logs` | — (none) | admin read only |
+
+**Writes deferred:** no INSERT/UPDATE/DELETE policy on any table → all mutations
+stay **default-deny**. Identity/access writes (admin user/role/permission
+management, profile self-edit, `deleteUser` soft-delete) go through admin-gated
+RPCs / the `admin_create_user` Edge Function in later steps (§5) — not here, so a
+user cannot alter their own roles/permissions/status and no escalation path
+exists. `audit_logs` writes come from future `SECURITY DEFINER` RPCs (bypass RLS);
+none created here.
+
+**Disabled/soft-deleted users:** every authenticated policy is gated by
+`is_active_user()` (or, for `profiles` self, the row's own `is_active AND
+deleted_at IS NULL`). A disabled or soft-deleted user — including a disabled
+admin — fails all of them and cannot even read their own profile (the Sprint-10
+auth layer treats an unreadable post-login profile as "disabled" and signs out).
+
+**Not in this step:** `user_unavailability`, project/team/stages/closure/links
+policies; the `manages_project` / `assigned_to_project` / `is_available` helpers;
+any RPC/Edge Function; anon access; Flutter.

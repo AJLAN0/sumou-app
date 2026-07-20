@@ -358,3 +358,64 @@ through the transactional RPCs in a later step.
 **Not in this step:** `is_available()`, assignment/overlap validation, Marketing
 exemption logic, booking/assignment RPCs, closure/links/tracking policies or RPCs,
 Edge Functions, anon access, Flutter. Step 6.1 helpers unchanged.
+
+---
+
+## 9. Step 6.3 implementation notes (closure/links RLS + closure & tracking RPCs)
+
+Migration `supabase/migrations/20260714180000_closure_and_tracking.sql`. Runs
+after Step 6.2. Statically reviewed, **not** applied.
+
+**closure_requests — SELECT only** (`closure_requests_select_scoped`): owning
+manager (`manages_project`), submitter of their own request while the parent
+project is live, or admin (live projects). No "all assigned" visibility; no
+write policy (retained history). `reject_reason`/`reviewed_at` are legitimate
+columns; reviewer **identity** is not a column here.
+
+**project_links — SELECT only** (`project_links_select_manage`): owning manager
+(all links incl. unapproved/hidden/retained, for management) or admin (live
+projects). **No assigned-staff policy** — no current Flutter contract reads
+`project_links` directly (the photographer's delivery URL is stored on
+`closure_requests`), so the frozen matrix's P/MK "assigned project" link read is
+**deferred/reported**, not granted. No anon policy; no write policy.
+
+**Closure workflow RPCs** (`plpgsql`, `SECURITY DEFINER`, `search_path=''`,
+schema-qualified; execute revoked from PUBLIC+anon, granted to `authenticated`).
+Transitions mirror the mock exactly:
+
+| RPC | Authorization | Effect |
+|---|---|---|
+| `submit_closure_request(project_id, delivery_link, report_file_url, notes)` | `has_feature('can_request_closure')` AND `assigned_to_project` | insert pending (submitter = `auth.uid()`); project → **pending_closure**; audit `closure.submit` |
+| `approve_closure_request(request_id)` | `is_admin()` OR (`manages_project` AND `has_feature('can_approve_closure')`) | request → **approved**, `reviewed_at`; project → **completed**; all stages → **done**; audit `closure.approve` |
+| `reject_closure_request(request_id, reason)` | same as approve; non-blank reason | request → **rejected**, `reject_reason`, `reviewed_at`; project → **active**; audit `closure.reject` |
+
+Each runs in one transaction, fails closed for inactive/deleted callers, and
+returns the request id. **Locking / duplicate-pending:** submit locks the project
+row `FOR UPDATE` (serializing concurrent submits) and relies on the partial unique
+index `…one_pending_per_project_uidx` (unique_violation → clean error);
+approve/reject lock the request row `FOR UPDATE` first, so a second reviewer sees
+the committed non-pending status and is rejected. **Reviewer identity** is retained
+only in `audit_logs` (`actor_id`), never in a `reviewed_by` column; the full
+rejection reason is **not** placed in audit `meta`.
+
+**Public tracking RPC** `track_project_by_serial(project_serial text) returns
+jsonb` — the **only** anon entry point (`SECURITY DEFINER`, `STABLE`,
+`search_path=''`; execute revoked from PUBLIC, granted to **anon + authenticated**;
+anon has **no** table policy). Serial normalized `upper(btrim(...))` and validated
+against `^(FLD|SOC|WED)-[A-Z0-9]{4}-[A-Z0-9]{2}$`; returns **NULL** for invalid/
+unknown/soft-deleted/inactive projects (indistinguishable → no existence leak).
+Returns only: `serial`, `project_name`, `client_name`, a coarse `status`
+(completed/delivered/approved → `'done'`, else `'active'` — reported mapping; the
+mock's public vocabulary is 'active'/'done'), and `links` `[{label,url}]` satisfying
+the **complete** predicate `is_approved AND is_client_visible AND is_active AND
+deleted_at IS NULL`, ordered by `created_at, id`. **Never** exposed: uuid,
+manager, team/photographer identities, `project_team_members.value`, notes,
+`reject_reason`, review timestamps/reviewer, roles/permissions, `user_unavailability`,
+`audit_logs`, unapproved/inactive/soft-deleted links, internal auth email.
+
+**Deferred / not created:** project-link CRUD RPCs (no Flutter contract → all
+`project_links` writes stay default-deny); client reviews/ratings; `is_available()`
+/overlap/Marketing exemption; project/team/stage RPCs; Edge Functions; Flutter.
+Closure `delivery_link` is validated as an http(s) URL (matching the Flutter
+submit validator); `report_file_url`/`notes` are stored as plain text (Step 5
+schema has no CHECK). **Step 6.4 not started.**

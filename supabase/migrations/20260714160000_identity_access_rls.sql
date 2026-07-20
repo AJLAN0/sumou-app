@@ -70,8 +70,11 @@ as $$
   )
 $$;
 
--- has_role(role_code): caller holds the given role AND that role is active.
--- Inactive roles (finance/wedding_finance) never match. SECURITY DEFINER.
+-- has_role(role_code): caller is an ACTIVE user who holds the given ACTIVE role.
+-- Fails closed for inactive/soft-deleted profiles via the internal
+-- is_active_user() gate, so it is safe when called DIRECTLY by a future RPC
+-- (independent of any policy-level check). Inactive roles (finance/
+-- wedding_finance) never match. SECURITY DEFINER.
 create or replace function public.has_role(role_code text)
 returns boolean
 language sql
@@ -79,7 +82,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select exists (
+  select public.is_active_user() and exists (
     select 1
     from public.user_roles ur
     join public.roles r on r.id = ur.role_id
@@ -89,7 +92,9 @@ as $$
   )
 $$;
 
--- is_admin(): caller holds the active `admin` role.
+-- is_admin(): caller is an active user holding the active `admin` role. Inherits
+-- the has_role() fail-closed gate → a disabled or soft-deleted admin gets false,
+-- including when called directly by an RPC.
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -100,7 +105,10 @@ as $$
   select public.has_role('admin')
 $$;
 
--- has_feature(perm_code): effective permission (D5).
+-- has_feature(perm_code): effective permission (D5). Fails closed for inactive/
+-- soft-deleted profiles via the internal is_active_user() gate, so it is safe
+-- when called DIRECTLY by a future RPC.
+--   * requires an ACTIVE caller, then
 --   * user_permissions explicit override wins (grant OR revoke), else
 --   * OR of role_permissions defaults across the caller's ACTIVE roles, else
 --   * false.
@@ -118,7 +126,7 @@ as $$
     select id from public.permissions
     where code = perm_code and is_active
   )
-  select coalesce(
+  select public.is_active_user() and coalesce(
     -- explicit user override (only for an active permission)
     (select up.granted
        from public.user_permissions up
@@ -135,12 +143,21 @@ as $$
   )
 $$;
 
--- Lock down execution: revoke the implicit PUBLIC grant, allow only authenticated.
+-- Lock down execution: revoke the implicit PUBLIC grant (covers anon), and also
+-- revoke from anon explicitly (belt-and-suspenders / auditable). Allow only
+-- authenticated. Ownership stays with the migration role, so `authenticated`
+-- can execute but can never CREATE OR REPLACE / ALTER / DROP these functions.
 revoke all on function public.current_profile_id()      from public;
 revoke all on function public.is_active_user()          from public;
 revoke all on function public.has_role(text)            from public;
 revoke all on function public.is_admin()                from public;
 revoke all on function public.has_feature(text)         from public;
+
+revoke all on function public.current_profile_id()      from anon;
+revoke all on function public.is_active_user()          from anon;
+revoke all on function public.has_role(text)            from anon;
+revoke all on function public.is_admin()                from anon;
+revoke all on function public.has_feature(text)         from anon;
 
 grant execute on function public.current_profile_id()   to authenticated;
 grant execute on function public.is_active_user()       to authenticated;

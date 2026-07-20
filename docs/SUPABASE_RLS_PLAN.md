@@ -239,11 +239,24 @@ policy they **bypass RLS** on the tables they read, so a policy on
 `profiles`/`user_roles` never re-enters those tables' policies → **no RLS
 recursion**. `current_profile_id()` reads nothing, so it stays `invoker`.
 
-**Hardening vs the §1 draft:** `has_feature()` counts **active permissions only**
+**Fail-closed on inactive/deleted profiles (internal gate):** `has_role()` and
+`has_feature()` each begin with `is_active_user() AND …`, and `is_admin()`
+inherits it through `has_role('admin')`. So a disabled or soft-deleted user
+(including a disabled admin) gets `false` **even when a future SECURITY DEFINER
+RPC calls these helpers directly** — safety does not depend on a separate
+`is_active_user()` call at the call site. The chain `has_role → is_active_user`
+(both DEFINER, both bypass RLS) reads `profiles`/`user_roles`/`roles` without
+re-entering RLS, so the internal gate adds **no recursion**.
+
+**Active-only resolution:** `has_feature()` counts **active permissions only**
 (`permissions.is_active`) and **active roles only** for role defaults; `has_role()`
-already requires `roles.is_active`. So `can_manage_finance` (inactive) and the
+requires `roles.is_active`. So `can_manage_finance` (inactive) and the
 `finance`/`wedding_finance` roles resolve to **false / never match** — zero
 behavior. `has_feature()` does **not** copy role defaults into `user_permissions`.
+
+**Execution locked:** default PUBLIC execute is revoked and `anon` is revoked
+explicitly; only `authenticated` is granted `execute`. Functions are owned by the
+migration role, so `authenticated` can execute but cannot replace/alter/drop them.
 
 **Policies added — all `FOR SELECT TO authenticated` (no anon, no writes):**
 

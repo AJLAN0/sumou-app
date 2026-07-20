@@ -315,24 +315,29 @@ caller gets false even inside a future RPC. Canonical param name is `pid` (per �
 | Table | Rule |
 |---|---|
 | `projects` | `manages_project(id)` OR `assigned_to_project(id)` OR (`is_admin()` AND live) |
-| `project_team_members` | parent project visible (delegates to `projects` RLS) |
-| `project_team_types` | parent team member visible (delegates to member → project RLS) |
+| `project_team_members` | admin (live project) OR owning manager OR **own row only** (`user_id=uid` on a live project) |
+| `project_team_types` | admin (live) OR owning manager OR **own member's types only** (`m.user_id=uid`) |
 | `project_stages` | parent project visible (delegates to `projects` RLS) |
 | `user_unavailability` | self (own rows, incl. cancelled history) **or** admin (all) |
 
-**Delegation pattern:** child tables use "visible iff the parent project (or team
-member) is visible", which reproduces the frozen matrix and inherently hides
-soft-deleted/inactive projects' children. It is **recursion-free**: parents'
-policies use only the SECURITY DEFINER helpers (which bypass RLS) and plain
-columns, so `team_types → team_members → projects → (definer helpers)` is acyclic.
+**`stages` delegation:** `project_stages` uses "visible iff the parent project is
+visible" (stages carry no sensitive `value`), which reproduces the frozen matrix
+and hides soft-deleted projects' stages. Recursion-free: `projects`' policy uses
+only SECURITY DEFINER helpers (bypass RLS) + plain columns.
 
-**Assignment-`value` exposure (reported):** RLS is row-level, so assigned staff
-who can see a project see **all** teammate rows including `value`. This matches
-both the frozen matrix (P/MK read own/teammates) **and** the current Flutter UI
-(`project_details_screen` shows every teammate's `value` as «… ر.س», ungated), so
-it is the approved visibility, not an over-exposure. `value` is assignment
-metadata, never finance. Restricting `value` to manager/admin would need a
-column-masking read view/RPC — **deferred**, not created here.
+**Assignment-`value` privacy (CORRECTED — row-scoped):** `project_team_members.value`
+is sensitive internal assignment metadata, and RLS is row-level (it cannot hide a
+single column). So `value` is visible **only to admin and the owning manager**;
+**assigned staff read only their own assignment row** (`user_id = auth.uid()`) and
+can never read teammate rows or teammate `value`. External members (`user_id`
+null) are visible to admin + owning manager only. `project_team_types` mirrors
+this via an **explicit** parent-member predicate (`m.user_id = auth.uid()` for
+assigned staff), so it does **not** depend on the member policy's breadth. The
+`value` column is retained; **no masking view/RPC** is created here — a future
+restricted **safe team-summary RPC** may expose teammate names/types **without**
+`value`. The current Flutter `project_details_screen`, which shows teammate
+`value` to any viewer, must be corrected **during Flutter backend integration**,
+not in this step.
 
 **`user_unavailability` privacy:** notes/reasons are visible only to the record's
 owner and to admins. Managers have **no** direct table access; their availability

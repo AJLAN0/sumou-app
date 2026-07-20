@@ -383,20 +383,31 @@ projects). **No assigned-staff policy** — no current Flutter contract reads
 schema-qualified; execute revoked from PUBLIC+anon, granted to `authenticated`).
 Transitions mirror the mock exactly:
 
-| RPC | Authorization | Effect |
-|---|---|---|
-| `submit_closure_request(project_id, delivery_link, report_file_url, notes)` | `has_feature('can_request_closure')` AND `assigned_to_project` | insert pending (submitter = `auth.uid()`); project → **pending_closure**; audit `closure.submit` |
-| `approve_closure_request(request_id)` | `is_admin()` OR (`manages_project` AND `has_feature('can_approve_closure')`) | request → **approved**, `reviewed_at`; project → **completed**; all stages → **done**; audit `closure.approve` |
-| `reject_closure_request(request_id, reason)` | same as approve; non-blank reason | request → **rejected**, `reject_reason`, `reviewed_at`; project → **active**; audit `closure.reject` |
+| RPC | Authorization | Project-state guard | Effect |
+|---|---|---|---|
+| `submit_closure_request(project_id, delivery_link, report_file_url, notes)` | `has_feature('can_request_closure')` AND `assigned_to_project` | live AND status ∈ **{active, in_progress}** (`ProjectModel.isActive`) | insert pending (submitter = `auth.uid()`); project → **pending_closure**; audit `closure.submit` |
+| `approve_closure_request(request_id)` | `is_admin()` OR (`manages_project` AND `has_feature('can_approve_closure')`) | live AND status = **pending_closure** (admin too) | request → **approved**, `reviewed_at`; project → **completed**; all stages → **done**; audit `closure.approve` |
+| `reject_closure_request(request_id, reason)` | same as approve; non-blank reason | live AND status = **pending_closure** (admin too) | request → **rejected**, `reject_reason`, `reviewed_at`; project → **active**; audit `closure.reject` |
 
-Each runs in one transaction, fails closed for inactive/deleted callers, and
-returns the request id. **Locking / duplicate-pending:** submit locks the project
-row `FOR UPDATE` (serializing concurrent submits) and relies on the partial unique
-index `…one_pending_per_project_uidx` (unique_violation → clean error);
-approve/reject lock the request row `FOR UPDATE` first, so a second reviewer sees
-the committed non-pending status and is rejected. **Reviewer identity** is retained
-only in `audit_logs` (`actor_id`), never in a `reviewed_by` column; the full
-rejection reason is **not** placed in audit `meta`.
+Each runs in one transaction and fails closed for inactive/deleted callers. The
+**submit** guard rejects pending_closure/completed/delivered/approved/rejected
+projects (stricter than the mock, which only blocks a pending row — an intentional
+contract-backed hardening). **approve/reject** lock and re-validate the parent
+project (must be live and `pending_closure`) so a soft-deleted or state-inconsistent
+project is never processed and rejection never reactivates a soft-deleted project.
+**Locking / duplicate-pending:** submit locks the project row `FOR UPDATE`
+(serializing concurrent submits) and relies on the partial unique index
+`…one_pending_per_project_uidx` (unique_violation → clean error); approve/reject
+lock the request row `FOR UPDATE` first, so a second reviewer sees the committed
+non-pending status and is rejected. **Existence disclosure:** approve/reject return
+a single consistent `not found or access denied` error for both a missing request
+and an unauthorized caller, so an authenticated caller cannot probe arbitrary
+request ids. **Return type:** each returns the request `uuid`; the future Supabase
+repository does a second **authorized** read (via `closure_requests_select_scoped`
+— submitter after submit, manager/admin after approve/reject, all on the now-live
+project) to build `ClosureRequestModel`. **Reviewer identity** is retained only in
+`audit_logs` (`actor_id`), never in a `reviewed_by` column; the full rejection
+reason is **not** placed in audit `meta`.
 
 **Public tracking RPC** `track_project_by_serial(project_serial text) returns
 jsonb` — the **only** anon entry point (`SECURITY DEFINER`, `STABLE`,
@@ -405,8 +416,11 @@ anon has **no** table policy). Serial normalized `upper(btrim(...))` and validat
 against `^(FLD|SOC|WED)-[A-Z0-9]{4}-[A-Z0-9]{2}$`; returns **NULL** for invalid/
 unknown/soft-deleted/inactive projects (indistinguishable → no existence leak).
 Returns only: `serial`, `project_name`, `client_name`, a coarse `status`
-(completed/delivered/approved → `'done'`, else `'active'` — reported mapping; the
-mock's public vocabulary is 'active'/'done'), and `links` `[{label,url}]` satisfying
+(mapped via `ProjectModel.isCompleted` = completed/delivered/approved → `'done'`,
+else `'active'`; the mock's public vocabulary is 'active'/'done' — confirm at
+Flutter integration), and `links` `[{label,url}]` (objects, not URL strings;
+future mapping `project_name→projectName`, `client_name→clientName`,
+`links→approvedLinks`) satisfying
 the **complete** predicate `is_approved AND is_client_visible AND is_active AND
 deleted_at IS NULL`, ordered by `created_at, id`. **Never** exposed: uuid,
 manager, team/photographer identities, `project_team_members.value`, notes,

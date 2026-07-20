@@ -117,11 +117,12 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_uid    uuid := auth.uid();
-  v_link   text := nullif(btrim(p_delivery_link), '');
-  v_report text := nullif(btrim(p_report_file_url), '');
-  v_notes  text := nullif(btrim(p_notes), '');
-  v_req_id uuid;
+  v_uid     uuid := auth.uid();
+  v_link    text := nullif(btrim(p_delivery_link), '');
+  v_report  text := nullif(btrim(p_report_file_url), '');
+  v_notes   text := nullif(btrim(p_notes), '');
+  v_pstatus public.project_status;
+  v_req_id  uuid;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '28000';
@@ -140,11 +141,22 @@ begin
   end if;
   -- lock the parent project row; it must be live. Serializes concurrent submits
   -- on the same project so the one-pending rule holds without a race.
-  perform 1 from public.projects p
+  select p.status into v_pstatus
+    from public.projects p
     where p.id = p_project_id and p.is_active and p.deleted_at is null
     for update;
   if not found then
     raise exception 'project is not available for closure' using errcode = 'P0002';
+  end if;
+  -- Allowed submit states = ProjectModel.isActive = {active, in_progress}
+  -- (lib/core/models/project_model.dart). Rejects pending_closure (also blocked
+  -- by the partial unique index), completed/delivered/approved (isCompleted), and
+  -- rejected. This is stricter than the mock (which only blocks a pending row) —
+  -- an intentional, contract-backed hardening.
+  if v_pstatus not in ('active'::public.project_status,
+                        'in_progress'::public.project_status) then
+    raise exception 'project status does not allow a closure request'
+      using errcode = 'P0001';
   end if;
   -- one pending request per project (explicit check; the partial unique index
   -- closure_requests_one_pending_per_project_uidx is the hard guarantee).
@@ -195,9 +207,12 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_uid     uuid := auth.uid();
-  v_project uuid;
-  v_status  public.closure_status;
+  v_uid      uuid := auth.uid();
+  v_project  uuid;
+  v_status   public.closure_status;
+  v_pactive  boolean;
+  v_pdeleted timestamptz;
+  v_pstatus  public.project_status;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '28000';
@@ -207,22 +222,31 @@ begin
     from public.closure_requests
     where id = p_request_id
     for update;
-  if not found then
-    raise exception 'closure request not found' using errcode = 'P0002';
+  -- Consistent not-found/unauthorized error: an unauthorized caller must not be
+  -- able to probe whether an arbitrary request id exists. (plpgsql short-circuits
+  -- the OR, so the auth helpers are not evaluated when the row is absent.)
+  if not found
+     or not (
+       public.is_admin()
+       or (public.manages_project(v_project) and public.has_feature('can_approve_closure'))
+     ) then
+    raise exception 'closure request not found or access denied' using errcode = '42501';
   end if;
-  -- reviewer authorization: active admin OR owning manager w/ can_approve_closure.
-  if not (
-    public.is_admin()
-    or (public.manages_project(v_project) and public.has_feature('can_approve_closure'))
-  ) then
-    raise exception 'not authorized to review this closure request'
-      using errcode = '42501';
-  end if;
-  -- only a pending request may be approved (rejects repeat approve/reject).
+  -- only a pending request may be approved (blocks repeat approve/reject).
   if v_status <> 'pending'::public.closure_status then
     raise exception 'closure request is not pending' using errcode = 'P0001';
   end if;
-  perform 1 from public.projects where id = v_project for update;
+  -- lock + validate the parent project (applies to admin AND manager): it must be
+  -- live and in the pending_closure state a pending request implies. A soft-deleted
+  -- or state-inconsistent project is never processed.
+  select p.is_active, p.deleted_at, p.status
+    into v_pactive, v_pdeleted, v_pstatus
+    from public.projects p where p.id = v_project for update;
+  if not found or not v_pactive or v_pdeleted is not null
+     or v_pstatus <> 'pending_closure'::public.project_status then
+    raise exception 'project is not in a state to process this closure request'
+      using errcode = 'P0001';
+  end if;
 
   -- frozen/mock transition: request approved; project completed; all stages done.
   update public.closure_requests
@@ -260,10 +284,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_uid     uuid := auth.uid();
-  v_project uuid;
-  v_status  public.closure_status;
-  v_reason  text := btrim(coalesce(p_reason, ''));
+  v_uid      uuid := auth.uid();
+  v_project  uuid;
+  v_status   public.closure_status;
+  v_reason   text := btrim(coalesce(p_reason, ''));
+  v_pactive  boolean;
+  v_pdeleted timestamptz;
+  v_pstatus  public.project_status;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '28000';
@@ -275,20 +302,28 @@ begin
     from public.closure_requests
     where id = p_request_id
     for update;
-  if not found then
-    raise exception 'closure request not found' using errcode = 'P0002';
-  end if;
-  if not (
-    public.is_admin()
-    or (public.manages_project(v_project) and public.has_feature('can_approve_closure'))
-  ) then
-    raise exception 'not authorized to review this closure request'
-      using errcode = '42501';
+  -- Consistent not-found/unauthorized error (see approve): no existence probing.
+  if not found
+     or not (
+       public.is_admin()
+       or (public.manages_project(v_project) and public.has_feature('can_approve_closure'))
+     ) then
+    raise exception 'closure request not found or access denied' using errcode = '42501';
   end if;
   if v_status <> 'pending'::public.closure_status then
     raise exception 'closure request is not pending' using errcode = 'P0001';
   end if;
-  perform 1 from public.projects where id = v_project for update;
+  -- lock + validate the parent project (admin AND manager): must be live and
+  -- pending_closure. Guarantees a soft-deleted project is never touched and is
+  -- never "reactivated" to active by the rejection transition below.
+  select p.is_active, p.deleted_at, p.status
+    into v_pactive, v_pdeleted, v_pstatus
+    from public.projects p where p.id = v_project for update;
+  if not found or not v_pactive or v_pdeleted is not null
+     or v_pstatus <> 'pending_closure'::public.project_status then
+    raise exception 'project is not in a state to process this closure request'
+      using errcode = 'P0001';
+  end if;
 
   update public.closure_requests
     set status = 'rejected'::public.closure_status,
@@ -339,11 +374,15 @@ grant execute on function public.reject_closure_request(uuid, text)             
 --   is_approved AND is_client_visible AND is_active AND deleted_at IS NULL,
 -- ordered deterministically by created_at, id.
 --
--- NOTE (reported): the current Flutter tracking `status` vocabulary is 'active'/
--- 'done' (ungated to a projects mapping in the mock). To avoid leaking internal
--- workflow states (pending_closure/rejected/approved) the mapping here collapses
--- completed/delivered/approved → 'done', everything else → 'active'. Confirm/adjust
--- at Flutter integration time. Stages, rating, and message are NOT returned
+-- STATUS MAPPING (contract-backed): the public tracking vocabulary is 'active'/
+-- 'done' (client screen maps 'done' → delivered chip). The mock TrackingRepository
+-- hardcodes those strings and does not itself derive from ProjectStatus, so the
+-- projects→public mapping uses the app's own completion grouping
+-- `ProjectModel.isCompleted` = {completed, delivered, approved}
+-- (lib/core/models/project_model.dart) → 'done'; everything else → 'active'. This
+-- deliberately collapses internal workflow states (pending_closure/rejected/
+-- in_progress) so they are never exposed. Reported for owner confirmation at
+-- Flutter integration. Stages, rating, and message are NOT returned
 -- (ClientTrackingModel has no stages; reviews/ratings are deferred).
 -- ###########################################################################
 

@@ -433,3 +433,62 @@ manager, team/photographer identities, `project_team_members.value`, notes,
 Closure `delivery_link` is validated as an http(s) URL (matching the Flutter
 submit validator); `report_file_url`/`notes` are stored as plain text (Step 5
 schema has no CHECK). **Step 6.4 not started.**
+
+---
+
+## 10. Step 6.4 implementation notes (project write RPCs)
+
+Migration `supabase/migrations/20260714190000_project_write_rpcs.sql`. Runs after
+Step 6.3. Statically reviewed, **not** applied. No table policies added/changed —
+direct writes stay default-deny; every mutation flows through these RPCs.
+
+**RPCs** (all `plpgsql`, `SECURITY DEFINER`, `search_path=''`, schema-qualified,
+fail closed for inactive/deleted callers; return the affected id, repository
+re-reads via the Step-6.2 SELECT policies):
+
+| RPC | Execute | Authorization | Effect / return |
+|---|---|---|---|
+| `gen_project_serial(type)` | (none — helper; revoked from PUBLIC+anon, called only by the definer `create_project`) | — | secure serial candidate |
+| `create_project(name, client_name, type, start_date, end_date, notes, manager_id?)` | authenticated | `is_admin()` OR `has_feature('can_add_project')`; non-admin ⇒ `manager_id = auth.uid()`, admin may set another active manager | insert project (status `active`) + default stages + `project.create`; returns project id |
+| `update_project(project_id, name, client_name, type, start_date, end_date, notes)` | authenticated | `is_admin()` OR (`manages_project` AND `has_feature('can_edit_project')`) | edit **basics only** + `project.edit`; returns project id |
+| `update_project_stage(project_id, stage_id, notes?)` | authenticated | `is_admin()` OR ((`manages_project` OR `assigned_to_project`) AND `has_feature('can_update_stages')`) | set target `current`/earlier `done`/later `pending`, `updated_by`/`updated_at` on target + `project.stage.update`; returns project id |
+
+**Serial generation:** `PREFIX-XXXX-XX` where PREFIX = FLD/SOC/WED per type, and
+the two blocks are uppercase hex from a cryptographically-secure `gen_random_uuid()`
+(v4) — never `random()`. Uniqueness = the Step-4 `UNIQUE` constraint + a bounded
+retry loop (unique_violation → new candidate; 10 attempts → clean error). Matches
+the Step-4 CHECK; the constraint is **not** modified.
+
+**Create fields:** name, client_name, type, start_date (≥ today not required),
+end_date (`≥ start_date`), notes, manager_id. Stages seeded per `ProjectType`
+(3-stage field/wedding, 7-stage social) with the exact `ProjectStageTitles`,
+deterministic `stage_order`, stage 1 `current` and the rest `pending`.
+
+**Edit fields (exact):** name, client_name, type, start_date, end_date, notes.
+**Excluded:** `status` (a mock admin override over {active,completed,pending_closure}
+— every such change is a closure-workflow transition; §4 forbids bypassing Step
+6.3, so status changes go only through the closure RPCs), `manager_id`, `serial`,
+team, stages, and the soft-delete fields.
+
+**Stage progression:** exactly one `current` stage; earlier `done`, later
+`pending`; blocked on completed projects (`ProjectModel.isCompleted` =
+{completed,delivered,approved}) and on soft-deleted/inactive projects; never
+submits/approves closure and never changes project status.
+
+**Audit actions:** `project.create`, `project.edit`, `project.stage.update`
+(identifiers only — no names/notes/values/URLs/secrets).
+
+**Deferred (reported, not guessed):**
+- `is_available()` + `assign_project_team()` (and the initial team on create) —
+  the availability contract **conflicts** (Flutter `isBookedOn` uses the project
+  date-range + `ProjectModel.isActive` {active,in_progress}; frozen `is_available`
+  uses `project_team_members.date = on_date` + {active,in_progress,pending_closure})
+  **and** the `user_unavailability` `timestamptz` → `on_date` timezone/day-boundary
+  rule is undefined (Flutter `MockLeave` is date-only; no canonical tz). Per the
+  task's "don't guess / report" gate these await an owner decision. Marketing
+  exemption (project double-booking only, never explicit leave; inactive marketing
+  grants nothing; never mapped to designer) will live in that helper — not here.
+- Manager reassignment (`setProjectManager`), project soft-delete (no repository
+  method), and status editing — all deferred.
+
+**Step 6.5 not started.**

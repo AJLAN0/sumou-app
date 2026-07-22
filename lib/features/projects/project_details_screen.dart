@@ -221,9 +221,7 @@ class _Line extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: AppColors.textMuted),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: AppTextStyles.body),
-          ),
+          Expanded(child: Text(text, style: AppTextStyles.body)),
         ],
       ),
     );

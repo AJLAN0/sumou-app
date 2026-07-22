@@ -66,9 +66,7 @@ class _LiquidLogoLoaderState extends State<LiquidLogoLoader>
   Future<void> _loadLogo() async {
     try {
       final data = await rootBundle.load(widget.asset);
-      final codec = await ui.instantiateImageCodec(
-        data.buffer.asUint8List(),
-      );
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
       if (!mounted) {
         frame.image.dispose();
@@ -158,7 +156,8 @@ class _LiquidLogoPainter extends CustomPainter {
     canvas.saveLayer(rect, Paint());
 
     final amplitude = size.height * 0.035;
-    final surfaceY = (size.height + amplitude * 2) * (1 - fillLevel) - amplitude;
+    final surfaceY =
+        (size.height + amplitude * 2) * (1 - fillLevel) - amplitude;
     const wavesAcross = 2;
 
     final path = Path()..moveTo(0, size.height);
@@ -178,12 +177,7 @@ class _LiquidLogoPainter extends CustomPainter {
     canvas.drawPath(path, Paint()..color = fillColor);
 
     // Keep only the intersection of the liquid and the logo alpha.
-    canvas.drawImageRect(
-      logo,
-      src,
-      rect,
-      Paint()..blendMode = BlendMode.dstIn,
-    );
+    canvas.drawImageRect(logo, src, rect, Paint()..blendMode = BlendMode.dstIn);
     canvas.restore();
   }
 

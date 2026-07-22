@@ -502,11 +502,12 @@ column to `public.profiles`:
 
 | Column | Type | Notes |
 |---|---|---|
-| `must_change_password` | `boolean` not null default **true** | first-login password gate (D2). true at creation → false on first self-change → true on admin reset. Backfill: pre-existing rows set to **false** (don't force a bootstrapped admin). |
+| `must_change_password` | `boolean` not null default **true** | first-login password gate (D2). true at creation → false on first self-change → true on admin reset. Backfill: **only existing active, non-deleted `admin`-role profiles → false**; all other existing rows keep true. |
 
 No other schema change. **`profiles` still has no `email` column** — the internal
-Auth email lives only on `auth.users` and is never duplicated here (D2). No
+Auth email lives only on `auth.users`, is never duplicated here (D2), and must
+never be mapped into `UserModel.email` (which maps to `null`). No
 password/token/OTP/secret column added. Username stays normalized + unique
 (`^[a-z0-9._-]{2,50}$`). RLS unchanged; the existing self/admin SELECT policies
-scope the new column; no profile write policy. See
-`docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §11.
+scope the new column; no profile write policy. Migration **prepared in code;
+pending manual DEV application**. See `docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §11.

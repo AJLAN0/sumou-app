@@ -45,11 +45,25 @@ comment on column public.profiles.must_change_password is
   'a later forced change-password redirect. Never stores passwords/tokens/OTPs/secrets.';
 
 -- ---------------------------------------------------------------------------
--- Deliberate backfill (reported): profiles that already exist BEFORE this feature
--- are treated as already-established and are NOT forced through the change flow —
--- this avoids locking a manually-bootstrapped admin (dashboard-set password) out
--- of a usable login once the redirect lands. New rows use the column default
--- (true). On an empty database this affects 0 rows (reproducible). The first-admin
--- bootstrap template sets the value explicitly for a freshly bootstrapped admin.
+-- Deliberate, NARROW backfill: clear the flag ONLY for an existing active,
+-- non-deleted profile that holds the active `admin` role — i.e. the manually
+-- bootstrapped first admin, whose dashboard-set password is a real password.
+-- This protects that account from being forced into a change (once the Step-10.6
+-- redirect lands) WITHOUT exempting every old row: disabled, soft-deleted, and
+-- non-admin profiles KEEP must_change_password = true, so any pre-existing staff
+-- account (which would have been created with a temporary password) is still
+-- correctly forced to change. New rows use the column default (true). On an empty
+-- database this matches 0 rows (reproducible).
 -- ---------------------------------------------------------------------------
-update public.profiles set must_change_password = false;
+update public.profiles p
+set must_change_password = false
+where p.is_active
+  and p.deleted_at is null
+  and exists (
+    select 1
+    from public.user_roles ur
+    join public.roles r on r.id = ur.role_id
+    where ur.user_id = p.id
+      and r.code = 'admin'
+      and r.is_active
+  );

@@ -14,24 +14,20 @@ Accounts are **password accounts** on an **internal, non-routable email** (`<use
 
 ---
 
-## 2. Bootstrap the first admin (one-time, manual)
+## 2. Bootstrap the first admin (one-time, manual — DEV)
 
-There are no users in the DB yet (only the catalog). The first admin can't be created "by an admin", so bootstrap once:
+The first admin can't be created "by an admin", so it is bootstrapped once,
+manually, in **DEV only**. The single **canonical** procedure is the
+placeholder-only template `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql` (SQL-Editor
+`DO` block): create the Auth user in the Dashboard with the internal email, then
+insert the matching `profiles` (same UUID, active `admin` default role,
+`must_change_password` set explicitly) + `user_roles` in one transaction — **no**
+`user_permissions` copies (admin capability resolves from `role_permissions` via
+`has_feature()`). Admin state may or may not already exist on DEV; the template's
+placeholder guard and username validation make it safe to run once.
 
-1. Dashboard → **Authentication → Users → Add user**: email `admin@users.sumou.internal`, set a password, tick **Auto Confirm User**. Copy the new user's **UUID**.
-2. Dashboard → **SQL Editor**, run (single transaction — satisfies the deferrable default-role FK):
-
-```sql
-begin;
-insert into public.profiles (id, username, full_name, default_role_id, is_active)
-values ('<AUTH_UUID>', 'admin', 'إدارة سمو',
-        (select id from public.roles where code = 'admin'), true);
-insert into public.user_roles (user_id, role_id)
-values ('<AUTH_UUID>', (select id from public.roles where code = 'admin'));
-commit;
-```
-
-Admin permissions then resolve from `role_permissions` (admin defaults from Step 2). Do this on **DEV** first; repeat on **PROD** when you go live.
+> **Production bootstrap is a separate, future release procedure** — do **not**
+> run it now, and do **not** reuse the DEV template against Production.
 
 ---
 
@@ -123,12 +119,13 @@ No project/team/closure logic, no finance/payments/Rekaz/notifications/FCM/push/
 
 ---
 
-## 11. Step 10.1 — Auth schema readiness (implemented)
+## 11. Step 10.1 — Auth schema readiness (prepared in code)
 
-Migration `supabase/migrations/20260714210000_auth_schema_readiness.sql` (applied
-by the owner to DEV). This is the schema-only groundwork before the Edge Functions
-and Flutter work — **no** Auth users, Edge Functions, Flutter, RPCs, policies, or
-secrets.
+Migration `supabase/migrations/20260714210000_auth_schema_readiness.sql` —
+**prepared in code; pending owner review and manual DEV application** (not yet
+applied to DEV, not on Production). This is the schema-only groundwork before the
+Edge Functions and Flutter work — **no** Auth users, Edge Functions, Flutter,
+RPCs, policies, or secrets.
 
 ### Approved Sprint 10 sequence
 1. **Auth schema readiness** ← this step (10.1)
@@ -144,10 +141,27 @@ secrets.
 `public.profiles.must_change_password boolean NOT NULL DEFAULT true`.
 Lifecycle: **true** at creation (temp password) → **false** on first successful
 self-change → **true** again on an admin reset. It drives the later forced
-change-password redirect (Step 10.6). **Backfill (deliberate):** pre-existing
-profiles are set to **false** so a manually-bootstrapped admin is not locked into
-a forced change once the redirect lands; new rows use the default (true). No
-password/token/OTP/secret column was added.
+change-password redirect (Step 10.6). No password/token/OTP/secret column added.
+
+**Backfill (deliberate, narrow):** only an existing **active, non-deleted** profile
+that holds the **active `admin` role** is set to **false** — the manually
+bootstrapped first admin, whose dashboard-set password is a real password. Every
+**other** existing profile keeps **true**: disabled, soft-deleted, and non-admin
+accounts are NOT exempted, so any pre-existing staff account (which would have been
+created with a temporary password) is still correctly forced to change. New rows
+use the default (true); on an empty database the backfill matches 0 rows.
+
+### Forced first-password-change — completion is NOT done in Step 10.1
+Step 10.1 only adds the **state** (`must_change_password`). Clearing it requires a
+**trusted** operation, because `profiles` has **no direct UPDATE policy**. A plain
+`auth.updateUser({ password })` changes the Supabase Auth password but does **not**
+clear the database flag. **Step 10.6** must implement the approved trusted
+completion (e.g. a narrow `security definer` RPC callable only by the
+authenticated owner for their own row, or an Edge Function) that sets
+`must_change_password = false` after a verified first change. **Do not** claim the
+forced first-password flow is complete, and **do not** build that operation now —
+the exact Step-10.6 mechanism (narrow RPC vs Edge Function, re-auth requirement)
+remains to be finalized before implementation.
 
 ### Username normalization — ownership
 - **Rule (deterministic):** `lower(btrim(username))`, validated `^[a-z0-9._-]{2,50}$`;
@@ -166,13 +180,18 @@ password/token/OTP/secret column was added.
   `auth.admin.createUser`. It is **never** displayed, **never** written to
   `audit_logs`, and **never** returned by a public RPC.
 
-### Contact email vs internal Auth email
-- `auth.users.email` = the hidden internal identity above.
+### Contact email vs internal Auth email — mapping rule
+- `auth.users.email` = the hidden internal login identity (`<username>@users.sumou.internal`).
 - **`public.profiles` has no `email` column** and Step 10.1 does not add one (the
-  internal Auth email must not be duplicated into a public column). A user's
-  optional public/contact email is **not** persisted server-side today and is
-  **never** the login identity. If a contact email is wanted later, it is a
-  separate, explicitly-approved column — distinct from the Auth identity.
+  internal Auth email must not be duplicated into a public column).
+- `UserModel.email` (Flutter) currently has **no backend profile source**. The
+  future `SupabaseProfileMapper`/`SupabaseAuthRepository` **must map
+  `UserModel.email` to `null`** — it must **never** expose `auth.users.email` as
+  `UserModel.email` (that would leak the hidden internal identity into the UI).
+- A user's optional public/contact email is **not** persisted server-side and is
+  **never** the login identity. Only if a separate public contact-email column is
+  explicitly approved later would the mapper source `UserModel.email` from it — a
+  distinct decision from the Auth identity, not part of Step 10.1.
 
 ### Permission codes
 No new permission codes are required or added. User management resolves through
@@ -201,9 +220,11 @@ Auth still accepts the password — the Step-10.5 session loader signs out / blo
 inactive/deleted profiles. No hard-delete of accounts.
 
 ### First-admin bootstrap (DEV only)
-See `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql` — a manual, one-time, placeholder-only
-DEV template: create the Auth user in the dashboard with the internal email, then
-insert the matching `profiles` + `user_roles` (admin) in one transaction with the
-same UUID; `must_change_password` per the bootstrap decision; **no**
-`user_permissions` copies; no real credentials committed; verification + cleanup/
-recovery included. Never creates a Production administrator.
+The single canonical procedure is `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql` (see §2)
+— a manual, one-time, placeholder-only DEV template run in the SQL Editor (DEV
+database-owner context): a `DO $$` block with a placeholder-UUID guard, username
+normalization/validation, active-admin-role lookup, and `profiles` + `user_roles`
+inserted in one transaction with `must_change_password` explicitly chosen and **no**
+`user_permissions` inserts. Auth-user creation stays manual in the DEV Dashboard.
+No real credentials/project-ref/secrets. **Production bootstrap is a separate,
+future release procedure — never run it now.**

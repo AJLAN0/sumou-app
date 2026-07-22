@@ -146,7 +146,8 @@ The four planning docs, now **decision-frozen and consistent**:
 
 Backend/DB precedes Flutter. Order:
 1. **Auth schema readiness** — `profiles.must_change_password` (migration
-   `20260714210000_auth_schema_readiness.sql`). *(done — Step 10.1)*
+   `20260714210000_auth_schema_readiness.sql`). *(Step 10.1 — prepared in code;
+   pending owner review and manual DEV application.)*
 2. Admin **create-user** backend — `admin-create-user` Edge Function +
    `create_staff_profile` `security definer` RPC (needs an explicit `execute`
    grant — default function privileges are hardened, Step 6.5).

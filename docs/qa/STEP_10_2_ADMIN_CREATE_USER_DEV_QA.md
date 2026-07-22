@@ -74,3 +74,27 @@ select actor_id, action, entity, meta from public.audit_logs
   a pre-existing user with the same username is never deleted (guarded by the
   friendly pre-check + unique constraint → 409 before any Auth create).
 - Server logs never contain the request body or the temp password.
+
+## Local checks (owner; Deno required — NOT run in this repo's CI env)
+```bash
+deno fmt --check supabase/functions/admin-create-user/index.ts \
+  supabase/functions/_shared/auth-utils.ts supabase/functions/_shared/auth-utils.test.ts
+deno check supabase/functions/admin-create-user/index.ts
+deno test supabase/functions/_shared/auth-utils.test.ts
+```
+> Deno was **not available** in the environment that authored this step, so these
+> were **not executed** here — run them locally/CI before deploy. Do not assume
+> they passed.
+
+## Response-header assertions (every response)
+`Content-Type: application/json`, `Cache-Control: no-store, max-age=0`,
+`Pragma: no-cache`, `X-Content-Type-Options: nosniff`; a 405 additionally carries
+`Allow: POST`. The 201 body (with `temp_password`) must be uncacheable.
+
+## Framing/allowlist assertions
+- `Content-Type` must be exactly `application/json` (params ok); `text/plain,
+  application/json` → 415.
+- Oversized body → 413 **without** parsing (bounded streaming read; byte-counted,
+  multibyte-safe; a lying/absent `Content-Length` is still capped).
+- Any unknown top-level key (incl. case variants like `Password`, `IS_ACTIVE`) →
+  400; any extra key inside a `permission_overrides` object → 400.

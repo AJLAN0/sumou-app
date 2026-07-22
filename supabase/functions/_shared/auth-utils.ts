@@ -79,6 +79,13 @@ export const FORBIDDEN_KEYS = [
   "audit", "meta",
 ];
 
+/** The ONLY top-level keys accepted (strict allowlist — unknown keys rejected). */
+export const ALLOWED_TOP_LEVEL_KEYS = [
+  "username", "full_name", "default_role", "roles", "photographer_types", "permission_overrides",
+] as const;
+/** The ONLY keys accepted inside a permission override object. */
+export const ALLOWED_OVERRIDE_KEYS = ["code", "granted"] as const;
+
 export interface PermissionOverride { code: string; granted: boolean }
 export interface CreateUserInput {
   username: string;
@@ -109,8 +116,14 @@ export function validateCreateUserInput(body: unknown): ValidationResult {
   }
   const o = body as Record<string, unknown>;
 
+  // explicit forbidden keys first (specific message), then a STRICT allowlist:
+  // every unknown top-level key is rejected, not ignored.
   for (const k of FORBIDDEN_KEYS) {
     if (k in o) return { ok: false, error: `field "${k}" is not allowed` };
+  }
+  const allowed = new Set<string>(ALLOWED_TOP_LEVEL_KEYS);
+  for (const k of Object.keys(o)) {
+    if (!allowed.has(k)) return { ok: false, error: `unknown field "${k}"` };
   }
 
   const username = normalizeUsername(o.username);
@@ -157,6 +170,11 @@ export function validateCreateUserInput(body: unknown): ValidationResult {
         return { ok: false, error: "each permission override must be an object" };
       }
       const ov = raw as Record<string, unknown>;
+      for (const key of Object.keys(ov)) {
+        if (key !== "code" && key !== "granted") {
+          return { ok: false, error: `unknown permission override field "${key}"` };
+        }
+      }
       if (typeof ov.code !== "string" || ov.code.trim() === "") {
         return { ok: false, error: "permission override needs a code" };
       }
@@ -175,4 +193,69 @@ export function validateCreateUserInput(body: unknown): ValidationResult {
     ok: true,
     value: { username, full_name, default_role, roles, photographer_types, permission_overrides },
   };
+}
+
+// ---- request framing helpers ------------------------------------------------
+
+/**
+ * True only when the media type is EXACTLY `application/json` (params like
+ * `; charset=utf-8` are allowed). Rejects strings that merely CONTAIN the token,
+ * e.g. `text/plain, application/json`.
+ */
+export function isJsonContentType(header: string | null): boolean {
+  if (!header) return false;
+  const mediaType = header.split(";", 1)[0].trim().toLowerCase();
+  return mediaType === "application/json";
+}
+
+export type BoundedBody =
+  | { ok: true; bytes: Uint8Array }
+  | { ok: false; reason: "too_large" };
+
+/**
+ * Read a request body into bytes with a hard cap, WITHOUT buffering an oversized
+ * request. Rejects early on a too-large Content-Length (when present, but never
+ * trusted alone), then streams incrementally counting ACTUAL bytes and cancels
+ * the moment the cap is exceeded. UTF-8 is decoded by the caller only after the
+ * bounded bytes are collected. A null body yields zero bytes.
+ */
+export async function readBoundedBody(
+  body: ReadableStream<Uint8Array> | null,
+  contentLength: string | null,
+  maxBytes: number,
+): Promise<BoundedBody> {
+  if (contentLength != null && contentLength !== "") {
+    const declared = Number(contentLength);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      return { ok: false, reason: "too_large" };
+    }
+  }
+  if (body == null) return { ok: true, bytes: new Uint8Array(0) };
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        return { ok: false, reason: "too_large" };
+      }
+      chunks.push(value);
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released */ }
+  }
+
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, bytes: out };
 }

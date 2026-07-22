@@ -115,3 +115,90 @@ Deno.test("input: valid overrides pass through", () => {
     assertEquals(r.value.permission_overrides, [{ code: "can_view_reports", granted: false }]);
   }
 });
+
+// ---- request framing + strict allowlist (added in the 10.2 hardening) -------
+import { isJsonContentType, MAX_BODY_BYTES, readBoundedBody } from "./auth-utils.ts";
+
+function streamOf(bytes: Uint8Array, chunk = 3): ReadableStream<Uint8Array> {
+  let i = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (i >= bytes.length) return controller.close();
+      const end = Math.min(i + chunk, bytes.length);
+      controller.enqueue(bytes.slice(i, end));
+      i = end;
+    },
+  });
+}
+
+Deno.test("isJsonContentType: exact media type only (params allowed)", () => {
+  assert(isJsonContentType("application/json"));
+  assert(isJsonContentType("application/json; charset=utf-8"));
+  assert(isJsonContentType("APPLICATION/JSON"));
+  assertFalse(isJsonContentType("text/plain"));
+  assertFalse(isJsonContentType("text/plain, application/json")); // must not merely contain
+  assertFalse(isJsonContentType("application/jsonx"));
+  assertFalse(isJsonContentType(null));
+});
+
+Deno.test("readBoundedBody: exactly at the limit passes", async () => {
+  const bytes = new Uint8Array(10).fill(65); // 10 x 'A'
+  const r = await readBoundedBody(streamOf(bytes), "10", 10);
+  assert(r.ok);
+  if (r.ok) assertEquals(r.bytes.length, 10);
+});
+
+Deno.test("readBoundedBody: over the limit is rejected (byte count)", async () => {
+  const bytes = new Uint8Array(11).fill(65);
+  const r = await readBoundedBody(streamOf(bytes), null, 10); // no Content-Length
+  assertFalse(r.ok);
+});
+
+Deno.test("readBoundedBody: multibyte UTF-8 counts bytes, not chars", async () => {
+  const bytes = new TextEncoder().encode("€€€€"); // 4 chars, 12 bytes
+  assertEquals(bytes.length, 12);
+  const over = await readBoundedBody(streamOf(bytes), null, 10);
+  assertFalse(over.ok, "12 bytes > 10 → rejected");
+  const ok = await readBoundedBody(streamOf(bytes), null, 12);
+  assert(ok.ok, "12 bytes <= 12 → accepted");
+});
+
+Deno.test("readBoundedBody: rejects a lying/oversized Content-Length early", async () => {
+  const r = await readBoundedBody(streamOf(new Uint8Array(1)), String(MAX_BODY_BYTES + 1), MAX_BODY_BYTES);
+  assertFalse(r.ok);
+});
+
+Deno.test("readBoundedBody: a big stream with a small Content-Length is still capped", async () => {
+  const bytes = new Uint8Array(50).fill(66);
+  const r = await readBoundedBody(streamOf(bytes), "3", 10); // header lies
+  assertFalse(r.ok);
+});
+
+Deno.test("readBoundedBody: null body yields zero bytes", async () => {
+  const r = await readBoundedBody(null, null, 10);
+  assert(r.ok);
+  if (r.ok) assertEquals(r.bytes.length, 0);
+});
+
+Deno.test("input: unknown top-level key rejected (not ignored)", () => {
+  assertFalse(validateCreateUserInput({
+    username: "user", full_name: "N", default_role: "manager", roles: ["manager"], extra: "x",
+  }).ok);
+});
+
+Deno.test("input: case-variant of a forbidden key is rejected as unknown", () => {
+  for (const k of ["Password", "IS_ACTIVE", "User_Id", "Email"]) {
+    const body: Record<string, unknown> = {
+      username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
+    };
+    body[k] = "x";
+    assertFalse(validateCreateUserInput(body).ok, `reject "${k}"`);
+  }
+});
+
+Deno.test("input: extra key inside a permission override is rejected", () => {
+  assertFalse(validateCreateUserInput({
+    username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
+    permission_overrides: [{ code: "can_view_reports", granted: true, foo: 1 }],
+  }).ok);
+});

@@ -323,3 +323,24 @@ Inactive roles (`finance`/`wedding_finance`), non-catalog roles (`client_trackin
 inactive permissions (`can_manage_finance`), duplicate roles/types/overrides,
 missing default-in-roles, blank name, and malformed/un-normalized usernames are all
 rejected. **No email/notification/password delivery.** **No Production deployment.**
+
+### Authorization boundary — `can_manage_users` vs `can_manage_permissions` (reported)
+**Option A (documented, current behavior).** Per the frozen §3, **initial account
+provisioning — including assigning `roles` and optional explicit
+`permission_overrides` at creation — is intentionally governed by
+`can_manage_users`.** Later, standalone editing of a user's roles/permissions is
+governed by `can_manage_permissions` (§8 sequence, admin user-management step).
+Authorization was **not** silently changed, and **no new permission code was
+invented**.
+
+**Reported escalation consequence (owner decision).** Because creation is gated
+only by `can_manage_users`, an admin who has `can_manage_users` but **not**
+`can_manage_permissions` can still, at creation time: (a) create another **admin**
+(by putting `admin` in `roles`), and (b) supply explicit `permission_overrides`
+(including granting `can_manage_permissions=true` to the new user). That is a
+privilege-escalation surface. If the owner wants creation-time role/override
+assignment — or specifically minting a new admin / granting
+`can_manage_permissions` — to additionally require the caller to hold
+`can_manage_permissions`, that is a small, explicit follow-up gate to add to both
+the Edge Function pre-check and the `create_staff_profile` actor check. **Left as
+an owner decision; not changed here.**

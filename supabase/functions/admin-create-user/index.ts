@@ -14,21 +14,30 @@
 //
 // NOT deployed by this step — the owner deploys to DEV manually.
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
   buildInternalEmail,
   generateTempPassword,
+  isJsonContentType,
   MAX_BODY_BYTES,
+  readBoundedBody,
   validateCreateUserInput,
 } from "../_shared/auth-utils.ts";
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
+// Every response carries these. The 201 success body contains a one-time temp
+// password, so responses must NEVER be cached or content-sniffed.
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Type": "application/json",
+  "Cache-Control": "no-store, max-age=0",
+  "Pragma": "no-cache",
+  "X-Content-Type-Options": "nosniff",
+};
 
-function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+function json(body: unknown, status: number, extra: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...SECURITY_HEADERS, ...extra } });
 }
-function errorResponse(code: string, message: string, status: number): Response {
-  return json({ error: { code, message } }, status);
+function errorResponse(code: string, message: string, status: number, extra: Record<string, string> = {}): Response {
+  return json({ error: { code, message } }, status, extra);
 }
 
 /** Effective can_manage_users for the caller, via their own RLS-scoped reads. */
@@ -92,11 +101,14 @@ function statusForRpcError(code: string | undefined): number {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
-  if (req.method !== "POST") return errorResponse("method_not_allowed", "use POST", 405);
+  // No wildcard CORS / OPTIONS preflight is offered (no approved browser-origin
+  // policy). Any non-POST — including OPTIONS — gets 405 with an Allow header.
+  if (req.method !== "POST") {
+    return errorResponse("method_not_allowed", "use POST", 405, { "Allow": "POST" });
+  }
 
-  const ctype = req.headers.get("content-type") ?? "";
-  if (!ctype.toLowerCase().includes("application/json")) {
+  // Content-Type must be EXACTLY application/json (charset param allowed).
+  if (!isJsonContentType(req.headers.get("content-type"))) {
     return errorResponse("unsupported_media_type", "Content-Type must be application/json", 415);
   }
 
@@ -113,14 +125,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse("server_error", "server is not configured", 500);
   }
 
-  // Read the body with a size cap.
-  const raw = await req.text();
-  if (raw.length > MAX_BODY_BYTES) {
+  // Bounded, streaming body read — never buffers an oversized request. Counts
+  // actual bytes (not JS chars) and decodes UTF-8 only after the cap holds.
+  const bounded = await readBoundedBody(req.body, req.headers.get("content-length"), MAX_BODY_BYTES);
+  if (!bounded.ok) {
     return errorResponse("payload_too_large", "request body too large", 413);
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bounded.bytes));
   } catch {
     return errorResponse("invalid_request", "malformed JSON body", 400);
   }

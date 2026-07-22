@@ -433,3 +433,94 @@ manager, team/photographer identities, `project_team_members.value`, notes,
 Closure `delivery_link` is validated as an http(s) URL (matching the Flutter
 submit validator); `report_file_url`/`notes` are stored as plain text (Step 5
 schema has no CHECK). **Step 6.4 not started.**
+
+---
+
+## 10. Step 6.4 implementation notes (project write RPCs)
+
+Migration `supabase/migrations/20260714190000_project_write_rpcs.sql`. Runs after
+Step 6.3. Statically reviewed, **not** applied. No table policies added/changed —
+direct writes stay default-deny; every mutation flows through these RPCs.
+
+**Previously-unresolved decisions — now applied (owner-approved):**
+1. Canonical booking date = `project_team_members.date` (NOT the project range).
+2. Booking-conflict statuses = `active` / `in_progress` / `pending_closure`.
+3. Unavailability timezone = **Asia/Riyadh** calendar-day overlap.
+4. Marketing (active role) bypasses **project double-booking only**, never leave.
+
+**Functions** (all `plpgsql`, `SECURITY DEFINER`, `search_path=''`,
+schema-qualified, no dynamic SQL, fail closed for inactive/deleted callers):
+
+| Function | Execute | Authorization | Effect / return |
+|---|---|---|---|
+| `gen_project_serial(type)` | **internal** (revoked PUBLIC+anon, no authenticated grant) | — | secure serial candidate |
+| `_apply_project_team(project_id, members)` | **internal** (revoked PUBLIC+anon, no authenticated grant) | — (caller authorizes + locks project) | validate-all → lock profiles → verify → is_available → replace-all → `project.team.assign`; returns count |
+| `is_available(uid, on_date, exclude_project_id?)` | authenticated (gated) | active admin OR `can_assign_photographers` OR own uid | boolean only |
+| `create_project(name, client_name, type, start_date, end_date, notes, manager_id?, members?)` | authenticated | `is_admin()` OR `has_feature('can_add_project')`; team present ⇒ also admin/`can_assign_photographers` | project (`active`) + stages + optional initial team + `project.create`; returns project id |
+| `update_project(project_id, name, client_name, type, start_date, end_date, notes)` | authenticated | `is_admin()` OR (`manages_project` AND `has_feature('can_edit_project')`) | edit basics; **type immutable**; + `project.edit`; returns project id |
+| `update_project_stage(project_id, stage_id, notes?)` | authenticated | `is_admin()` OR ((`manages_project` OR `assigned_to_project`) AND `has_feature('can_update_stages')`) | target `current`/earlier `done`/later `pending` (target-only metadata) + `project.stage.update`; returns project id |
+| `assign_team_roles(project_id, members)` | authenticated | `is_admin()` OR (`manages_project` AND `has_feature('can_assign_photographers')`) | lock project → `_apply_project_team` (replace-all); returns project id |
+
+**`is_available` logic:** null-guard → target profile live → **explicit leave**
+(active `user_unavailability` overlapping the Riyadh day `[day_start,day_end)` via
+`starts_at < day_end AND ends_at > day_start`; blocks **everyone incl. Marketing**;
+`kind`/`notes` never read) → **Marketing** (`user_roles→roles.code='marketing' AND
+roles.is_active`) returns true (skips only project-booking) → **non-Marketing**:
+false if a `project_team_members.date = on_date` row exists on a **live** project
+with status ∈ {active,in_progress,pending_closure}, honouring `exclude_project_id`.
+
+**Team assignment (`members` jsonb):** array of
+`{user_id: uuid|null, person_name, value, date, photographer_type_ids: [uuid,…]}`.
+Replace-all + atomic: the **entire** proposed team is validated (person_name
+non-blank; no duplicate internal user; no duplicate type per member; internal
+members require a date) **before** any delete; internal profiles are then locked
+`FOR UPDATE` in **deterministic uuid order** (cross-project double-booking race
+guard + deadlock reduction), each verified active/non-deleted, every
+`photographer_type` verified active, and `is_available(user, date, project)`
+re-checked **after** the locks; only then are `project_team_members` deleted
+(cascading `project_team_types`) and the new set inserted. External members
+(`user_id` null) need only a non-blank `person_name`, get no availability check,
+and no profile/Auth is invented. `value` is metadata only (schema has no bound →
+none invented) and stays hidden from assigned peers (Step-6.2 privacy). The photo
+type list is **not** constrained to `user_photographer_types` — the Flutter picker
+offers all types, so no declared-capability check is enforced. Lock order:
+project → profiles(by id) → team rows.
+
+**create_project initial team:** the repository `createProject(...teamRoles)` and
+the Flutter create flow **do** pass an initial team (assignment `date` = project
+`start_date`), so `create_project` accepts `members` and assigns them atomically
+in the **same transaction** via the internal `_apply_project_team` (not an
+externally-authorized RPC), after its own `can_assign_photographers` check. Type
+names → `photographer_type_ids` and role→member grouping are done by the future
+repository. The current create flow always sets manager = the signed-in user.
+
+**Manager roles:** a non-admin creator's `manager_id` is forced to `auth.uid()`.
+When an **admin delegates** `manager_id` to another profile, that profile must be
+active, non-deleted, and hold an **active** management role — accepted codes:
+**`admin`, `manager`, `wedding_admin`** (a photographer/designer/marketing/etc.
+cannot be made manager).
+
+**Serial generation:** `PREFIX-XXXX-XX` (FLD/SOC/WED) with two uppercase-hex blocks
+from cryptographically-secure `gen_random_uuid()` (v4) — never `random()`;
+uniqueness = the Step-4 `UNIQUE` constraint + a bounded retry loop (10 attempts →
+clean error). Step-4 CHECK unchanged.
+
+**Edit fields (exact):** name, client_name, start_date, end_date, notes. **Type is
+IMMUTABLE** after creation (it selects the 3-/7-stage template; the sources define
+no safe stage-rebuild and rebuilding would lose stage history, so a change attempt
+is rejected). **Excluded:** `status` (closure-workflow only), `manager_id`,
+`serial`, team, stages, soft-delete fields.
+
+**Stage progression:** exactly one `current`; earlier `done`, later `pending`;
+**target-only** `updated_by`/`updated_at` (the mock explicitly defines target-only
+metadata — §11 exception); blocked on completed (`ProjectModel.isCompleted`) and
+soft-deleted/inactive projects; never changes project status or closure.
+
+**Audit actions:** `project.create`, `project.edit`, `project.stage.update`,
+`project.team.assign` (identifiers only; team audit `meta` = `{member_count}` —
+no names/values/dates/types/leave).
+
+**Still deferred (reported):** manager reassignment (`setProjectManager`), project
+soft-delete (no repository method), and status editing (closure-workflow only).
+
+**Step 6.5 not started.**

@@ -89,21 +89,41 @@ Keeps the exact `AuthRepository` interface, so the UI/providers don't change.
 
 ## 7. Dependency & sequencing (important)
 
-- **RLS prerequisite:** logging in and loading a profile requires RLS policies that let a user **read their own** `profiles` / `user_roles` / `user_permissions` (+ read the `roles`/`permissions` catalogs). Those are part of **Sprint 9 Step 6**. So this auth step needs **either** Step 6 done first **or** a minimal "self-read" policy subset bundled in.
-- The `admin-create-user` path itself works without RLS policies (service_role bypasses RLS), but the **app can't read data back** until the self-read policies exist.
-- **Recommendation:** implement the identity/access **self-read RLS policies** (a slice of Step 6) as the first task of the build, then the Edge Function + Flutter auth.
+- **RLS prerequisite — already satisfied.** Logging in and loading a profile
+  requires RLS policies that let a user **read their own** `profiles` /
+  `user_roles` / `user_permissions` (+ read the `roles`/`permissions` catalogs).
+  These identity/access **self-read RLS policies are completed and live on DEV**
+  (Sprint 9 Step 6.1, migration `20260714160000_identity_access_rls.sql`). **No
+  additional self-read RLS prerequisite is needed in Sprint 10** — the Auth build
+  starts directly at the create-user backend.
+- The `admin-create-user` path runs with service_role (bypasses RLS); the app
+  reads data back through the existing self-read policies.
 
 ---
 
-## 8. Build checklist (when approved)
+## 8. Build checklist — the approved eight-step Sprint 10 sequence
 
-1. RLS self-read policies for `profiles`/`user_roles`/`user_permissions`/`roles`/`permissions` (own-row + catalog read). *(migration)*
-2. `create_staff_profile` RPC (`security definer`). *(migration)*
-3. Edge Function `admin-create-user` (+ optional `admin-reset-password`); `supabase secrets set` for service_role. *(supabase/functions)*
-4. Add `supabase_flutter` package; initialize with URL + anon key via `--dart-define-from-file`. *(Flutter)*
-5. `SupabaseAuthRepository implements AuthRepository`; wire the "add user" flow to the Edge Function + temp-password dialog; wire `changePassword`. *(Flutter)*
-6. Swap `authRepositoryProvider` to Supabase (keep the mock for widget tests). *(Flutter)*
-7. Deploy functions + push RPC/policy migrations to DEV; manual end-to-end test; then PROD.
+Identity/access self-read RLS is **already done** (Step 6.1, live on DEV), so it
+is **not** a step here. The Auth build follows the approved sequence (see §11):
+
+1. **Auth schema readiness** — `profiles.must_change_password` (migration
+   `20260714210000`). *(done — prepared in code; pending manual DEV apply.)*
+2. **Admin create-user backend** — `create_staff_profile` `security definer` RPC
+   (needs an **explicit** `execute` grant — default function privileges are
+   hardened, Step 6.5) + `admin-create-user` Edge Function (service_role secret).
+3. **Admin reset-password backend** — `admin-reset-password` Edge Function.
+4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
+   `--dart-define-from-file`.
+5. **Username login / session / profile loading** — `SupabaseAuthRepository`;
+   sign out / block inactive/deleted profiles.
+6. **Forced first password change** — redirect on `must_change_password` + the
+   trusted completion operation that clears the flag (mechanism TBD; §11).
+7. **Admin user-management integration** — wire create/reset/activate/roles.
+8. **Auth QA**.
+
+> **Production deployment remains a separate, explicitly-approved future release**
+> — do not push functions/migrations to Production or perform any Production
+> action now. All apply steps in this checklist are **DEV-only** until then.
 
 ---
 

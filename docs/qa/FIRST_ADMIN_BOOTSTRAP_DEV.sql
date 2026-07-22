@@ -42,6 +42,8 @@ declare
   v_admin_name text := 'إدارة سمو';                              -- <-- replace if needed
   v_must_change boolean := false;                                -- bootstrap decision
   v_username   text;
+  v_expected_email text;
+  v_actual_email   text;
   v_role_id    uuid;
 begin
   -- guard: refuse to run with the placeholder UUID still in place.
@@ -53,6 +55,19 @@ begin
   v_username := lower(btrim(v_admin_user));
   if v_username !~ '^[a-z0-9._-]{2,50}$' then
     raise exception 'Invalid username "%": must match ^[a-z0-9._-]{2,50}$', v_admin_user;
+  end if;
+
+  -- expected hidden internal Auth identity derived from the normalized username.
+  v_expected_email := v_username || '@users.sumou.internal';
+
+  -- verify the Auth user (STEP A) exists and matches this username. The internal
+  -- email is NEVER printed in exception text (it is a hidden identity).
+  select lower(email) into v_actual_email from auth.users where id = v_admin_uid;
+  if v_actual_email is null then
+    raise exception 'No auth.users row for v_admin_uid — create the Auth user in the Dashboard (STEP A) first.';
+  end if;
+  if v_actual_email is distinct from v_expected_email then
+    raise exception 'auth.users UUID belongs to a different internal identity than username "%"; fix v_admin_uid or v_admin_user.', v_username;
   end if;
 
   -- active admin role must exist.

@@ -471,20 +471,27 @@ with status ∈ {active,in_progress,pending_closure}, honouring `exclude_project
 
 **Team assignment (`members` jsonb):** array of
 `{user_id: uuid|null, person_name, value, date, photographer_type_ids: [uuid,…]}`.
-Replace-all + atomic: the **entire** proposed team is validated (person_name
-non-blank; no duplicate internal user; no duplicate type per member; internal
-members require a date) **before** any delete; internal profiles are then locked
-`FOR UPDATE` in **deterministic uuid order** (cross-project double-booking race
-guard + deadlock reduction), each verified active/non-deleted, every
-`photographer_type` verified active, and `is_available(user, date, project)`
-re-checked **after** the locks; only then are `project_team_members` deleted
-(cascading `project_team_types`) and the new set inserted. External members
-(`user_id` null) need only a non-blank `person_name`, get no availability check,
-and no profile/Auth is invented. `value` is metadata only (schema has no bound →
-none invented) and stays hidden from assigned peers (Step-6.2 privacy). The photo
-type list is **not** constrained to `user_photographer_types` — the Flutter picker
-offers all types, so no declared-capability check is enforced. Lock order:
-project → profiles(by id) → team rows.
+Replace-all + atomic. **Structural validation (before any delete):** members is a
+JSON array; each member a JSON object; `user_id` null or a well-formed UUID;
+`photographer_type_ids` an array of well-formed UUIDs with no duplicate within a
+member; `value` a JSON number (or null → 0); no duplicate internal user across
+members; internal members require a `date`; external members require a non-blank
+`person_name`. Malformed input raises a clear `22023` validation error. Then
+internal profiles are locked `FOR UPDATE` in **deterministic uuid order**
+(cross-project double-booking race guard + deadlock reduction), each verified
+active/non-deleted, every `photographer_type` verified active, and
+`is_available(user, date, project)` re-checked **after** the locks; only then are
+`project_team_members` deleted (cascading `project_team_types`) and the new set
+inserted. **Internal `person_name` is derived from the locked
+`profiles.full_name` — the client-supplied name is never trusted for an internal
+member (anti-spoofing).** External members (`user_id` null) store the normalized
+input name, get no availability check, and no profile/Auth is invented. `value` is
+metadata only (schema has no bound → none invented) and stays hidden from assigned
+peers (Step-6.2 privacy). The photo type list is **not** constrained to
+`user_photographer_types` — the Flutter picker offers all types, so no
+declared-capability check is enforced. Lock order: project → profiles(by id) →
+team rows. Assignment is allowed only while the project is in a **working state**
+({active, in_progress}).
 
 **create_project initial team:** the repository `createProject(...teamRoles)` and
 the Flutter create flow **do** pass an initial team (assignment `date` = project
@@ -503,7 +510,18 @@ cannot be made manager).
 **Serial generation:** `PREFIX-XXXX-XX` (FLD/SOC/WED) with two uppercase-hex blocks
 from cryptographically-secure `gen_random_uuid()` (v4) — never `random()`;
 uniqueness = the Step-4 `UNIQUE` constraint + a bounded retry loop (10 attempts →
-clean error). Step-4 CHECK unchanged.
+clean error). The retry is **scoped to the `projects_serial_key` collision** via
+`GET STACKED DIAGNOSTICS constraint_name`; any other unique violation is re-raised
+unchanged (never masked as a serial error). Step-4 CHECK unchanged.
+
+**Editable project states:** `update_project`, `assign_team_roles`, and
+`update_project_stage` all require the project to be in a **working state**
+(`ProjectModel.isActive` = {active, in_progress}). This blocks edits/reassignment/
+stage changes on **pending_closure** (under closure review — §8), completed/
+delivered/approved, and rejected projects — a conservative resolution of a case the
+sources leave undefined (the mock has no gate), **reported** for owner confirmation.
+It also prevents mutating a project in a state owned by the Step-6.3 closure
+workflow.
 
 **Edit fields (exact):** name, client_name, start_date, end_date, notes. **Type is
 IMMUTABLE** after creation (it selects the 3-/7-stage template; the sources define
@@ -513,8 +531,15 @@ is rejected). **Excluded:** `status` (closure-workflow only), `manager_id`,
 
 **Stage progression:** exactly one `current`; earlier `done`, later `pending`;
 **target-only** `updated_by`/`updated_at` (the mock explicitly defines target-only
-metadata — §11 exception); blocked on completed (`ProjectModel.isCompleted`) and
+metadata — earlier/later stages change status but not metadata — §11 exception);
+blocked outside the working state (incl. pending_closure and completed) and on
 soft-deleted/inactive projects; never changes project status or closure.
+
+**Wedding projects (owner decision, reported):** the frozen create guard is
+permission-based (`can_add_project`) and does **not** gate wedding-type creation on
+`can_manage_wedding_projects`; no such restriction is invented here. Whether a
+non-admin should need `can_manage_wedding_projects` to create/manage a wedding
+project is an open owner decision.
 
 **Audit actions:** `project.create`, `project.edit`, `project.stage.update`,
 `project.team.assign` (identifiers only; team audit `meta` = `{member_count}` —

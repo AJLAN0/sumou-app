@@ -209,29 +209,55 @@ begin
   for m in select value from jsonb_array_elements(v_members) loop
     v_count := v_count + 1;
 
-    v_pname := btrim(coalesce(m->>'person_name', ''));
-    if v_pname = '' then
-      raise exception 'person_name is required for every team member'
-        using errcode = '22023';
+    -- each member must be a JSON object.
+    if jsonb_typeof(m) <> 'object' then
+      raise exception 'each team member must be a JSON object' using errcode = '22023';
     end if;
 
-    -- duplicate photographer type inside one member.
+    -- photographer_type_ids: absent → empty; if present must be a JSON array.
+    if (m ? 'photographer_type_ids')
+       and jsonb_typeof(m->'photographer_type_ids') <> 'array' then
+      raise exception 'photographer_type_ids must be an array' using errcode = '22023';
+    end if;
+    -- every photographer type id must be a well-formed UUID.
+    if exists (
+      select 1 from jsonb_array_elements_text(coalesce(m->'photographer_type_ids','[]'::jsonb)) as e(v)
+      where e.v !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    ) then
+      raise exception 'invalid photographer type id' using errcode = '22023';
+    end if;
+    -- no duplicate type id within one member.
     if (select count(*) from jsonb_array_elements_text(coalesce(m->'photographer_type_ids','[]'::jsonb)))
        <> (select count(distinct value) from jsonb_array_elements_text(coalesce(m->'photographer_type_ids','[]'::jsonb))) then
       raise exception 'duplicate photographer type for a team member'
         using errcode = '22023';
     end if;
 
-    if (m->>'user_id') is not null then
+    -- value, if present, must be a JSON number (or null → treated as 0).
+    if (m ? 'value') and jsonb_typeof(m->'value') not in ('number', 'null') then
+      raise exception 'value must be numeric' using errcode = '22023';
+    end if;
+
+    if m->>'user_id' is not null then
+      -- INTERNAL member: user_id must be a well-formed UUID; the stored
+      -- person_name is derived from the profile (never the client input).
+      if (m->>'user_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid user_id' using errcode = '22023';
+      end if;
       v_muid := (m->>'user_id')::uuid;
-      -- duplicate internal user across members.
       if v_muid = any (v_user_ids) then
         raise exception 'a user is assigned more than once' using errcode = '22023';
       end if;
       v_user_ids := array_append(v_user_ids, v_muid);
-      -- internal members need an assignment date.
-      if (m->>'date') is null or btrim(m->>'date') = '' then
+      if m->>'date' is null or btrim(m->>'date') = '' then
         raise exception 'assignment date is required for internal members'
+          using errcode = '22023';
+      end if;
+    else
+      -- EXTERNAL member: user_id null; a non-blank person_name is required and is
+      -- stored as given (no profile/Auth account is created).
+      if btrim(coalesce(m->>'person_name', '')) = '' then
+        raise exception 'person_name is required for external members'
           using errcode = '22023';
       end if;
     end if;
@@ -280,10 +306,19 @@ begin
   delete from public.project_team_members where project_id = p_project_id;
 
   for m in select value from jsonb_array_elements(v_members) loop
-    v_muid  := nullif(m->>'user_id', '')::uuid;   -- null → external member
-    v_pname := btrim(m->>'person_name');
     v_value := coalesce((m->>'value')::numeric, 0);
-    v_date  := nullif(btrim(coalesce(m->>'date', '')), '')::date;
+    if m->>'user_id' is not null then
+      -- INTERNAL: authoritative name from the locked+verified profile — the
+      -- client-supplied person_name is never used for an internal member.
+      v_muid := (m->>'user_id')::uuid;
+      select p.full_name into v_pname from public.profiles p where p.id = v_muid;
+      v_date := (m->>'date')::date;
+    else
+      -- EXTERNAL: normalized input name; date optional (no availability check).
+      v_muid  := null;
+      v_pname := btrim(m->>'person_name');
+      v_date  := nullif(btrim(coalesce(m->>'date', '')), '')::date;
+    end if;
 
     insert into public.project_team_members (project_id, user_id, person_name, value, date)
     values (p_project_id, v_muid, v_pname, v_value, v_date)
@@ -347,6 +382,7 @@ declare
   v_serial     text;
   v_project_id uuid;
   v_attempts   int := 0;
+  v_constraint text;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '28000';
@@ -408,6 +444,12 @@ begin
       returning id into v_project_id;
       exit;
     exception when unique_violation then
+      -- Only a serial collision (projects_serial_key) is retried; any other
+      -- unique violation is re-raised unchanged (not masked as a serial error).
+      get stacked diagnostics v_constraint = constraint_name;
+      if v_constraint is distinct from 'projects_serial_key' then
+        raise;
+      end if;
       v_attempts := v_attempts + 1;
       if v_attempts >= 10 then
         raise exception 'could not allocate a unique project serial'
@@ -483,6 +525,7 @@ declare
   v_active  boolean;
   v_deleted timestamptz;
   v_ptype   public.project_type;
+  v_pstatus public.project_status;
 begin
   if v_uid is null then
     raise exception 'authentication required' using errcode = '28000';
@@ -493,10 +536,20 @@ begin
   ) then
     raise exception 'project not found or access denied' using errcode = '42501';
   end if;
-  select p.is_active, p.deleted_at, p.type into v_active, v_deleted, v_ptype
+  select p.is_active, p.deleted_at, p.type, p.status
+    into v_active, v_deleted, v_ptype, v_pstatus
     from public.projects p where p.id = p_project_id for update;
   if not found or not v_active or v_deleted is not null then
     raise exception 'project not found or access denied' using errcode = '42501';
+  end if;
+  -- Editable only while the project is in a working state (ProjectModel.isActive
+  -- = {active, in_progress}). Basics of a project under closure review
+  -- (pending_closure) or finished (completed/delivered/approved) or rejected are
+  -- NOT editable here — a conservative resolution of an undefined-in-sources case
+  -- (mock allows any); reported for owner confirmation.
+  if v_pstatus not in ('active'::public.project_status,
+                       'in_progress'::public.project_status) then
+    raise exception 'project is not in an editable state' using errcode = 'P0001';
   end if;
   -- type is immutable (protects the stage template / history).
   if p_type is distinct from v_ptype then
@@ -569,10 +622,12 @@ begin
   if not found or not v_active or v_deleted is not null then
     raise exception 'project not found or access denied' using errcode = '42501';
   end if;
-  if v_pstatus in ('completed'::public.project_status,
-                   'delivered'::public.project_status,
-                   'approved'::public.project_status) then
-    raise exception 'cannot update stages of a completed project'
+  -- Stages are updatable only in a working state (ProjectModel.isActive =
+  -- {active, in_progress}); this blocks completed/delivered/approved AND
+  -- closure-pending (pending_closure, under review — §8) and rejected.
+  if v_pstatus not in ('active'::public.project_status,
+                       'in_progress'::public.project_status) then
+    raise exception 'cannot update stages of a project in this state'
       using errcode = 'P0001';
   end if;
   select s.stage_order into v_target
@@ -650,10 +705,13 @@ begin
   if not found or not v_active or v_deleted is not null then
     raise exception 'project not found or access denied' using errcode = '42501';
   end if;
-  if v_pstatus in ('completed'::public.project_status,
-                   'delivered'::public.project_status,
-                   'approved'::public.project_status) then
-    raise exception 'cannot change the team of a completed project'
+  -- Team changes allowed only in a working state (ProjectModel.isActive =
+  -- {active, in_progress}); blocks completed/delivered/approved AND
+  -- closure-pending (pending_closure) and rejected — conservative resolution of
+  -- an undefined-in-sources case (mock has no gate), reported for owner review.
+  if v_pstatus not in ('active'::public.project_status,
+                       'in_progress'::public.project_status) then
+    raise exception 'cannot change the team of a project in this state'
       using errcode = 'P0001';
   end if;
 

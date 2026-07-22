@@ -494,3 +494,19 @@ implements §4.5 (`closure_requests`) and §4.6 (`project_links`) plus the
   RPCs, Edge Functions, RLS policies, Storage buckets, roles/permissions changes,
   seed data, or Flutter/package changes. Reproducible from empty (enum before
   table; Step 2 `profiles` + Step 4 `projects` deps present).
+
+## 13. Step 10.1 note (auth schema readiness)
+
+Migration `supabase/migrations/20260714210000_auth_schema_readiness.sql` adds one
+column to `public.profiles`:
+
+| Column | Type | Notes |
+|---|---|---|
+| `must_change_password` | `boolean` not null default **true** | first-login password gate (D2). true at creation → false on first self-change → true on admin reset. Backfill: pre-existing rows set to **false** (don't force a bootstrapped admin). |
+
+No other schema change. **`profiles` still has no `email` column** — the internal
+Auth email lives only on `auth.users` and is never duplicated here (D2). No
+password/token/OTP/secret column added. Username stays normalized + unique
+(`^[a-z0-9._-]{2,50}$`). RLS unchanged; the existing self/admin SELECT policies
+scope the new column; no profile write policy. See
+`docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §11.

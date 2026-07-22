@@ -139,3 +139,25 @@ The four planning docs, now **decision-frozen and consistent**:
 `SUPABASE_CORE_PLAN.md` · `SUPABASE_SCHEMA_DRAFT.md` · `SUPABASE_RLS_PLAN.md` · `SUPABASE_MIGRATION_PLAN.md`.
 
 **No Supabase link · no migrations · no SQL files · no Flutter edits · no new packages · Sprint 9 not started.** Implementation begins only in a later, explicitly-approved apply-sprint.
+
+---
+
+## 8. Sprint 10 — Auth integration sequence (added at Step 10.1)
+
+Backend/DB precedes Flutter. Order:
+1. **Auth schema readiness** — `profiles.must_change_password` (migration
+   `20260714210000_auth_schema_readiness.sql`). *(done — Step 10.1)*
+2. Admin **create-user** backend — `admin-create-user` Edge Function +
+   `create_staff_profile` `security definer` RPC (needs an explicit `execute`
+   grant — default function privileges are hardened, Step 6.5).
+3. Admin **reset-password** backend — `admin-reset-password` Edge Function.
+4. Flutter Supabase **initialization** (add `supabase_flutter`, env wiring).
+5. **Username login / session / profile loading** (`SupabaseAuthRepository`;
+   sign out / block inactive/deleted profiles).
+6. **Forced first password change** (redirect on `must_change_password` + the
+   password-update operation).
+7. Admin **user-management integration** (wire create/reset/activate/roles).
+8. **Auth QA**.
+
+Excluded throughout: finance/payments/Rekaz/notifications/FCM/push/reminders, and
+no `role_permissions` are ever copied into `user_permissions`.

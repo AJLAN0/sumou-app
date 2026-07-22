@@ -1,0 +1,19 @@
+-- Supabase seed file — documentation-only for now.
+--
+-- Sprint 9 Step 1 (Development Foundation): intentionally EMPTY of application
+-- data. No tables exist yet, so there is nothing to seed.
+--
+-- When the schema is implemented (a later, explicitly approved step), seeds
+-- will populate ONLY lookup/reference data and dev fixtures, e.g.:
+--   * roles                (incl. 'marketing' — decision D1)
+--   * permissions          (feature codes; can_manage_finance kept INACTIVE as
+--                           an inert reserved placeholder, never granted)
+--   * role_permissions     (role defaults — decision D5)
+--   * photographer_types   (decision D3)
+--   * dev staff/projects mirrored from lib/data/repositories/mock/*
+--
+-- NEVER seed data for excluded domains: finance, payments, Rekaz,
+-- notifications, FCM, push, reminders (see docs/BACKEND_SCOPE_GUARD.md).
+--
+-- Real passwords are never hardcoded here; dev accounts are created through the
+-- planned admin flow at seed time (decision D2).

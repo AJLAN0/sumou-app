@@ -38,12 +38,12 @@ Runs with **service_role** (an Edge Function secret), so it can create auth user
 **Input:** `{ username, full_name, default_role, roles[], photo_types[] }` + the caller's JWT (Authorization header).
 
 **Steps:**
-1. **Authorize the caller:** verify the JWT → the caller is an **active admin** with `can_manage_users` (checked server-side against `profiles`/`user_roles`/permissions). Reject otherwise.
+1. **Authorize the caller:** verify the JWT → the caller is an **active admin** with **both `can_manage_users` AND `can_manage_permissions`** (checked server-side against `profiles`/`user_roles`/permissions; fail-closed on query errors). Reject otherwise. See the frozen operation-gate table in §12.
 2. **Normalize + validate** username (`^[a-z0-9._-]{2,50}$`); ensure it's not already taken.
 3. **Generate a strong temporary password** (e.g. 16+ random chars).
 4. `serviceClient.auth.admin.createUser({ email: '<username>@users.sumou.internal', password: <temp>, email_confirm: true, user_metadata: { username } })` — a **confirmed** account, **no email sent**.
 5. **Create the profile atomically** via the service-only `security definer` RPC
-   `create_staff_profile(p_actor_id, p_user_id, p_username, p_full_name, p_default_role, p_roles[], p_photographer_types[], p_permission_overrides jsonb)` — **exact signature/behavior in §12**. In ONE transaction it inserts `profiles` (`is_active=true`, `must_change_password=true`), `user_roles` (incl. the default), `user_photographer_types`, and — only when supplied — explicit `user_permissions` **overrides**, plus the audit row. It **re-validates `p_actor_id`** (active admin + `can_manage_users`) since `auth.uid()` is not the admin in the service context, and it **NEVER** copies `role_permissions` into `user_permissions` (role defaults resolve via `has_feature()`). Compensation: if this step fails, the Edge Function deletes the just-created auth user (§9).
+   `create_staff_profile(p_actor_id, p_user_id, p_username, p_full_name, p_default_role, p_roles[], p_photographer_types[], p_permission_overrides jsonb)` — **exact signature/behavior in §12**. In ONE transaction it inserts `profiles` (`is_active=true`, `must_change_password=true`), `user_roles` (incl. the default), `user_photographer_types`, and — only when supplied — explicit `user_permissions` **overrides**, plus the audit row. It **re-validates `p_actor_id`** (active admin + `can_manage_users` AND `can_manage_permissions`) since `auth.uid()` is not the admin in the service context, and it **NEVER** copies `role_permissions` into `user_permissions` (role defaults resolve via `has_feature()`). Compensation: if this step fails, the Edge Function deletes the just-created auth user (§9).
 6. **Audit** one minimal `audit_logs` row: `actor_id` = caller, `action` = `user.create`, `entity` = `profiles`, `entity_id` = new user id. **Never** log the password, the internal email, or any secret in `meta`.
 7. **Return `{ user, temp_password }` once** — the app shows the temp password to the admin to hand over. It is **never stored** (not in the DB, not in logs).
 
@@ -282,13 +282,16 @@ added only by the Edge Function HTTP response.
 ### Authorization (defense-in-depth, in BOTH layers)
 - **Edge Function** (caller-scoped RLS client): `auth.getUser()` → active profile
   (self policy only returns active/non-deleted) → active **admin** role →
-  effective **`can_manage_users`** (user override else OR of active-role defaults).
+  effective **`can_manage_users` AND `can_manage_permissions`** (reusable
+  `callerHasFeature`: user override else OR of active-role defaults; **fails
+  closed** — any query error → 500, never treated as empty/false-negative pass).
   It **never** trusts Flutter-supplied roles/permissions for authorization, and
   uses `service_role` only **after** this passes.
 - **RPC** (service context, so `auth.uid()` is NOT the admin): re-validates the
   supplied `p_actor_id` itself — active, non-deleted, active admin role, effective
-  `can_manage_users` — fail-closed. So authorization does not depend on the Edge
-  Function alone.
+  **`can_manage_users` AND `can_manage_permissions`** (same override-first/active-
+  role-default resolution) — fail-closed. So authorization does not depend on the
+  Edge Function alone.
 
 ### Normalization & internal email
 `normalizedUsername = username.trim().toLowerCase()`, validated `^[a-z0-9._-]{2,50}$`.
@@ -324,23 +327,25 @@ inactive permissions (`can_manage_finance`), duplicate roles/types/overrides,
 missing default-in-roles, blank name, and malformed/un-normalized usernames are all
 rejected. **No email/notification/password delivery.** **No Production deployment.**
 
-### Authorization boundary — `can_manage_users` vs `can_manage_permissions` (reported)
-**Option A (documented, current behavior).** Per the frozen §3, **initial account
-provisioning — including assigning `roles` and optional explicit
-`permission_overrides` at creation — is intentionally governed by
-`can_manage_users`.** Later, standalone editing of a user's roles/permissions is
-governed by `can_manage_permissions` (§8 sequence, admin user-management step).
-Authorization was **not** silently changed, and **no new permission code was
-invented**.
+### Authorization boundary — FROZEN operation gates
+Creating a user assigns at least one role and may set explicit permission
+overrides, so an admin who lacks `can_manage_permissions` must not bypass that
+restriction via account creation. The owner **froze** this rule (no new permission
+code introduced):
 
-**Reported escalation consequence (owner decision).** Because creation is gated
-only by `can_manage_users`, an admin who has `can_manage_users` but **not**
-`can_manage_permissions` can still, at creation time: (a) create another **admin**
-(by putting `admin` in `roles`), and (b) supply explicit `permission_overrides`
-(including granting `can_manage_permissions=true` to the new user). That is a
-privilege-escalation surface. If the owner wants creation-time role/override
-assignment — or specifically minting a new admin / granting
-`can_manage_permissions` — to additionally require the caller to hold
-`can_manage_permissions`, that is a small, explicit follow-up gate to add to both
-the Edge Function pre-check and the `create_staff_profile` actor check. **Left as
-an owner decision; not changed here.**
+| Operation | Required (effective) permissions |
+|---|---|
+| **Create user** | active admin + **`can_manage_users` AND `can_manage_permissions`** |
+| Reset password (Step 10.3) | active admin + `can_manage_users` |
+| Activate/deactivate / edit basic profile | active admin + `can_manage_users` |
+| Edit roles or permission overrides | active admin + `can_manage_permissions` |
+
+**`can_manage_users` alone cannot assign initial roles or permission overrides.**
+This gate is enforced in **both** layers: the Edge Function `authorizeAdmin`
+requires both permissions before any `service_role` use, and
+`create_staff_profile` independently re-checks both for `p_actor_id` (the RPC is
+authoritative — `auth.uid()` is not the admin in the service context). Both use
+the same **override-first, else OR-of-active-role-defaults** resolution, over
+**active** catalog rows only, and **fail closed** on any resolution/query error.
+Reset-password authorization is documented here for Step 10.3 and is **not
+implemented** in Step 10.2.

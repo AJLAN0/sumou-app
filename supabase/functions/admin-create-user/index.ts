@@ -40,27 +40,45 @@ function errorResponse(code: string, message: string, status: number, extra: Rec
   return json({ error: { code, message } }, status, extra);
 }
 
-/** Effective can_manage_users for the caller, via their own RLS-scoped reads. */
-async function callerCanManageUsers(userClient: SupabaseClient, uid: string): Promise<boolean> {
-  const { data: override } = await userClient
+/**
+ * Fail-closed effective-permission check for the caller, via their own RLS-scoped
+ * reads: explicit `user_permissions` override wins; else OR of active-role
+ * `role_permissions` defaults; only ACTIVE permission-catalog rows count.
+ * Returns `false` on ANY Supabase query error (never continues to defaults after
+ * an override read failed). `error` distinguishes a query failure from a clean
+ * "not granted" so the caller can 500 vs 403.
+ */
+export async function callerHasFeature(
+  userClient: SupabaseClient,
+  uid: string,
+  permissionCode: string,
+): Promise<{ ok: true; granted: boolean } | { ok: false }> {
+  const override = await userClient
     .from("user_permissions")
     .select("granted, permissions!inner(code, is_active)")
     .eq("user_id", uid)
-    .eq("permissions.code", "can_manage_users")
+    .eq("permissions.code", permissionCode)
     .eq("permissions.is_active", true)
     .maybeSingle();
-  if (override) return override.granted === true;
+  if (override.error) return { ok: false }; // query failed → fail closed, do NOT fall through
+  if (override.data) return { ok: true, granted: override.data.granted === true };
 
-  const { data: defaults } = await userClient
+  const defaults = await userClient
     .from("role_permissions")
     .select("granted, permissions!inner(code, is_active)")
-    .eq("permissions.code", "can_manage_users")
+    .eq("permissions.code", permissionCode)
     .eq("permissions.is_active", true);
-  return (defaults ?? []).some((r: { granted: boolean }) => r.granted === true);
+  if (defaults.error) return { ok: false };
+  return { ok: true, granted: (defaults.data ?? []).some((r: { granted: boolean }) => r.granted === true) };
 }
 
-/** Authorize: authenticated + active profile + active admin role + can_manage_users. */
-async function authorizeAdmin(
+/**
+ * Authorize: authenticated + active profile + active admin role + BOTH
+ * can_manage_users AND can_manage_permissions (owner-frozen create rule). Every
+ * DB read fails closed: a query error → 500 (auth-check failure), never treated
+ * as empty. HTTP-body roles/permissions are never consulted for authorization.
+ */
+export async function authorizeAdmin(
   userClient: SupabaseClient,
 ): Promise<{ ok: true; uid: string } | { ok: false; status: number; code: string; message: string }> {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
@@ -70,21 +88,33 @@ async function authorizeAdmin(
   const uid = userData.user.id;
 
   // profiles self-read policy only returns the row when active + not soft-deleted.
-  const { data: profile } = await userClient
+  const profileRes = await userClient
     .from("profiles").select("id, is_active").eq("id", uid).maybeSingle();
-  if (!profile || profile.is_active !== true) {
+  if (profileRes.error) {
+    return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
+  }
+  if (!profileRes.data || profileRes.data.is_active !== true) {
     return { ok: false, status: 403, code: "forbidden", message: "not an active account" };
   }
 
-  const { data: roles } = await userClient
+  const rolesRes = await userClient
     .from("user_roles").select("roles!inner(code, is_active)").eq("user_id", uid);
-  const isAdmin = (roles ?? []).some(
+  if (rolesRes.error) {
+    return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
+  }
+  const isAdmin = (rolesRes.data ?? []).some(
     (r: { roles: { code: string; is_active: boolean } }) => r.roles.code === "admin" && r.roles.is_active,
   );
   if (!isAdmin) return { ok: false, status: 403, code: "forbidden", message: "admin role required" };
 
-  if (!(await callerCanManageUsers(userClient, uid))) {
-    return { ok: false, status: 403, code: "forbidden", message: "can_manage_users required" };
+  for (const code of ["can_manage_users", "can_manage_permissions"]) {
+    const feat = await callerHasFeature(userClient, uid, code);
+    if (!feat.ok) {
+      return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
+    }
+    if (!feat.granted) {
+      return { ok: false, status: 403, code: "forbidden", message: `${code} required` };
+    }
   }
   return { ok: true, uid };
 }
@@ -100,7 +130,7 @@ function statusForRpcError(code: string | undefined): number {
   }
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+export async function handleRequest(req: Request): Promise<Response> {
   // No wildcard CORS / OPTIONS preflight is offered (no approved browser-origin
   // policy). Any non-POST — including OPTIONS — gets 405 with an Allow header.
   if (req.method !== "POST") {
@@ -157,9 +187,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   });
 
   // Friendly pre-check for a taken username (race still guarded by DB/Auth).
-  const { data: taken } = await serviceClient
+  // A query error fails closed (500) rather than proceeding as "not taken".
+  const takenRes = await serviceClient
     .from("profiles").select("id").eq("username", input.username).maybeSingle();
-  if (taken) return errorResponse("conflict", "username is already taken", 409);
+  if (takenRes.error) {
+    console.error("admin-create-user: username pre-check failed");
+    return errorResponse("server_error", "could not verify the username", 500);
+  }
+  if (takenRes.data) return errorResponse("conflict", "username is already taken", 409);
 
   const internalEmail = buildInternalEmail(input.username);
   const tempPassword = generateTempPassword();
@@ -207,4 +242,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // 4) Success — return the profile + the temp password ONCE. No internal email.
   return json({ user: rpc.data, temp_password: tempPassword }, 201);
-});
+}
+
+// Start the server only when run as the entry point — so tests can import the
+// exported handler/authorization functions without binding a port.
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

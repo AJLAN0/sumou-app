@@ -15,7 +15,8 @@
 -- all API roles, this function is granted EXECUTE to service_role ONLY (PUBLIC/
 -- anon/authenticated explicitly revoked). It is called with the service_role
 -- context, so it does NOT trust auth.uid() — it re-validates the supplied
--- p_actor_id (active admin + effective can_manage_users) itself, fail-closed.
+-- p_actor_id (active admin + effective can_manage_users AND can_manage_permissions)
+-- itself, fail-closed.
 --
 -- Guardrail (docs/BACKEND_SCOPE_GUARD.md): no finance/payments/Rekaz/
 -- notifications/FCM/push/reminders. Inactive roles (finance/wedding_finance) and
@@ -52,7 +53,8 @@ declare
   v_overrides  jsonb  := coalesce(p_permission_overrides, '[]'::jsonb);
   v_default_id uuid;
   v_email      text;
-  v_can_manage boolean;
+  v_can_users  boolean;
+  v_can_perms  boolean;
 begin
   -- ===== 1) Actor authorization (re-checked here; auth.uid() is NOT trusted) ==
   if p_actor_id is null or p_user_id is null then
@@ -71,8 +73,13 @@ begin
   ) then
     raise exception 'actor is not an admin' using errcode = '42501';
   end if;
-  -- effective can_manage_users for the ACTOR: user override wins, else OR of
-  -- active-role defaults (mirrors has_feature but keyed on p_actor_id).
+  -- Effective permission for the ACTOR (override-first, else OR of ACTIVE-role
+  -- defaults; only ACTIVE permission catalog rows count) — mirrors has_feature
+  -- but keyed on p_actor_id (auth.uid() is NOT the admin in the service context).
+  -- Creating a user assigns roles and may set explicit permission overrides, so
+  -- BOTH can_manage_users AND can_manage_permissions are required (owner-frozen
+  -- rule): an admin without can_manage_permissions cannot mint roles/overrides
+  -- via account creation.
   with p as (select id from public.permissions where code = 'can_manage_users' and is_active)
   select coalesce(
     (select up.granted from public.user_permissions up join p on p.id = up.permission_id
@@ -83,9 +90,23 @@ begin
        join public.roles r on r.id = ur.role_id and r.is_active
        where ur.user_id = p_actor_id),
     false)
-  into v_can_manage;
-  if not coalesce(v_can_manage, false) then
-    raise exception 'actor lacks can_manage_users' using errcode = '42501';
+  into v_can_users;
+
+  with p as (select id from public.permissions where code = 'can_manage_permissions' and is_active)
+  select coalesce(
+    (select up.granted from public.user_permissions up join p on p.id = up.permission_id
+       where up.user_id = p_actor_id),
+    (select bool_or(rp.granted) from public.role_permissions rp
+       join p on p.id = rp.permission_id
+       join public.user_roles ur on ur.role_id = rp.role_id
+       join public.roles r on r.id = ur.role_id and r.is_active
+       where ur.user_id = p_actor_id),
+    false)
+  into v_can_perms;
+
+  if not (coalesce(v_can_users, false) and coalesce(v_can_perms, false)) then
+    raise exception 'actor lacks can_manage_users and can_manage_permissions'
+      using errcode = '42501';
   end if;
 
   -- ===== 2) New-user identity validation =====================================
@@ -221,7 +242,7 @@ end;
 $$;
 
 comment on function public.create_staff_profile(uuid, uuid, text, text, text, text[], text[], jsonb) is
-  'Service-only: atomically create a staff identity (profiles+user_roles+user_photographer_types+optional user_permissions overrides) + a user.create audit row. Re-validates the actor (active admin + can_manage_users). Never copies role_permissions into user_permissions; never handles passwords/internal email. Called by the admin-create-user Edge Function (service_role).';
+  'Service-only: atomically create a staff identity (profiles+user_roles+user_photographer_types+optional user_permissions overrides) + a user.create audit row. Re-validates the actor (active admin + can_manage_users AND can_manage_permissions). Never copies role_permissions into user_permissions; never handles passwords/internal email. Called by the admin-create-user Edge Function (service_role).';
 
 -- Execution: service_role ONLY (default privileges are hardened, Step 6.5).
 revoke all on function public.create_staff_profile(uuid, uuid, text, text, text, text[], text[], jsonb)

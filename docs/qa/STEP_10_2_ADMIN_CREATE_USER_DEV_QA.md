@@ -5,11 +5,15 @@ deploys the function manually (this repo runs no remote commands).
 
 ## Automated unit tests (no stack needed)
 ```bash
-deno test supabase/functions/_shared/auth-utils.test.ts
+deno test supabase/functions/
 ```
-Covers: username normalization/validation, internal-email construction, temp-password
-length/character-classes/charset/uniqueness, forbidden-field rejection, blank name,
-default-role-in-roles, duplicate roles/types/overrides, override boolean/code shape.
+Covers (auth-utils.test.ts): username normalization/validation, internal-email
+construction, temp-password length/classes/charset/uniqueness, forbidden + unknown
+fields, blank name, default-role-in-roles, duplicate roles/types/overrides, override
+shape, exact media-type, bounded/multibyte body reader.
+Covers (index.test.ts, fake client): effective-permission override-true/false-wins,
+role-default-only-when-no-override, resolution error fails closed, authorizeAdmin
+requires BOTH can_manage_users AND can_manage_permissions, 401/403/500 paths.
 
 ## One-time setup (owner, DEV)
 1. Apply the migration: `20260714220000_admin_create_user_backend.sql` (review then
@@ -44,6 +48,10 @@ where n.nspname = 'public' and p.proname = 'create_staff_profile';
 | 9 | `POST`, admin JWT, duplicate `roles` / `photographer_types` / `permission_overrides` | 400 |
 | 10 | `POST`, **non-admin** JWT, valid body | 403 (no Auth user created) |
 | 11 | `POST`, **disabled admin** JWT | 403 |
+| 11a | `POST`, admin JWT with BOTH `can_manage_users`+`can_manage_permissions` | proceeds (→ 201 on valid body) |
+| 11b | `POST`, admin missing `can_manage_users` | 403 (no Auth user created) |
+| 11c | `POST`, admin missing `can_manage_permissions` | 403 (no Auth user created) |
+| 11d | `POST`, admin with an explicit `false` override for either permission | 403 |
 | 12 | `POST`, admin JWT, `roles:["finance"]` or `["client_tracking"]` | provisioning_failed → 400 (RPC rejects inactive/unknown role); **Auth user compensated/deleted** |
 | 13 | `POST`, admin JWT, `permission_overrides:[{code:"can_manage_finance",granted:true}]` | 400 (inactive permission); compensated |
 | 14 | `POST`, admin JWT, valid `{username,full_name,default_role,roles,photographer_types,permission_overrides}` | **201** `{ user:{…, is_active:true, must_change_password:true}, temp_password:"…"}` |
@@ -73,7 +81,12 @@ select actor_id, action, entity, meta from public.audit_logs
 - Compensation (#12/#13) deletes **only** the Auth user created by that request —
   a pre-existing user with the same username is never deleted (guarded by the
   friendly pre-check + unique constraint → 409 before any Auth create).
-- Server logs never contain the request body or the temp password.
+- Server logs never contain the request body, username, internal email, or temp password.
+- **Create requires BOTH `can_manage_users` AND `can_manage_permissions`** (Edge
+  Function AND the RPC actor re-check); an explicit `false` override for either, or
+  an inactive permission-catalog row, denies. Any authorization query error fails
+  closed (500), never treated as empty.
+- role defaults are never copied into `user_permissions` (post-success check).
 
 ## Local checks (owner; Deno required — NOT run in this repo's CI env)
 ```bash

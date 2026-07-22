@@ -42,7 +42,8 @@ Runs with **service_role** (an Edge Function secret), so it can create auth user
 2. **Normalize + validate** username (`^[a-z0-9._-]{2,50}$`); ensure it's not already taken.
 3. **Generate a strong temporary password** (e.g. 16+ random chars).
 4. `serviceClient.auth.admin.createUser({ email: '<username>@users.sumou.internal', password: <temp>, email_confirm: true, user_metadata: { username } })` — a **confirmed** account, **no email sent**.
-5. **Create the profile atomically** via a `security definer` RPC `create_staff_profile(user_id, username, full_name, default_role, roles[], photo_types[])` that, in ONE transaction, inserts `profiles` (with `must_change_password = true`), `user_roles` (incl. the default role), `user_photographer_types`, and — only when supplied — explicit `user_permissions` **overrides**. It does **NOT** copy `role_permissions` into `user_permissions`; role-default capabilities resolve at read time via `has_feature()`. (Compensation: if this step fails, the function deletes the just-created auth user to avoid an orphaned `auth.users` row.)
+5. **Create the profile atomically** via the service-only `security definer` RPC
+   `create_staff_profile(p_actor_id, p_user_id, p_username, p_full_name, p_default_role, p_roles[], p_photographer_types[], p_permission_overrides jsonb)` — **exact signature/behavior in §12**. In ONE transaction it inserts `profiles` (`is_active=true`, `must_change_password=true`), `user_roles` (incl. the default), `user_photographer_types`, and — only when supplied — explicit `user_permissions` **overrides**, plus the audit row. It **re-validates `p_actor_id`** (active admin + `can_manage_users`) since `auth.uid()` is not the admin in the service context, and it **NEVER** copies `role_permissions` into `user_permissions` (role defaults resolve via `has_feature()`). Compensation: if this step fails, the Edge Function deletes the just-created auth user (§9).
 6. **Audit** one minimal `audit_logs` row: `actor_id` = caller, `action` = `user.create`, `entity` = `profiles`, `entity_id` = new user id. **Never** log the password, the internal email, or any secret in `meta`.
 7. **Return `{ user, temp_password }` once** — the app shows the temp password to the admin to hand over. It is **never stored** (not in the DB, not in logs).
 
@@ -248,3 +249,77 @@ inserted in one transaction with `must_change_password` explicitly chosen and **
 `user_permissions` inserts. Auth-user creation stays manual in the DEV Dashboard.
 No real credentials/project-ref/secrets. **Production bootstrap is a separate,
 future release procedure — never run it now.**
+
+---
+
+## 12. Step 10.2 — Admin create-user backend (implemented; DEV-pending)
+
+**Prepared in code; pending owner review, manual DEV apply + deploy.** Not on
+Production. Files: `supabase/migrations/20260714220000_admin_create_user_backend.sql`,
+`supabase/functions/admin-create-user/index.ts`,
+`supabase/functions/_shared/auth-utils.ts` (+ `.test.ts`),
+`docs/qa/STEP_10_2_ADMIN_CREATE_USER_DEV_QA.md`.
+
+### RPC signature & grant
+```
+public.create_staff_profile(
+  p_actor_id uuid, p_user_id uuid, p_username text, p_full_name text,
+  p_default_role text, p_roles text[], p_photographer_types text[] default '{}',
+  p_permission_overrides jsonb default '[]'
+) returns jsonb
+```
+`SECURITY DEFINER`, `search_path=''`, schema-qualified, no dynamic SQL. **EXECUTE
+revoked from PUBLIC/anon/authenticated; granted to `service_role` ONLY** (default
+privileges are hardened — Step 6.5 — so the grant is explicit). Inputs are stable
+**codes** (roles/permissions/photographer types), never UUIDs; it accepts **no**
+password/temp-password/internal-email/token/secret/`is_active`/`must_change_password`.
+
+Return `jsonb`: `{ id, username, full_name, default_role, roles[], photographer_types[],
+permission_overrides[], is_active:true, must_change_password:true }` — **never** the
+internal email, password, hash, token, or service-role data. The temp password is
+added only by the Edge Function HTTP response.
+
+### Authorization (defense-in-depth, in BOTH layers)
+- **Edge Function** (caller-scoped RLS client): `auth.getUser()` → active profile
+  (self policy only returns active/non-deleted) → active **admin** role →
+  effective **`can_manage_users`** (user override else OR of active-role defaults).
+  It **never** trusts Flutter-supplied roles/permissions for authorization, and
+  uses `service_role` only **after** this passes.
+- **RPC** (service context, so `auth.uid()` is NOT the admin): re-validates the
+  supplied `p_actor_id` itself — active, non-deleted, active admin role, effective
+  `can_manage_users` — fail-closed. So authorization does not depend on the Edge
+  Function alone.
+
+### Normalization & internal email
+`normalizedUsername = username.trim().toLowerCase()`, validated `^[a-z0-9._-]{2,50}$`.
+The internal email `<normalizedUsername>@users.sumou.internal` is built **only** in
+the Edge Function, never accepted from the client, never returned or logged. The
+RPC additionally verifies `auth.users.email` matches the username (never echoing it).
+
+### Temporary password
+Generated in the Edge Function with `crypto.getRandomValues` (rejection-sampled, no
+`Math.random`): 20 chars from an unambiguous set (no `0/O/1/l/I`) guaranteeing ≥1
+lower/upper/digit/symbol. Never stored, never logged, never in `audit_logs`;
+returned **once** in the 201 body.
+
+### Atomic profile creation & audit
+The RPC does all public writes + the audit row in **one transaction**: `profiles`
+(`is_active=true`, `must_change_password=true`), `user_roles` (validated active
+roles incl. the default), `user_photographer_types` (active types),
+`user_permissions` (**explicit overrides only** — inserts nothing when none;
+**never** copies `role_permissions`), and one `audit_logs` row (`actor_id`,
+`action='user.create'`, `entity='profiles'`, `entity_id`, `meta` = counts only —
+no username/email/password/secret). Any failure rolls back everything.
+
+### Compensation
+Auth and public schema cannot share one SQL transaction, so: create the Auth user
+→ call the RPC → on RPC failure the Edge Function calls `auth.admin.deleteUser` for
+**only** the UUID it just created (never a pre-existing user; a taken username
+returns 409 before any Auth create). If cleanup also fails, it returns a generic
+provisioning failure and never leaks details.
+
+### Validation & rejections
+Inactive roles (`finance`/`wedding_finance`), non-catalog roles (`client_tracking`),
+inactive permissions (`can_manage_finance`), duplicate roles/types/overrides,
+missing default-in-roles, blank name, and malformed/un-normalized usernames are all
+rejected. **No email/notification/password delivery.** **No Production deployment.**

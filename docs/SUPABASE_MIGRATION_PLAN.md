@@ -149,8 +149,10 @@ Backend/DB precedes Flutter. Order:
    `20260714210000_auth_schema_readiness.sql`). *(Step 10.1 — prepared in code;
    pending owner review and manual DEV application.)*
 2. Admin **create-user** backend — `admin-create-user` Edge Function +
-   `create_staff_profile` `security definer` RPC (needs an explicit `execute`
-   grant — default function privileges are hardened, Step 6.5).
+   `create_staff_profile` `security definer` RPC (migration
+   `20260714220000_admin_create_user_backend.sql`; explicit `execute` grant to
+   `service_role` only — hardened defaults, Step 6.5). *(Step 10.2 — prepared in
+   code; pending owner review + manual DEV apply/deploy.)*
 3. Admin **reset-password** backend — `admin-reset-password` Edge Function.
 4. Flutter Supabase **initialization** (add `supabase_flutter`, env wiring).
 5. **Username login / session / profile loading** (`SupabaseAuthRepository`;

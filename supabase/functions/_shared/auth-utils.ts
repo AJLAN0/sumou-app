@@ -60,7 +60,12 @@ function shuffle<T>(arr: T[]): T[] {
 
 export function generateTempPassword(length = TEMP_PASSWORD_LENGTH): string {
   const n = Math.max(16, length);
-  const chars: string[] = [pick(PW_LOWER), pick(PW_UPPER), pick(PW_DIGIT), pick(PW_SYMBOL)];
+  const chars: string[] = [
+    pick(PW_LOWER),
+    pick(PW_UPPER),
+    pick(PW_DIGIT),
+    pick(PW_SYMBOL),
+  ];
   while (chars.length < n) chars.push(pick(PW_ALL));
   return shuffle(chars).join("");
 }
@@ -70,23 +75,42 @@ export const MAX_BODY_BYTES = 8 * 1024; // generous for identity metadata
 
 /** Keys the client must NEVER supply (identity/authorization are server-derived). */
 export const FORBIDDEN_KEYS = [
-  "password", "temp_password", "tempPassword",
-  "email", "internal_email", "internalEmail",
-  "id", "user_id", "userId", "uuid",
-  "actor_id", "actorId",
-  "is_active", "isActive",
-  "must_change_password", "mustChangePassword",
-  "audit", "meta",
+  "password",
+  "temp_password",
+  "tempPassword",
+  "email",
+  "internal_email",
+  "internalEmail",
+  "id",
+  "user_id",
+  "userId",
+  "uuid",
+  "actor_id",
+  "actorId",
+  "is_active",
+  "isActive",
+  "must_change_password",
+  "mustChangePassword",
+  "audit",
+  "meta",
 ];
 
 /** The ONLY top-level keys accepted (strict allowlist — unknown keys rejected). */
 export const ALLOWED_TOP_LEVEL_KEYS = [
-  "username", "full_name", "default_role", "roles", "photographer_types", "permission_overrides",
+  "username",
+  "full_name",
+  "default_role",
+  "roles",
+  "photographer_types",
+  "permission_overrides",
 ] as const;
 /** The ONLY keys accepted inside a permission override object. */
 export const ALLOWED_OVERRIDE_KEYS = ["code", "granted"] as const;
 
-export interface PermissionOverride { code: string; granted: boolean }
+export interface PermissionOverride {
+  code: string;
+  granted: boolean;
+}
 export interface CreateUserInput {
   username: string;
   full_name: string;
@@ -167,19 +191,28 @@ export function validateCreateUserInput(body: unknown): ValidationResult {
     const seen = new Set<string>();
     for (const raw of o.permission_overrides) {
       if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-        return { ok: false, error: "each permission override must be an object" };
+        return {
+          ok: false,
+          error: "each permission override must be an object",
+        };
       }
       const ov = raw as Record<string, unknown>;
       for (const key of Object.keys(ov)) {
         if (key !== "code" && key !== "granted") {
-          return { ok: false, error: `unknown permission override field "${key}"` };
+          return {
+            ok: false,
+            error: `unknown permission override field "${key}"`,
+          };
         }
       }
       if (typeof ov.code !== "string" || ov.code.trim() === "") {
         return { ok: false, error: "permission override needs a code" };
       }
       if (typeof ov.granted !== "boolean") {
-        return { ok: false, error: "permission override needs a boolean granted" };
+        return {
+          ok: false,
+          error: "permission override needs a boolean granted",
+        };
       }
       if (seen.has(ov.code)) {
         return { ok: false, error: "duplicate permission override" };
@@ -191,7 +224,14 @@ export function validateCreateUserInput(body: unknown): ValidationResult {
 
   return {
     ok: true,
-    value: { username, full_name, default_role, roles, photographer_types, permission_overrides },
+    value: {
+      username,
+      full_name,
+      default_role,
+      roles,
+      photographer_types,
+      permission_overrides,
+    },
   };
 }
 
@@ -248,7 +288,9 @@ export async function readBoundedBody(
       chunks.push(value);
     }
   } finally {
-    try { reader.releaseLock(); } catch { /* already released */ }
+    try {
+      reader.releaseLock();
+    } catch { /* already released */ }
   }
 
   const out = new Uint8Array(total);

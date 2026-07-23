@@ -15,7 +15,10 @@
 //
 // NOT deployed by this step — the owner deploys to DEV manually.
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
   buildInternalEmail,
   generateTempPassword,
@@ -34,10 +37,22 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
 };
 
-function json(body: unknown, status: number, extra: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...SECURITY_HEADERS, ...extra } });
+function json(
+  body: unknown,
+  status: number,
+  extra: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...SECURITY_HEADERS, ...extra },
+  });
 }
-function errorResponse(code: string, message: string, status: number, extra: Record<string, string> = {}): Response {
+function errorResponse(
+  code: string,
+  message: string,
+  status: number,
+  extra: Record<string, string> = {},
+): Response {
   return json({ error: { code, message } }, status, extra);
 }
 
@@ -63,7 +78,9 @@ export async function callerHasFeature(
   userClient: SupabaseClient,
   permissionCode: string,
 ): Promise<{ ok: true; granted: boolean } | { ok: false }> {
-  const { data, error } = await userClient.rpc("has_feature", { perm_code: permissionCode });
+  const { data, error } = await userClient.rpc("has_feature", {
+    perm_code: permissionCode,
+  });
   if (error) return { ok: false }; // RPC failed → fail closed
   if (data === true) return { ok: true, granted: true };
   return { ok: true, granted: false };
@@ -77,10 +94,22 @@ export async function callerHasFeature(
  */
 export async function authorizeAdmin(
   userClient: SupabaseClient,
-): Promise<{ ok: true; uid: string } | { ok: false; status: number; code: string; message: string }> {
+): Promise<
+  { ok: true; uid: string } | {
+    ok: false;
+    status: number;
+    code: string;
+    message: string;
+  }
+> {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData?.user) {
-    return { ok: false, status: 401, code: "unauthenticated", message: "invalid or missing session" };
+    return {
+      ok: false,
+      status: 401,
+      code: "unauthenticated",
+      message: "invalid or missing session",
+    };
   }
   const uid = userData.user.id;
 
@@ -88,29 +117,71 @@ export async function authorizeAdmin(
   const profileRes = await userClient
     .from("profiles").select("id, is_active").eq("id", uid).maybeSingle();
   if (profileRes.error) {
-    return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
+    return {
+      ok: false,
+      status: 500,
+      code: "server_error",
+      message: "authorization check failed",
+    };
   }
   if (!profileRes.data || profileRes.data.is_active !== true) {
-    return { ok: false, status: 403, code: "forbidden", message: "not an active account" };
+    return {
+      ok: false,
+      status: 403,
+      code: "forbidden",
+      message: "not an active account",
+    };
   }
 
   const rolesRes = await userClient
-    .from("user_roles").select("roles!inner(code, is_active)").eq("user_id", uid);
+    .from("user_roles").select("roles!inner(code, is_active)").eq(
+      "user_id",
+      uid,
+    );
   if (rolesRes.error) {
-    return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
+    return {
+      ok: false,
+      status: 500,
+      code: "server_error",
+      message: "authorization check failed",
+    };
   }
-  const isAdmin = (rolesRes.data ?? []).some(
-    (r: { roles: { code: string; is_active: boolean } }) => r.roles.code === "admin" && r.roles.is_active,
-  );
-  if (!isAdmin) return { ok: false, status: 403, code: "forbidden", message: "admin role required" };
+  // PostgREST may type/return an embedded to-one relation as an object OR an
+  // array depending on version; normalize to an array before matching so the
+  // active-admin check is correct either way.
+  const isAdmin = (rolesRes.data ?? []).some((r: { roles: unknown }) => {
+    const roles = Array.isArray(r.roles) ? r.roles : [r.roles];
+    return roles.some(
+      (x: { code?: string; is_active?: boolean }) =>
+        x?.code === "admin" && x?.is_active === true,
+    );
+  });
+  if (!isAdmin) {
+    return {
+      ok: false,
+      status: 403,
+      code: "forbidden",
+      message: "admin role required",
+    };
+  }
 
   for (const code of ["can_manage_users", "can_manage_permissions"]) {
     const feat = await callerHasFeature(userClient, code);
     if (!feat.ok) {
-      return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
+      return {
+        ok: false,
+        status: 500,
+        code: "server_error",
+        message: "authorization check failed",
+      };
     }
     if (!feat.granted) {
-      return { ok: false, status: 403, code: "forbidden", message: `${code} required` };
+      return {
+        ok: false,
+        status: 403,
+        code: "forbidden",
+        message: `${code} required`,
+      };
     }
   }
   return { ok: true, uid };
@@ -119,11 +190,16 @@ export async function authorizeAdmin(
 /** Map a create_staff_profile / Postgres error to a safe HTTP status (no raw leak). */
 function statusForRpcError(code: string | undefined): number {
   switch (code) {
-    case "23505": return 409; // unique_violation (username/profile already exists)
-    case "42501": return 403; // insufficient_privilege (actor re-check failed)
-    case "22023": return 400; // invalid_parameter_value
-    case "P0002": return 400; // no auth user / not found
-    default: return 500;
+    case "23505":
+      return 409; // unique_violation (username/profile already exists)
+    case "42501":
+      return 403; // insufficient_privilege (actor re-check failed)
+    case "22023":
+      return 400; // invalid_parameter_value
+    case "P0002":
+      return 400; // no auth user / not found
+    default:
+      return 500;
   }
 }
 
@@ -131,12 +207,18 @@ export async function handleRequest(req: Request): Promise<Response> {
   // No wildcard CORS / OPTIONS preflight is offered (no approved browser-origin
   // policy). Any non-POST — including OPTIONS — gets 405 with an Allow header.
   if (req.method !== "POST") {
-    return errorResponse("method_not_allowed", "use POST", 405, { "Allow": "POST" });
+    return errorResponse("method_not_allowed", "use POST", 405, {
+      "Allow": "POST",
+    });
   }
 
   // Content-Type must be EXACTLY application/json (charset param allowed).
   if (!isJsonContentType(req.headers.get("content-type"))) {
-    return errorResponse("unsupported_media_type", "Content-Type must be application/json", 415);
+    return errorResponse(
+      "unsupported_media_type",
+      "Content-Type must be application/json",
+      415,
+    );
   }
 
   const auth = req.headers.get("authorization") ?? "";
@@ -148,25 +230,35 @@ export async function handleRequest(req: Request): Promise<Response> {
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("admin-create-user: missing required environment configuration");
+    console.error(
+      "admin-create-user: missing required environment configuration",
+    );
     return errorResponse("server_error", "server is not configured", 500);
   }
 
   // Bounded, streaming body read — never buffers an oversized request. Counts
   // actual bytes (not JS chars) and decodes UTF-8 only after the cap holds.
-  const bounded = await readBoundedBody(req.body, req.headers.get("content-length"), MAX_BODY_BYTES);
+  const bounded = await readBoundedBody(
+    req.body,
+    req.headers.get("content-length"),
+    MAX_BODY_BYTES,
+  );
   if (!bounded.ok) {
     return errorResponse("payload_too_large", "request body too large", 413);
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bounded.bytes));
+    parsed = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(bounded.bytes),
+    );
   } catch {
     return errorResponse("invalid_request", "malformed JSON body", 400);
   }
 
   const validation = validateCreateUserInput(parsed);
-  if (!validation.ok) return errorResponse("invalid_request", validation.error, 400);
+  if (!validation.ok) {
+    return errorResponse("invalid_request", validation.error, 400);
+  }
   const input = validation.value;
 
   // Caller-scoped client (RLS) for authentication + authorization.
@@ -191,7 +283,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     console.error("admin-create-user: username pre-check failed");
     return errorResponse("server_error", "could not verify the username", 500);
   }
-  if (takenRes.data) return errorResponse("conflict", "username is already taken", 409);
+  if (takenRes.data) {
+    return errorResponse("conflict", "username is already taken", 409);
+  }
 
   const internalEmail = buildInternalEmail(input.username);
   const tempPassword = generateTempPassword();
@@ -210,7 +304,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       return errorResponse("conflict", "account already exists", 409);
     }
     console.error("admin-create-user: auth.createUser failed");
-    return errorResponse("server_error", "could not provision the account", 500);
+    return errorResponse(
+      "server_error",
+      "could not provision the account",
+      500,
+    );
   }
   const newUserId = created.data.user.id;
 
@@ -229,12 +327,22 @@ export async function handleRequest(req: Request): Promise<Response> {
   if (rpc.error) {
     // 3) COMPENSATE — delete ONLY the user created in this request.
     const cleanup = await serviceClient.auth.admin.deleteUser(newUserId);
-    console.error("admin-create-user: create_staff_profile failed; compensation ran");
+    console.error(
+      "admin-create-user: create_staff_profile failed; compensation ran",
+    );
     if (cleanup.error) {
       // Orphaned Auth user — surface a generic failure; never leak details.
-      return errorResponse("server_error", "provisioning failed and cleanup did not complete", 500);
+      return errorResponse(
+        "server_error",
+        "provisioning failed and cleanup did not complete",
+        500,
+      );
     }
-    return errorResponse("provisioning_failed", "could not create the profile", statusForRpcError(rpc.error.code));
+    return errorResponse(
+      "provisioning_failed",
+      "could not create the profile",
+      statusForRpcError(rpc.error.code),
+    );
   }
 
   // 4) Success — return the profile + the temp password ONCE. No internal email.

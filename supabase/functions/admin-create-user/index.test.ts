@@ -8,12 +8,19 @@
 // and is covered by database QA — so those old table-scan tests are gone. These
 // tests only assert: the RPC result is mapped correctly, every read fails closed,
 // and authorizeAdmin requires BOTH permissions.
-import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assert,
+  assertEquals,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { authorizeAdmin, callerHasFeature } from "./index.ts";
 
 type QueryResult = { data: unknown; error: unknown };
 /** canned(table, filters, kind) → {data, error}. `kind` is "single" or "list". */
-type Canned = (table: string, filters: Record<string, unknown>, kind: "single" | "list") => QueryResult;
+type Canned = (
+  table: string,
+  filters: Record<string, unknown>,
+  kind: "single" | "list",
+) => QueryResult;
 /** rpc(name, args) → {data, error}. */
 type Rpc = (name: string, args: Record<string, unknown>) => QueryResult;
 
@@ -37,13 +44,20 @@ function fakeClient(getUser: QueryResult, canned: Canned, rpc: Rpc): any {
   return {
     auth: { getUser: () => Promise.resolve(getUser) },
     from,
-    rpc: (name: string, args: Record<string, unknown>) => Promise.resolve(rpc(name, args)),
+    rpc: (name: string, args: Record<string, unknown>) =>
+      Promise.resolve(rpc(name, args)),
   };
 }
 
 const OK_USER: QueryResult = { data: { user: { id: "u1" } }, error: null };
-const ADMIN_ROLES: QueryResult = { data: [{ roles: { code: "admin", is_active: true } }], error: null };
-const ACTIVE_PROFILE: QueryResult = { data: { id: "u1", is_active: true }, error: null };
+const ADMIN_ROLES: QueryResult = {
+  data: [{ roles: { code: "admin", is_active: true } }],
+  error: null,
+};
+const ACTIVE_PROFILE: QueryResult = {
+  data: { id: "u1", is_active: true },
+  error: null,
+};
 
 /** Default table responses for a healthy active admin (profiles + user_roles). */
 const adminTables: Canned = (table) => {
@@ -77,13 +91,21 @@ Deno.test("callerHasFeature: has_feature false → denied", async () => {
 
 Deno.test("callerHasFeature: any non-true success → denied", async () => {
   // A null/undefined/non-boolean success must NOT be treated as granted.
-  const c = fakeClient(OK_USER, adminTables, () => ({ data: null, error: null }));
+  const c = fakeClient(
+    OK_USER,
+    adminTables,
+    () => ({ data: null, error: null }),
+  );
   const r = await callerHasFeature(c, "can_x");
   assert(r.ok && r.granted === false);
 });
 
 Deno.test("callerHasFeature: RPC error fails closed", async () => {
-  const c = fakeClient(OK_USER, adminTables, () => ({ data: null, error: { message: "boom" } }));
+  const c = fakeClient(
+    OK_USER,
+    adminTables,
+    () => ({ data: null, error: { message: "boom" } }),
+  );
   const r = await callerHasFeature(c, "can_x");
   assertEquals(r.ok, false);
 });
@@ -131,9 +153,10 @@ Deno.test("authorizeAdmin: missing can_manage_users → 403", async () => {
 // ---- authorizeAdmin: every read fails closed ------------------------------
 
 Deno.test("authorizeAdmin: has_feature RPC error → 500 (fail closed)", async () => {
-  const rpc: Rpc = (name) => name === "has_feature"
-    ? { data: null, error: { message: "rpc down" } }
-    : { data: null, error: null };
+  const rpc: Rpc = (name) =>
+    name === "has_feature"
+      ? { data: null, error: { message: "rpc down" } }
+      : { data: null, error: null };
   const r = await authorizeAdmin(fakeClient(OK_USER, adminTables, rpc));
   assert(!r.ok);
   if (!r.ok) assertEquals(r.status, 500);
@@ -141,10 +164,14 @@ Deno.test("authorizeAdmin: has_feature RPC error → 500 (fail closed)", async (
 
 Deno.test("authorizeAdmin: profile query error → 500 (fail closed)", async () => {
   const canned: Canned = (table) => {
-    if (table === "profiles") return { data: null, error: { message: "db down" } };
+    if (table === "profiles") {
+      return { data: null, error: { message: "db down" } };
+    }
     return { data: null, error: null };
   };
-  const r = await authorizeAdmin(fakeClient(OK_USER, canned, hasFeatureRpc({})));
+  const r = await authorizeAdmin(
+    fakeClient(OK_USER, canned, hasFeatureRpc({})),
+  );
   assert(!r.ok);
   if (!r.ok) assertEquals(r.status, 500);
 });
@@ -152,10 +179,14 @@ Deno.test("authorizeAdmin: profile query error → 500 (fail closed)", async () 
 Deno.test("authorizeAdmin: user_roles query error → 500 (fail closed)", async () => {
   const canned: Canned = (table) => {
     if (table === "profiles") return ACTIVE_PROFILE;
-    if (table === "user_roles") return { data: null, error: { message: "db down" } };
+    if (table === "user_roles") {
+      return { data: null, error: { message: "db down" } };
+    }
     return { data: null, error: null };
   };
-  const r = await authorizeAdmin(fakeClient(OK_USER, canned, hasFeatureRpc({})));
+  const r = await authorizeAdmin(
+    fakeClient(OK_USER, canned, hasFeatureRpc({})),
+  );
   assert(!r.ok);
   if (!r.ok) assertEquals(r.status, 500);
 });
@@ -165,7 +196,9 @@ Deno.test("authorizeAdmin: inactive/soft-deleted profile (no row) → 403", asyn
     if (table === "profiles") return { data: null, error: null }; // RLS returns no row
     return { data: null, error: null };
   };
-  const r = await authorizeAdmin(fakeClient(OK_USER, canned, hasFeatureRpc({})));
+  const r = await authorizeAdmin(
+    fakeClient(OK_USER, canned, hasFeatureRpc({})),
+  );
   assert(!r.ok);
   if (!r.ok) assertEquals(r.status, 403);
 });
@@ -173,16 +206,27 @@ Deno.test("authorizeAdmin: inactive/soft-deleted profile (no row) → 403", asyn
 Deno.test("authorizeAdmin: non-admin → 403", async () => {
   const canned: Canned = (table) => {
     if (table === "profiles") return ACTIVE_PROFILE;
-    if (table === "user_roles") return { data: [{ roles: { code: "manager", is_active: true } }], error: null };
+    if (table === "user_roles") {
+      return {
+        data: [{ roles: { code: "manager", is_active: true } }],
+        error: null,
+      };
+    }
     return { data: null, error: null };
   };
-  const r = await authorizeAdmin(fakeClient(OK_USER, canned, hasFeatureRpc({})));
+  const r = await authorizeAdmin(
+    fakeClient(OK_USER, canned, hasFeatureRpc({})),
+  );
   assert(!r.ok);
   if (!r.ok) assertEquals(r.status, 403);
 });
 
 Deno.test("authorizeAdmin: unauthenticated → 401", async () => {
-  const c = fakeClient({ data: { user: null }, error: null }, adminTables, hasFeatureRpc({}));
+  const c = fakeClient(
+    { data: { user: null }, error: null },
+    adminTables,
+    hasFeatureRpc({}),
+  );
   const r = await authorizeAdmin(c);
   assert(!r.ok);
   if (!r.ok) assertEquals(r.status, 401);

@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-// shared_preferences is a transitive dep of supabase_flutter; used here only to
-// mock local storage so Supabase.initialize can run offline in a unit test.
-// ignore: depend_on_referenced_packages
+// Declared under dev_dependencies; mocks local storage so Supabase.initialize
+// can run offline in a unit test.
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

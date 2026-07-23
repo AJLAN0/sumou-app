@@ -75,26 +75,39 @@ class SupabaseConfig {
   /// Public anon/publishable key. Trimmed. **Never** logged or shown.
   final String anonKey;
 
-  static const _placeholderUrls = <String>{'https://your-project.supabase.co'};
   static const _placeholderKeys = <String>{
     'your-anon-key',
     'your-publishable-key',
     'your-publishable-or-anon-key',
   };
 
+  /// A **standard hosted** Supabase project URL and nothing else:
+  /// `https://<20 lowercase alnum ref>.supabase.co` with an optional single
+  /// trailing slash — no userInfo, no explicit port, no path/query/fragment.
+  /// Matched against the raw (case-sensitive) string because `Uri` would
+  /// silently lowercase the host and hide an invalid uppercase ref.
+  static final _hostedSupabaseUrl = RegExp(
+    r'^https://[a-z0-9]{20}\.supabase\.co/?$',
+  );
+
   /// Both values are present (non-empty after trimming). Does not imply validity.
   bool get isComplete => url.isNotEmpty && anonKey.isNotEmpty;
 
   /// `null` when the configuration is valid; otherwise the first failure reason.
+  /// Never logs or embeds the provided URL/key — callers get a value-free reason.
   SupabaseConfigError? validate() {
     if (url.isEmpty) return SupabaseConfigError.missingUrl;
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.host.isEmpty || !uri.host.contains('.')) {
-      return SupabaseConfigError.invalidUrl;
+    if (uri == null) return SupabaseConfigError.invalidUrl;
+    // A present-but-non-https scheme is reported distinctly (e.g. http://).
+    if (uri.scheme.isNotEmpty && uri.scheme != 'https') {
+      return SupabaseConfigError.notHttps;
     }
-    if (uri.scheme != 'https') return SupabaseConfigError.notHttps;
-    if (_placeholderUrls.contains(url) || uri.host.startsWith('your-project')) {
-      return SupabaseConfigError.placeholderUrl;
+    if (url.contains('your-project')) return SupabaseConfigError.placeholderUrl;
+    // Restrict to a hosted Supabase project URL: rejects other hosts, uppercase
+    // refs, userInfo, explicit ports, and any path/query/fragment.
+    if (!_hostedSupabaseUrl.hasMatch(url)) {
+      return SupabaseConfigError.invalidUrl;
     }
     if (anonKey.isEmpty) return SupabaseConfigError.missingAnonKey;
     if (_placeholderKeys.contains(anonKey) || anonKey.startsWith('your-')) {

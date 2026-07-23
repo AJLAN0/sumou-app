@@ -172,9 +172,11 @@ Backend/DB precedes Flutter. Order:
    RLS policy. Local Deno gate green (fmt/check OK, 64 tests); smoke tests pass.
    Production untouched.)*
 4. Flutter Supabase **initialization** (add `supabase_flutter`, env wiring).
-   *(Step 10.4 — **DONE.** `supabase_flutter ^2.15.4` added; `SupabaseConfig`
-   reads `SUPABASE_URL`/`SUPABASE_ANON_KEY` from `--dart-define-from-file`,
-   validated (https + non-placeholder), key never logged; `bootstrap()`
+   *(Step 10.4 — **DONE.** `supabase_flutter 2.15.4` (pinned exactly); test-only
+   `shared_preferences 2.5.3` under dev_dependencies. `SupabaseConfig` reads
+   `SUPABASE_URL`/`SUPABASE_ANON_KEY` from `--dart-define-from-file`, validated
+   (URL restricted to hosted `https://<20-char-ref>.supabase.co`; non-placeholder),
+   key never logged; `bootstrap()`
    fails-fast on bad config then `Supabase.initialize` once before `runApp`;
    canonical `supabaseClientProvider` exposes the client. **Mock AuthRepository
    still active — no login/session/profile/RPC/Edge calls.** `service_role`

@@ -1,74 +1,48 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/core/config/supabase_config.dart';
 
-/// A realistic (but fake) DEV-shaped configuration. Not a real key.
-SupabaseConfig _valid() => SupabaseConfig.from(
-  rawUrl: 'https://abcdefghijklmnopqrst.supabase.co',
-  rawAnonKey: 'sb_publishable_fake_value_for_tests_only',
-);
+/// A standard-shaped (but fake) hosted DEV URL — 20-char ref. Never real.
+const _fakeUrl = 'https://abcdefghijklmnopqrst.supabase.co';
+
+/// A realistic (but fake) key value. Never a real key.
+const _fakeKey = 'sb_publishable_fake_value_for_tests_only';
+
+SupabaseConfig _cfg(String url, String key) =>
+    SupabaseConfig.from(rawUrl: url, rawAnonKey: key);
 
 void main() {
-  group('SupabaseConfig.validate', () {
-    test('valid DEV-like config passes', () {
-      final c = _valid();
+  group('SupabaseConfig.validate — happy path', () {
+    test('valid standard hosted URL passes', () {
+      final c = _cfg(_fakeUrl, _fakeKey);
       expect(c.validate(), isNull);
       expect(c.isValid, isTrue);
       expect(c.isComplete, isTrue);
     });
 
+    test('a single trailing slash is accepted', () {
+      expect(_cfg('$_fakeUrl/', _fakeKey).validate(), isNull);
+    });
+  });
+
+  group('SupabaseConfig.validate — missing / whitespace / key', () {
     test('missing SUPABASE_URL', () {
-      final c = SupabaseConfig.from(rawUrl: '', rawAnonKey: 'sb_publishable_x');
+      final c = _cfg('', _fakeKey);
       expect(c.validate(), SupabaseConfigError.missingUrl);
       expect(c.isComplete, isFalse);
     });
 
     test('missing SUPABASE_ANON_KEY', () {
-      final c = SupabaseConfig.from(
-        rawUrl: 'https://abc.supabase.co',
-        rawAnonKey: '',
-      );
+      final c = _cfg(_fakeUrl, '');
       expect(c.validate(), SupabaseConfigError.missingAnonKey);
       expect(c.isComplete, isFalse);
     });
 
     test('whitespace-only values are treated as missing (trimmed)', () {
-      final url = SupabaseConfig.from(rawUrl: '   ', rawAnonKey: 'sb_x');
-      expect(url.validate(), SupabaseConfigError.missingUrl);
-      final key = SupabaseConfig.from(
-        rawUrl: 'https://abc.supabase.co',
-        rawAnonKey: '   ',
+      expect(_cfg('   ', _fakeKey).validate(), SupabaseConfigError.missingUrl);
+      expect(
+        _cfg(_fakeUrl, '   ').validate(),
+        SupabaseConfigError.missingAnonKey,
       );
-      expect(key.validate(), SupabaseConfigError.missingAnonKey);
-    });
-
-    test('malformed URL is rejected', () {
-      final c = SupabaseConfig.from(rawUrl: 'not a url', rawAnonKey: 'sb_x');
-      expect(c.validate(), SupabaseConfigError.invalidUrl);
-      expect(c.isValid, isFalse);
-    });
-
-    test('URL without a dotted host is rejected', () {
-      final c = SupabaseConfig.from(
-        rawUrl: 'https://localhost',
-        rawAnonKey: 'sb_x',
-      );
-      expect(c.validate(), SupabaseConfigError.invalidUrl);
-    });
-
-    test('non-HTTPS URL is rejected', () {
-      final c = SupabaseConfig.from(
-        rawUrl: 'http://abc.supabase.co',
-        rawAnonKey: 'sb_x',
-      );
-      expect(c.validate(), SupabaseConfigError.notHttps);
-    });
-
-    test('placeholder URL is rejected', () {
-      final c = SupabaseConfig.from(
-        rawUrl: 'https://your-project.supabase.co',
-        rawAnonKey: 'sb_publishable_x',
-      );
-      expect(c.validate(), SupabaseConfigError.placeholderUrl);
     });
 
     test('placeholder anon key is rejected', () {
@@ -77,42 +51,81 @@ void main() {
         'your-publishable-key',
         'your-publishable-or-anon-key',
       ]) {
-        final c = SupabaseConfig.from(
-          rawUrl: 'https://abc.supabase.co',
-          rawAnonKey: k,
-        );
         expect(
-          c.validate(),
+          _cfg(_fakeUrl, k).validate(),
           SupabaseConfigError.placeholderAnonKey,
           reason: 'expected "$k" rejected',
         );
       }
     });
+  });
 
-    test('requireValid throws SupabaseConfigException when invalid', () {
+  group('SupabaseConfig.validate — URL shape (hosted Supabase only)', () {
+    test('malformed URL is rejected', () {
+      expect(_cfg('not a url', _fakeKey).validate(), isNotNull);
+      expect(_cfg('not a url', _fakeKey).isValid, isFalse);
+    });
+
+    test('non-HTTPS URL is rejected as notHttps', () {
       expect(
-        () => SupabaseConfig.from(rawUrl: '', rawAnonKey: '').requireValid(),
+        _cfg('http://abcdefghijklmnopqrst.supabase.co', _fakeKey).validate(),
+        SupabaseConfigError.notHttps,
+      );
+    });
+
+    test('placeholder URL is rejected as placeholderUrl', () {
+      expect(
+        _cfg('https://your-project.supabase.co', _fakeKey).validate(),
+        SupabaseConfigError.placeholderUrl,
+      );
+    });
+
+    test('rejects non-Supabase and non-standard hosted URLs', () {
+      const rejected = <String>[
+        'https://example.com',
+        'https://abc.supabase.co', // ref too short
+        'https://ABCDEFGHIJKLMNOPQRST.supabase.co', // uppercase ref
+        'https://abcdefghijklmnopqrst.supabase.co/path', // path
+        'https://abcdefghijklmnopqrst.supabase.co?x=1', // query
+        'https://abcdefghijklmnopqrst.supabase.co#fragment', // fragment
+        'https://user@abcdefghijklmnopqrst.supabase.co', // userInfo
+        'https://abcdefghijklmnopqrst.supabase.co:8443', // explicit port
+      ];
+      for (final u in rejected) {
+        expect(
+          _cfg(u, _fakeKey).validate(),
+          SupabaseConfigError.invalidUrl,
+          reason: 'expected "$u" rejected as invalidUrl',
+        );
+      }
+    });
+  });
+
+  group('requireValid', () {
+    test('throws SupabaseConfigException when invalid', () {
+      expect(
+        () => _cfg('', '').requireValid(),
         throwsA(isA<SupabaseConfigException>()),
       );
-      expect(_valid().requireValid(), isA<SupabaseConfig>());
+    });
+
+    test('returns the config when valid', () {
+      expect(_cfg(_fakeUrl, _fakeKey).requireValid(), isA<SupabaseConfig>());
     });
   });
 
   group('anon key is never exposed', () {
     const secret = 'sb_publishable_super_secret_do_not_leak_123456';
-    final c = SupabaseConfig.from(
-      rawUrl: 'https://abc.supabase.co',
-      rawAnonKey: secret,
-    );
+    final c = _cfg(_fakeUrl, secret);
 
     test('toString does not contain the anon key', () {
       expect(c.toString().contains(secret), isFalse);
       expect(c.toString(), contains('<redacted>'));
       // the (public) URL may appear.
-      expect(c.toString(), contains('abc.supabase.co'));
+      expect(c.toString(), contains('abcdefghijklmnopqrst.supabase.co'));
     });
 
-    test('exception message does not contain the anon key', () {
+    test('exception message/toString do not contain the anon key', () {
       final ex = SupabaseConfigException(
         SupabaseConfigError.placeholderAnonKey,
       );

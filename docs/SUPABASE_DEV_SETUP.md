@@ -28,7 +28,7 @@
 When Flutter integration begins (a later step), values are injected at build time via `--dart-define` (or `--dart-define-from-file`), read with `String.fromEnvironment(...)`. No secrets are baked into source. **Not implemented in Step 1.**
 
 ### Flutter Supabase init & run (Step 10.4 — implemented)
-`supabase_flutter ^2.15.4` is initialized once at bootstrap. Only the **public**
+`supabase_flutter 2.15.4` (pinned exactly) is initialized once at bootstrap. Only the **public**
 client values reach Flutter — `SUPABASE_URL` and `SUPABASE_ANON_KEY` (the dashboard
 may label the latter a *publishable* key). **Never** put `SUPABASE_SERVICE_ROLE_KEY`,
 the DB password, or access tokens in Flutter.
@@ -44,8 +44,10 @@ the DB password, or access tokens in Flutter.
    flutter run --dart-define-from-file=config/dev.json
    # tests need no config: flutter test
    ```
-`lib/core/config/supabase_config.dart` validates the URL (https, non-placeholder)
-and rejects placeholder/empty keys; the anon key is **never** logged or included in
+`lib/core/config/supabase_config.dart` validates the URL — it must be a standard
+hosted `https://<20-char-ref>.supabase.co` (no userInfo/port/path/query/fragment;
+an uppercase ref is rejected; a single trailing `/` is allowed) — and rejects
+placeholder/empty keys; the anon key is **never** logged or included in
 `toString`/errors. `bootstrap()` **fails fast** on missing/invalid config (it never
 falls back to a hardcoded/production project). The initialized client is exposed via
 the canonical `supabaseClientProvider`. Step 10.4 only initializes Supabase — the app

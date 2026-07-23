@@ -551,5 +551,6 @@ targets allowed but NOT reactivated**); sets `profiles.must_change_password = tr
 roles/permissions/is_active/username/name; handles no passwords/internal-email/
 secrets. Called by the `admin-reset-password` Edge Function **after** the Auth
 password update (Auth + public schema are not one transaction — see the Step 10.3
-DEV QA for the ordering/partial-failure contract). **Prepared in code; pending
-manual DEV apply/deploy.**
+DEV QA for the ordering/partial-failure contract). **APPLIED + DEPLOYED to DEV
+2026-07-23** (DB-verified: SECURITY DEFINER, `search_path=""`, EXECUTE service_role
+only; no profiles write RLS policy).

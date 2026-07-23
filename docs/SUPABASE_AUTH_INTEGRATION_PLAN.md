@@ -70,7 +70,7 @@ Keeps the exact `AuthRepository` interface, so the UI/providers don't change.
 2. `auth.updateUser({ password: newPassword })`. No service_role, no Edge Function.
 
 **Admin reset — `admin-reset-password` Edge Function (service_role) — Step 10.3,
-implemented (pending DEV apply/deploy):**
+APPLIED + DEPLOYED to DEV 2026-07-23:**
 Input is ONLY `{ user_id }`; the actor is the verified JWT. Full contract +
 DEV QA: `docs/qa/STEP_10_3_ADMIN_RESET_PASSWORD_DEV_QA.md`.
 1. Authorize caller (**active, non-deleted admin** + effective `can_manage_users`,
@@ -142,10 +142,10 @@ is **not** a step here. The Auth build follows the approved sequence (see §11):
    `docs/qa/STEP_10_2_ADMIN_CREATE_USER_DEV_QA.md`.)*
 3. **Admin reset-password backend** — `admin-reset-password` Edge Function +
    `record_admin_password_reset` `security definer` RPC (migration
-   `20260714230000`, `service_role`-only EXECUTE). *(**Implemented; pending DEV
-   apply/deploy.** Requires active admin + `can_manage_users` only; Auth-update-
-   then-RPC ordering with idempotent-retry recovery; local Deno gate green, 64
-   tests. Not applied/deployed.)*
+   `20260714230000`, `service_role`-only EXECUTE). *(**APPLIED + DEPLOYED to DEV
+   2026-07-23.** Requires active admin + `can_manage_users` only; Auth-update-
+   then-RPC ordering with idempotent-retry recovery; DB-verified grant matrix;
+   local Deno gate green, 64 tests; smoke tests pass. JWT verification ON.)*
 4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
    `--dart-define-from-file`.
 5. **Username login / session / profile loading** — `SupabaseAuthRepository`;

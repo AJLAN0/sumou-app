@@ -1,7 +1,31 @@
 # Step 10.3 — Admin Reset-Password Backend: DEV QA (manual)
 
-Backend-only. **DEV only**, never Production. **Pending owner apply/deploy** —
-this step does not run any remote Supabase command.
+Backend-only. **DEV only**, never Production.
+
+## DEV rollout status — 2026-07-23 (project `fnanhaflpsoggfoaqzes` / SUMOU-DEV)
+- **Migration `20260714230000` APPLIED** — `supabase db push --linked` (the DB
+  history confirmed the RPC/version were absent beforehand; the empty non-`--debug`
+  dry-run list was a non-TTY spinner artifact — the `--debug` trace correctly
+  showed the one pending file). `migration list --linked` shows it Local + Remote.
+- **Function `admin-reset-password` DEPLOYED** — `supabase functions deploy
+  admin-reset-password --project-ref fnanhaflpsoggfoaqzes --use-api` (Docker
+  absent); **JWT verification left ON** (no `--no-verify-jwt`). `functions list`
+  → ACTIVE. Bundle includes `admin-reset-password/index.ts` + `_shared/auth-utils.ts`.
+- **DB contract verified** (psql, read-only): `record_admin_password_reset` →
+  SECURITY DEFINER, `search_path=""`, EXECUTE = **service_role only**
+  (public/anon/authenticated revoked); `has_feature` unchanged (SECURITY DEFINER,
+  executable by `authenticated`, not anon/public); `profiles` has **no UPDATE/write
+  RLS policy** (only two SELECT policies).
+- **Local Deno gate (deno 2.9.3): all green** — `deno fmt --check` OK, `deno check`
+  OK, `deno test` **64 passed / 0 failed** (13 create-user + 24 reset + 27 auth-utils).
+- **Unauthenticated / handler smoke tests: PASS** — no-JWT → **401** (gateway);
+  with a project key: GET/PUT → **405** + `Allow: POST`; `text/plain` → **415**;
+  malformed JSON → **400**; unknown field → **400**; invalid UUID → **400**; valid
+  body + non-user token → **401** at `auth.getUser()` (before any service_role/Auth
+  change). `no-store`/`no-cache`/`nosniff` headers on every response.
+- **PENDING (owner):** authenticated admin QA (real admin JWT + disposable target)
+  — needs a bootstrapped DEV admin and a session token; not run here (no
+  JWT/passwords pasted into chat). Production untouched. Step 10.4 not started.
 
 ## What it is
 `admin-reset-password` Edge Function + `record_admin_password_reset` service-only

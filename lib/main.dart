@@ -1,8 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'app/bootstrap.dart';
 
-import 'app/app.dart';
-
-void main() {
-  runApp(const ProviderScope(child: SumouApp()));
-}
+/// Entry point. All startup work (config validation + one-time Supabase
+/// initialization) happens in [bootstrap], which then runs the app root.
+Future<void> main() => bootstrap();

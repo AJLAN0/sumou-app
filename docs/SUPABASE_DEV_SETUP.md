@@ -27,6 +27,31 @@
 ### How env reaches the app (later)
 When Flutter integration begins (a later step), values are injected at build time via `--dart-define` (or `--dart-define-from-file`), read with `String.fromEnvironment(...)`. No secrets are baked into source. **Not implemented in Step 1.**
 
+### Flutter Supabase init & run (Step 10.4 — implemented)
+`supabase_flutter ^2.15.4` is initialized once at bootstrap. Only the **public**
+client values reach Flutter — `SUPABASE_URL` and `SUPABASE_ANON_KEY` (the dashboard
+may label the latter a *publishable* key). **Never** put `SUPABASE_SERVICE_ROLE_KEY`,
+the DB password, or access tokens in Flutter.
+
+1. Copy the template and fill your DEV values (this file is **gitignored**):
+   ```bash
+   cp config/dev.example.json config/dev.json
+   # edit config/dev.json → real DEV https URL + anon/publishable key
+   ```
+   `config/dev.example.json` (placeholders only) is the sole tracked config file.
+2. Run with the compile-time defines:
+   ```bash
+   flutter run --dart-define-from-file=config/dev.json
+   # tests need no config: flutter test
+   ```
+`lib/core/config/supabase_config.dart` validates the URL (https, non-placeholder)
+and rejects placeholder/empty keys; the anon key is **never** logged or included in
+`toString`/errors. `bootstrap()` **fails fast** on missing/invalid config (it never
+falls back to a hardcoded/production project). The initialized client is exposed via
+the canonical `supabaseClientProvider`. Step 10.4 only initializes Supabase — the app
+still authenticates through the **mock** `AuthRepository`; no login/session/profile/
+RPC/Edge integration yet (Step 10.5+).
+
 ---
 
 ## 2. Project environments — DEV + PROD (owner-approved)

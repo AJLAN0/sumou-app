@@ -147,7 +147,15 @@ is **not** a step here. The Auth build follows the approved sequence (see §11):
    then-RPC ordering with idempotent-retry recovery; DB-verified grant matrix;
    local Deno gate green, 64 tests; smoke tests pass. JWT verification ON.)*
 4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
-   `--dart-define-from-file`.
+   `--dart-define-from-file`. *(**DONE — Step 10.4.** `supabase_flutter ^2.15.4`.
+   `lib/core/config/supabase_config.dart` reads/validates `SUPABASE_URL` +
+   `SUPABASE_ANON_KEY` (https, non-placeholder; anon key never logged/toString'd);
+   `lib/app/bootstrap.dart` fails-fast on bad config then calls
+   `Supabase.initialize` **once** before `runApp`; `lib/core/providers/supabase_providers.dart`
+   exposes the canonical `supabaseClientProvider`. **No** sign-in/session/profile/
+   RPC/Edge call — the app still uses the mock `authRepositoryProvider`.
+   `service_role` never in Flutter. `config/dev.json` gitignored;
+   `config/dev.example.json` (placeholders) tracked. analyze clean; new tests pass.)*
 5. **Username login / session / profile loading** — `SupabaseAuthRepository`;
    sign out / block inactive/deleted profiles.
 6. **Forced first password change** — redirect on `must_change_password` + the

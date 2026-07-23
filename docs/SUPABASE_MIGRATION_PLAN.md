@@ -158,7 +158,17 @@ Backend/DB precedes Flutter. Order:
    verification left ON). DB-verified: `create_staff_profile` is SECURITY DEFINER,
    `search_path=""`, EXECUTE = service_role only (public/anon/authenticated revoked);
    `has_feature` remains EXECUTE-able by `authenticated`. Production untouched.)*
-3. Admin **reset-password** backend — `admin-reset-password` Edge Function.
+3. Admin **reset-password** backend — `admin-reset-password` Edge Function +
+   `record_admin_password_reset` `security definer` RPC (migration
+   `20260714230000_admin_reset_password_backend.sql`; explicit `execute` grant to
+   `service_role` only — hardened defaults, Step 6.5). *(Step 10.3 — **prepared in
+   code; pending owner review + manual DEV apply/deploy.** Reset requires an active
+   admin + effective `can_manage_users` (NOT `can_manage_permissions`); caller
+   authz via the authenticated `has_feature` RPC; the RPC re-checks the actor.
+   Ordering: Auth password update BEFORE the RPC (no distributed txn), with a
+   preflight; on RPC-after-Auth failure the temp password is NOT exposed and the
+   recovery is an idempotent retry. Local Deno gate green: fmt/check OK, 64 tests
+   pass. Nothing applied/deployed; Production untouched.)*
 4. Flutter Supabase **initialization** (add `supabase_flutter`, env wiring).
 5. **Username login / session / profile loading** (`SupabaseAuthRepository`;
    sign out / block inactive/deleted profiles).

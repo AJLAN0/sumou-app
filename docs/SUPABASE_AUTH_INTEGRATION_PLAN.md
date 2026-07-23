@@ -112,6 +112,14 @@ is **not** a step here. The Auth build follows the approved sequence (see §11):
 2. **Admin create-user backend** — `create_staff_profile` `security definer` RPC
    (needs an **explicit** `execute` grant — default function privileges are
    hardened, Step 6.5) + `admin-create-user` Edge Function (service_role secret).
+   *(**APPLIED + DEPLOYED to DEV on 2026-07-23.** Caller authorization goes through
+   the authenticated `public.has_feature` RPC — no direct `role_permissions` read —
+   and requires BOTH `can_manage_users` AND `can_manage_permissions`; the RPC
+   independently re-checks `p_actor_id`. Unauthenticated/handler smoke tests pass
+   (401 no-JWT, 405+`Allow: POST`, 415, 400 malformed, non-user token → 401 before
+   any Auth create; `no-store`/`nosniff` headers on every response). **Authenticated
+   admin create-user QA is pending** a bootstrapped DEV admin + admin JWT — see
+   `docs/qa/STEP_10_2_ADMIN_CREATE_USER_DEV_QA.md`.)*
 3. **Admin reset-password backend** — `admin-reset-password` Edge Function.
 4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
    `--dart-define-from-file`.

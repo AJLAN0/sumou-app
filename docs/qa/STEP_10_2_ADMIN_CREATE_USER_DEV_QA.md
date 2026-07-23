@@ -1,7 +1,35 @@
 # Step 10.2 — Admin Create-User Backend: DEV QA (manual)
 
-Backend-only. **DEV only**, never Production. The owner applies the migration and
-deploys the function manually (this repo runs no remote commands).
+Backend-only. **DEV only**, never Production.
+
+## DEV rollout status — 2026-07-23 (project `fnanhaflpsoggfoaqzes` / SUMOU-DEV)
+- **Migration `20260714220000` APPLIED** — `supabase db push --linked` (dry-run
+  first confirmed exactly one pending migration). `migration list --linked` shows
+  it in both Local and Remote.
+- **Function `admin-create-user` DEPLOYED** — `supabase functions deploy
+  admin-create-user --project-ref fnanhaflpsoggfoaqzes --use-api` (Docker absent);
+  **JWT verification left ON** (no `--no-verify-jwt`). `functions list` → ACTIVE v1.
+- **DB contract verified** (psql, read-only): `create_staff_profile` → SECURITY
+  DEFINER, `search_path=""`, EXECUTE = **service_role only** (public/anon/
+  authenticated all revoked); `has_feature` → SECURITY DEFINER, `search_path=""`,
+  EXECUTE-able by `authenticated` (needed by the caller RPC).
+- **Local Deno gate (deno 2.9.3): all green** — `deno fmt --check` OK (after a
+  one-time `deno fmt` of the never-formatted function files); `deno check` OK
+  (fixed a real TS2345 in `authorizeAdmin`'s embedded-relation typing); `deno test`
+  **34 passed / 0 failed** (13 admin-create-user + 21 auth-utils).
+- **Unauthenticated / handler smoke tests: PASS** — no-JWT → **401** (platform
+  gateway); with a project key: GET/PUT → **405** + `Allow: POST`; `text/plain` →
+  **415**; malformed JSON → **400**; valid body + non-user token → **401** at
+  `auth.getUser()` (rejected before any service_role/Auth-create work). Every
+  response carried `Cache-Control: no-store, max-age=0`, `Pragma: no-cache`,
+  `X-Content-Type-Options: nosniff`.
+- **PENDING (owner):** authenticated admin create-user QA (HTTP matrix rows with a
+  real admin JWT + post-success DB checks) — needs a bootstrapped DEV admin and an
+  admin session token; not run here (no JWT/passwords pasted into chat). Production
+  untouched. Step 10.3 not started.
+
+> The owner performed the DEV apply/deploy from this machine (linking authorized
+> for this task). This repo still runs no Production commands.
 
 ## Automated unit tests (no stack needed)
 ```bash
@@ -23,9 +51,12 @@ defaults, inactive-role/permission exclusion) is NOT computed by the Edge Functi
 1. Apply the migration: `20260714220000_admin_create_user_backend.sql` (review then
    `supabase db push`).
 2. Bootstrap a first admin: `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql`.
-3. Set function secrets (DEV): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-   `SUPABASE_SERVICE_ROLE_KEY` (`supabase secrets set …`). **Never commit them.**
-4. Deploy the function: `supabase functions deploy admin-create-user`.
+3. Function secrets `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+   are **auto-injected** into every Edge Function by the platform — no
+   `supabase secrets set` needed (confirmed on DEV: the deployed function reaches
+   `auth.getUser()` rather than the "server is not configured" 500). Never commit them.
+4. Deploy the function: `supabase functions deploy admin-create-user --use-api`
+   (add `--project-ref <ref>` when unlinked; Docker not required with `--use-api`).
 
 ## RPC assertions (SQL Editor, as the DEV database-owner)
 ```sql
@@ -119,7 +150,7 @@ select actor_id, action, entity, meta from public.audit_logs
   has_feature RPC / username pre-check) fails closed (500), never treated as empty.
 - role defaults are never copied into `user_permissions` (post-success check).
 
-## Local checks (owner; Deno required — NOT run in this repo's CI env)
+## Local checks (Deno)
 ```bash
 deno fmt --check supabase/functions/admin-create-user/index.ts \
   supabase/functions/admin-create-user/index.test.ts \
@@ -128,9 +159,11 @@ deno check supabase/functions/admin-create-user/index.ts
 deno test supabase/functions/admin-create-user/index.test.ts \
   supabase/functions/_shared/auth-utils.test.ts
 ```
-> Deno was **not available** when this step (and the has_feature-RPC authorization
-> fix) was authored, so these were **not executed** here — run them locally/CI
-> before deploy. Do not assume they passed.
+> **Executed 2026-07-23 with deno 2.9.3 — all green.** `fmt --check` OK (after a
+> one-time `deno fmt` of the function files, which had never been Deno-formatted);
+> `deno check` OK (it surfaced and we fixed a real TS2345 where `authorizeAdmin`
+> read the embedded `user_roles→roles` relation as an object although postgrest-js
+> types it as an array); `deno test` **34 passed / 0 failed**.
 
 ## Response-header assertions (every response)
 `Content-Type: application/json`, `Cache-Control: no-store, max-age=0`,

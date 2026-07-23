@@ -112,6 +112,14 @@ is **not** a step here. The Auth build follows the approved sequence (see §11):
 2. **Admin create-user backend** — `create_staff_profile` `security definer` RPC
    (needs an **explicit** `execute` grant — default function privileges are
    hardened, Step 6.5) + `admin-create-user` Edge Function (service_role secret).
+   *(**APPLIED + DEPLOYED to DEV on 2026-07-23.** Caller authorization goes through
+   the authenticated `public.has_feature` RPC — no direct `role_permissions` read —
+   and requires BOTH `can_manage_users` AND `can_manage_permissions`; the RPC
+   independently re-checks `p_actor_id`. Unauthenticated/handler smoke tests pass
+   (401 no-JWT, 405+`Allow: POST`, 415, 400 malformed, non-user token → 401 before
+   any Auth create; `no-store`/`nosniff` headers on every response). **Authenticated
+   admin create-user QA is pending** a bootstrapped DEV admin + admin JWT — see
+   `docs/qa/STEP_10_2_ADMIN_CREATE_USER_DEV_QA.md`.)*
 3. **Admin reset-password backend** — `admin-reset-password` Edge Function.
 4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
    `--dart-define-from-file`.
@@ -282,11 +290,16 @@ added only by the Edge Function HTTP response.
 ### Authorization (defense-in-depth, in BOTH layers)
 - **Edge Function** (caller-scoped RLS client): `auth.getUser()` → active profile
   (self policy only returns active/non-deleted) → active **admin** role →
-  effective **`can_manage_users` AND `can_manage_permissions`** (reusable
-  `callerHasFeature`: user override else OR of active-role defaults; **fails
-  closed** — any query error → 500, never treated as empty/false-negative pass).
-  It **never** trusts Flutter-supplied roles/permissions for authorization, and
-  uses `service_role` only **after** this passes.
+  effective **`can_manage_users` AND `can_manage_permissions`**, each resolved by
+  the reusable `callerHasFeature`, which delegates to the **authenticated
+  `public.has_feature(perm_code)` RPC** (SECURITY DEFINER; user override first,
+  else OR of the *caller's own* active-role defaults, active permissions only).
+  The Edge Function **never** re-implements permission math by reading
+  `role_permissions`/`user_permissions` directly — an active admin can read **all**
+  `role_permissions` via oversight RLS, so a code-only scan would count a grant on
+  an unrelated role. Every read **fails closed** (any error → 500, never treated as
+  empty/false-negative pass). It **never** trusts Flutter-supplied roles/permissions
+  for authorization, and uses `service_role` only **after** this passes.
 - **RPC** (service context, so `auth.uid()` is NOT the admin): re-validates the
   supplied `p_actor_id` itself — active, non-deleted, active admin role, effective
   **`can_manage_users` AND `can_manage_permissions`** (same override-first/active-

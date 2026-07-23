@@ -1,5 +1,9 @@
 // Backend unit tests for the pure Auth utilities. Run: `deno test` (no stack needed).
-import { assert, assertEquals, assertFalse } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assert,
+  assertEquals,
+  assertFalse,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   buildInternalEmail,
   FORBIDDEN_KEYS,
@@ -19,8 +23,8 @@ Deno.test("normalizeUsername trims + lowercases", () => {
 Deno.test("isValidUsername enforces ^[a-z0-9._-]{2,50}$", () => {
   assert(isValidUsername("admin"));
   assert(isValidUsername("a.b-c_1"));
-  assertFalse(isValidUsername("a"));          // too short
-  assertFalse(isValidUsername("Admin"));      // uppercase (must be normalized first)
+  assertFalse(isValidUsername("a")); // too short
+  assertFalse(isValidUsername("Admin")); // uppercase (must be normalized first)
   assertFalse(isValidUsername("has space"));
   assertFalse(isValidUsername("bad@char"));
   assertFalse(isValidUsername("x".repeat(51)));
@@ -48,8 +52,10 @@ Deno.test("temp password: length, classes, charset, uniqueness", () => {
 
 Deno.test("input: valid minimal payload normalizes", () => {
   const r = validateCreateUserInput({
-    username: "  New.User ", full_name: "  اسم كامل ",
-    default_role: "photographer", roles: ["photographer"],
+    username: "  New.User ",
+    full_name: "  اسم كامل ",
+    default_role: "photographer",
+    roles: ["photographer"],
   });
   assert(r.ok);
   if (r.ok) {
@@ -63,7 +69,10 @@ Deno.test("input: valid minimal payload normalizes", () => {
 Deno.test("input: forbidden fields are rejected", () => {
   for (const k of FORBIDDEN_KEYS) {
     const body: Record<string, unknown> = {
-      username: "user.x", full_name: "N", default_role: "manager", roles: ["manager"],
+      username: "user.x",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
     };
     body[k] = "x";
     const r = validateCreateUserInput(body);
@@ -72,52 +81,113 @@ Deno.test("input: forbidden fields are rejected", () => {
 });
 
 Deno.test("input: malformed username / blank name rejected", () => {
-  assertFalse(validateCreateUserInput({ username: "a", full_name: "N", default_role: "manager", roles: ["manager"] }).ok);
-  assertFalse(validateCreateUserInput({ username: "user", full_name: "   ", default_role: "manager", roles: ["manager"] }).ok);
+  assertFalse(
+    validateCreateUserInput({
+      username: "a",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
+    }).ok,
+  );
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "   ",
+      default_role: "manager",
+      roles: ["manager"],
+    }).ok,
+  );
 });
 
 Deno.test("input: default role must be in roles; no duplicate roles", () => {
-  assertFalse(validateCreateUserInput({ username: "user", full_name: "N", default_role: "admin", roles: ["manager"] }).ok);
-  assertFalse(validateCreateUserInput({ username: "user", full_name: "N", default_role: "manager", roles: ["manager", "manager"] }).ok);
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "admin",
+      roles: ["manager"],
+    }).ok,
+  );
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager", "manager"],
+    }).ok,
+  );
 });
 
 Deno.test("input: duplicate photographer types / overrides rejected", () => {
-  assertFalse(validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "photographer", roles: ["photographer"],
-    photographer_types: ["photo", "photo"],
-  }).ok);
-  assertFalse(validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
-    permission_overrides: [{ code: "can_add_project", granted: true }, { code: "can_add_project", granted: false }],
-  }).ok);
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "photographer",
+      roles: ["photographer"],
+      photographer_types: ["photo", "photo"],
+    }).ok,
+  );
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
+      permission_overrides: [{ code: "can_add_project", granted: true }, {
+        code: "can_add_project",
+        granted: false,
+      }],
+    }).ok,
+  );
 });
 
 Deno.test("input: override needs a boolean granted + a code", () => {
-  assertFalse(validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
-    permission_overrides: [{ code: "can_add_project", granted: "yes" }],
-  }).ok);
-  assertFalse(validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
-    permission_overrides: [{ granted: true }],
-  }).ok);
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
+      permission_overrides: [{ code: "can_add_project", granted: "yes" }],
+    }).ok,
+  );
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
+      permission_overrides: [{ granted: true }],
+    }).ok,
+  );
 });
 
 Deno.test("input: valid overrides pass through", () => {
   const r = validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "manager", roles: ["manager", "photographer"],
+    username: "user",
+    full_name: "N",
+    default_role: "manager",
+    roles: ["manager", "photographer"],
     photographer_types: ["photo", "video"],
     permission_overrides: [{ code: "can_view_reports", granted: false }],
   });
   assert(r.ok);
   if (r.ok) {
     assertEquals(r.value.roles, ["manager", "photographer"]);
-    assertEquals(r.value.permission_overrides, [{ code: "can_view_reports", granted: false }]);
+    assertEquals(r.value.permission_overrides, [{
+      code: "can_view_reports",
+      granted: false,
+    }]);
   }
 });
 
 // ---- request framing + strict allowlist (added in the 10.2 hardening) -------
-import { isJsonContentType, MAX_BODY_BYTES, readBoundedBody } from "./auth-utils.ts";
+import {
+  isJsonContentType,
+  MAX_BODY_BYTES,
+  readBoundedBody,
+} from "./auth-utils.ts";
 
 function streamOf(bytes: Uint8Array, chunk = 3): ReadableStream<Uint8Array> {
   let i = 0;
@@ -164,7 +234,11 @@ Deno.test("readBoundedBody: multibyte UTF-8 counts bytes, not chars", async () =
 });
 
 Deno.test("readBoundedBody: rejects a lying/oversized Content-Length early", async () => {
-  const r = await readBoundedBody(streamOf(new Uint8Array(1)), String(MAX_BODY_BYTES + 1), MAX_BODY_BYTES);
+  const r = await readBoundedBody(
+    streamOf(new Uint8Array(1)),
+    String(MAX_BODY_BYTES + 1),
+    MAX_BODY_BYTES,
+  );
   assertFalse(r.ok);
 });
 
@@ -181,15 +255,24 @@ Deno.test("readBoundedBody: null body yields zero bytes", async () => {
 });
 
 Deno.test("input: unknown top-level key rejected (not ignored)", () => {
-  assertFalse(validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "manager", roles: ["manager"], extra: "x",
-  }).ok);
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
+      extra: "x",
+    }).ok,
+  );
 });
 
 Deno.test("input: case-variant of a forbidden key is rejected as unknown", () => {
   for (const k of ["Password", "IS_ACTIVE", "User_Id", "Email"]) {
     const body: Record<string, unknown> = {
-      username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
     };
     body[k] = "x";
     assertFalse(validateCreateUserInput(body).ok, `reject "${k}"`);
@@ -197,8 +280,17 @@ Deno.test("input: case-variant of a forbidden key is rejected as unknown", () =>
 });
 
 Deno.test("input: extra key inside a permission override is rejected", () => {
-  assertFalse(validateCreateUserInput({
-    username: "user", full_name: "N", default_role: "manager", roles: ["manager"],
-    permission_overrides: [{ code: "can_view_reports", granted: true, foo: 1 }],
-  }).ok);
+  assertFalse(
+    validateCreateUserInput({
+      username: "user",
+      full_name: "N",
+      default_role: "manager",
+      roles: ["manager"],
+      permission_overrides: [{
+        code: "can_view_reports",
+        granted: true,
+        foo: 1,
+      }],
+    }).ok,
+  );
 });

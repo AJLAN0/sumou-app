@@ -282,11 +282,16 @@ added only by the Edge Function HTTP response.
 ### Authorization (defense-in-depth, in BOTH layers)
 - **Edge Function** (caller-scoped RLS client): `auth.getUser()` → active profile
   (self policy only returns active/non-deleted) → active **admin** role →
-  effective **`can_manage_users` AND `can_manage_permissions`** (reusable
-  `callerHasFeature`: user override else OR of active-role defaults; **fails
-  closed** — any query error → 500, never treated as empty/false-negative pass).
-  It **never** trusts Flutter-supplied roles/permissions for authorization, and
-  uses `service_role` only **after** this passes.
+  effective **`can_manage_users` AND `can_manage_permissions`**, each resolved by
+  the reusable `callerHasFeature`, which delegates to the **authenticated
+  `public.has_feature(perm_code)` RPC** (SECURITY DEFINER; user override first,
+  else OR of the *caller's own* active-role defaults, active permissions only).
+  The Edge Function **never** re-implements permission math by reading
+  `role_permissions`/`user_permissions` directly — an active admin can read **all**
+  `role_permissions` via oversight RLS, so a code-only scan would count a grant on
+  an unrelated role. Every read **fails closed** (any error → 500, never treated as
+  empty/false-negative pass). It **never** trusts Flutter-supplied roles/permissions
+  for authorization, and uses `service_role` only **after** this passes.
 - **RPC** (service context, so `auth.uid()` is NOT the admin): re-validates the
   supplied `p_actor_id` itself — active, non-deleted, active admin role, effective
   **`can_manage_users` AND `can_manage_permissions`** (same override-first/active-

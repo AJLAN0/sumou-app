@@ -11,9 +11,13 @@ Covers (auth-utils.test.ts): username normalization/validation, internal-email
 construction, temp-password length/classes/charset/uniqueness, forbidden + unknown
 fields, blank name, default-role-in-roles, duplicate roles/types/overrides, override
 shape, exact media-type, bounded/multibyte body reader.
-Covers (index.test.ts, fake client): effective-permission override-true/false-wins,
-role-default-only-when-no-override, resolution error fails closed, authorizeAdmin
-requires BOTH can_manage_users AND can_manage_permissions, 401/403/500 paths.
+Covers (index.test.ts, fake client): `callerHasFeature` maps the authenticated
+`has_feature` RPC result (true→granted, any non-true success→denied, RPC error→
+fail closed); authorizeAdmin requires BOTH can_manage_users AND can_manage_permissions,
+and fails closed on profile / user_roles / has_feature-RPC read errors; 401/403/500
+paths. **Effective-permission logic (override precedence, active-role-scoped
+defaults, inactive-role/permission exclusion) is NOT computed by the Edge Function
+— it lives in `public.has_feature(perm_code)` and is verified by the DB QA below.**
 
 ## One-time setup (owner, DEV)
 1. Apply the migration: `20260714220000_admin_create_user_backend.sql` (review then
@@ -33,6 +37,28 @@ select p.proname,
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and p.proname = 'create_staff_profile';
 ```
+
+## Caller authorization — `has_feature` correctness (SQL Editor)
+The Edge Function authorizes the caller **only** through the authenticated
+`public.has_feature(perm_code)` RPC (caller-scoped/RLS client). It never reads
+`role_permissions` directly — an active admin can read **all** `role_permissions`
+rows via oversight RLS, so a code-only scan would count a grant on an unrelated
+role and wrongly authorize. Confirm `has_feature` resolves per-caller (run each as
+the signed-in caller, i.e. via the deployed function or a caller-scoped session):
+
+- **Unrelated-role grant does NOT leak.** Grant `can_manage_permissions` as a
+  default on a role the caller does **not** hold; the caller keeps only a role
+  without it. `select public.has_feature('can_manage_permissions')` → **false**,
+  and create-user for that caller → **403**.
+- **Inactive-role default does NOT contribute.** A default `true` on an *inactive*
+  role the caller holds → `has_feature` → **false**.
+- **Explicit `false` user override wins** over a `true` active-role default →
+  `has_feature` → **false** → create-user **403**.
+- **Both present → allowed.** Caller effectively has both `can_manage_users` and
+  `can_manage_permissions` → each `has_feature` → **true** → create-user proceeds.
+- **Role defaults are never copied into `user_permissions`** on create (see the
+  post-success check): the new user's `user_permissions` holds only the explicit
+  overrides that were supplied.
 
 ## HTTP matrix (call the deployed function; `<JWT>` = a signed-in user's access token)
 | # | Request | Expect |
@@ -82,22 +108,29 @@ select actor_id, action, entity, meta from public.audit_logs
   a pre-existing user with the same username is never deleted (guarded by the
   friendly pre-check + unique constraint → 409 before any Auth create).
 - Server logs never contain the request body, username, internal email, or temp password.
-- **Create requires BOTH `can_manage_users` AND `can_manage_permissions`** (Edge
-  Function AND the RPC actor re-check); an explicit `false` override for either, or
-  an inactive permission-catalog row, denies. Any authorization query error fails
-  closed (500), never treated as empty.
+- **Create requires BOTH `can_manage_users` AND `can_manage_permissions`.** The
+  Edge Function resolves each through the authenticated `public.has_feature(perm_code)`
+  RPC on the caller-scoped client — it does **not** compute permissions by reading
+  `role_permissions`/`user_permissions` directly. The `create_staff_profile` RPC
+  then **independently** re-checks the actor (`p_actor_id`) with actor-scoped SQL,
+  because in the service-role context `auth.uid()` is not the admin. An explicit
+  `false` override for either permission, or an inactive permission-catalog row,
+  denies. Any authorization read error (auth.getUser / profile / user_roles /
+  has_feature RPC / username pre-check) fails closed (500), never treated as empty.
 - role defaults are never copied into `user_permissions` (post-success check).
 
 ## Local checks (owner; Deno required — NOT run in this repo's CI env)
 ```bash
 deno fmt --check supabase/functions/admin-create-user/index.ts \
+  supabase/functions/admin-create-user/index.test.ts \
   supabase/functions/_shared/auth-utils.ts supabase/functions/_shared/auth-utils.test.ts
 deno check supabase/functions/admin-create-user/index.ts
-deno test supabase/functions/_shared/auth-utils.test.ts
+deno test supabase/functions/admin-create-user/index.test.ts \
+  supabase/functions/_shared/auth-utils.test.ts
 ```
-> Deno was **not available** in the environment that authored this step, so these
-> were **not executed** here — run them locally/CI before deploy. Do not assume
-> they passed.
+> Deno was **not available** when this step (and the has_feature-RPC authorization
+> fix) was authored, so these were **not executed** here — run them locally/CI
+> before deploy. Do not assume they passed.
 
 ## Response-header assertions (every response)
 `Content-Type: application/json`, `Cache-Control: no-store, max-age=0`,

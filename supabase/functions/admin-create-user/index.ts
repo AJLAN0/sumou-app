@@ -1,8 +1,9 @@
 // admin-create-user — Supabase Edge Function (Sprint 10 Step 10.2).
 //
 // Admin-only user provisioning. Flow:
-//   authenticate caller (JWT) → authorize (active admin + can_manage_users, from
-//   the DB) → validate/normalize input → generate a secure temp password →
+//   authenticate caller (JWT) → authorize (active admin + BOTH can_manage_users
+//   AND can_manage_permissions, resolved via the authenticated has_feature RPC) →
+//   validate/normalize input → generate a secure temp password →
 //   create the Auth user (service_role) → call create_staff_profile RPC
 //   (atomic public rows + audit) → return the temp password ONCE. If the RPC
 //   fails, COMPENSATE by deleting the just-created Auth user (Auth + public schema
@@ -41,35 +42,31 @@ function errorResponse(code: string, message: string, status: number, extra: Rec
 }
 
 /**
- * Fail-closed effective-permission check for the caller, via their own RLS-scoped
- * reads: explicit `user_permissions` override wins; else OR of active-role
- * `role_permissions` defaults; only ACTIVE permission-catalog rows count.
- * Returns `false` on ANY Supabase query error (never continues to defaults after
- * an override read failed). `error` distinguishes a query failure from a clean
- * "not granted" so the caller can 500 vs 403.
+ * Fail-closed effective-permission check for the caller, delegated to the
+ * canonical authenticated helper `public.has_feature(perm_code)` via the caller-
+ * scoped (RLS) client. That SECURITY DEFINER function resolves the permission for
+ * `auth.uid()` and enforces everything correctly: an active/non-deleted caller,
+ * explicit `user_permissions` override first (grant OR revoke), else the OR of
+ * `role_permissions` defaults ACROSS THE CALLER'S OWN ACTIVE ROLES ONLY, only
+ * ACTIVE permission-catalog rows participating, otherwise false.
+ *
+ * This must NOT be re-implemented here by reading tables directly: an active
+ * admin can (by oversight RLS) read ALL `role_permissions` rows, so a code-only
+ * `role_permissions` scan would count a grant belonging to an unrelated role and
+ * wrongly authorize the caller. The service_role client is NEVER used for caller
+ * authorization — only this authenticated `userClient`.
+ *
+ * Returns `{ ok: false }` on ANY RPC error (fail closed → caller 500). A clean
+ * `data === true` grants; every other successful result denies (caller 403).
  */
 export async function callerHasFeature(
   userClient: SupabaseClient,
-  uid: string,
   permissionCode: string,
 ): Promise<{ ok: true; granted: boolean } | { ok: false }> {
-  const override = await userClient
-    .from("user_permissions")
-    .select("granted, permissions!inner(code, is_active)")
-    .eq("user_id", uid)
-    .eq("permissions.code", permissionCode)
-    .eq("permissions.is_active", true)
-    .maybeSingle();
-  if (override.error) return { ok: false }; // query failed → fail closed, do NOT fall through
-  if (override.data) return { ok: true, granted: override.data.granted === true };
-
-  const defaults = await userClient
-    .from("role_permissions")
-    .select("granted, permissions!inner(code, is_active)")
-    .eq("permissions.code", permissionCode)
-    .eq("permissions.is_active", true);
-  if (defaults.error) return { ok: false };
-  return { ok: true, granted: (defaults.data ?? []).some((r: { granted: boolean }) => r.granted === true) };
+  const { data, error } = await userClient.rpc("has_feature", { perm_code: permissionCode });
+  if (error) return { ok: false }; // RPC failed → fail closed
+  if (data === true) return { ok: true, granted: true };
+  return { ok: true, granted: false };
 }
 
 /**
@@ -108,7 +105,7 @@ export async function authorizeAdmin(
   if (!isAdmin) return { ok: false, status: 403, code: "forbidden", message: "admin role required" };
 
   for (const code of ["can_manage_users", "can_manage_permissions"]) {
-    const feat = await callerHasFeature(userClient, uid, code);
+    const feat = await callerHasFeature(userClient, code);
     if (!feat.ok) {
       return { ok: false, status: 500, code: "server_error", message: "authorization check failed" };
     }

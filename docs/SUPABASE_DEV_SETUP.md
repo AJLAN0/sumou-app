@@ -50,9 +50,16 @@ an uppercase ref is rejected; a single trailing `/` is allowed) — and rejects
 placeholder/empty keys; the anon key is **never** logged or included in
 `toString`/errors. `bootstrap()` **fails fast** on missing/invalid config (it never
 falls back to a hardcoded/production project). The initialized client is exposed via
-the canonical `supabaseClientProvider`. Step 10.4 only initializes Supabase — the app
-still authenticates through the **mock** `AuthRepository`; no login/session/profile/
-RPC/Edge integration yet (Step 10.5+).
+the canonical `supabaseClientProvider`.
+
+**Step 10.5 (done):** the app now authenticates for real through
+`SupabaseAuthRepository` (username → hidden internal email → Supabase Auth → own
+profile/roles/photo-types/effective-permissions → `UserModel`), with persisted
+session restoration and real logout. Provide `config/dev.json` and run
+`flutter run --dart-define-from-file=config/dev.json`; sign in with a **username**
+(not the internal email). `must_change_password` is loaded but **not** enforced yet
+(Step 10.6). Tests keep using the mock via `mockAuthOverrides()`. See
+`docs/qa/STEP_10_5_FLUTTER_AUTH_DEV_QA.md`.
 
 ---
 

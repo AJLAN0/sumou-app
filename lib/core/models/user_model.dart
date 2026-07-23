@@ -14,6 +14,7 @@ class UserModel {
     this.email,
     String? avatarInitials,
     this.active = true,
+    this.mustChangePassword = false,
     this.roles = const [],
     this.photoTypes = const [],
     this.permissions = const FeaturePermissions(),
@@ -24,6 +25,12 @@ class UserModel {
   final String username;
   final String? email;
   final bool active;
+
+  /// Whether the backend requires this user to change their password on next
+  /// login (`profiles.must_change_password`). Step 10.5 **loads and preserves**
+  /// this flag only — no forced-change routing yet (that is Step 10.6). Defaults
+  /// to `false` for mock/test users.
+  final bool mustChangePassword;
   final RoleType defaultRole;
   final List<RoleType> roles;
   final List<String> photoTypes;
@@ -71,6 +78,7 @@ class UserModel {
     String? email,
     String? avatarInitials,
     bool? active,
+    bool? mustChangePassword,
     RoleType? defaultRole,
     List<RoleType>? roles,
     List<String>? photoTypes,
@@ -83,6 +91,7 @@ class UserModel {
       email: email ?? this.email,
       avatarInitials: avatarInitials ?? _avatarInitials,
       active: active ?? this.active,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       defaultRole: defaultRole ?? this.defaultRole,
       roles: roles ?? this.roles,
       photoTypes: photoTypes ?? this.photoTypes,

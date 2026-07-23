@@ -9,11 +9,12 @@ import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'test_helpers.dart';
 
 void main() {
   // Logs in as the manager, opens a project, and opens the update-stage screen.
   Future<void> openUpdateStage(WidgetTester tester, String projectName) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

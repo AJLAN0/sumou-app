@@ -18,7 +18,48 @@ enum AppFeature {
   canViewReports,
   canManageAttendance,
   canManageWeddingProjects,
-  canManageFinance,
+  canManageFinance;
+
+  /// Stable backend permission code (`public.permissions.code`).
+  String get code => switch (this) {
+    AppFeature.canAddProject => 'can_add_project',
+    AppFeature.canEditProject => 'can_edit_project',
+    AppFeature.canAssignPhotographers => 'can_assign_photographers',
+    AppFeature.canRequestPhotographer => 'can_request_photographer',
+    AppFeature.canRequestDesign => 'can_request_design',
+    AppFeature.canUpdateStages => 'can_update_stages',
+    AppFeature.canRequestClosure => 'can_request_closure',
+    AppFeature.canApproveClosure => 'can_approve_closure',
+    AppFeature.canManageUsers => 'can_manage_users',
+    AppFeature.canManagePermissions => 'can_manage_permissions',
+    AppFeature.canViewReports => 'can_view_reports',
+    AppFeature.canManageAttendance => 'can_manage_attendance',
+    AppFeature.canManageWeddingProjects => 'can_manage_wedding_projects',
+    AppFeature.canManageFinance => 'can_manage_finance',
+  };
+
+  /// Map a backend permission code to its [AppFeature].
+  ///
+  /// Only the **active operational** codes map. `can_manage_finance` is a frozen
+  /// inactive/excluded capability and returns `null` (so it can never grant an
+  /// app feature), as does any unknown code — both are ignored safely by the
+  /// permission resolver.
+  static AppFeature? fromCode(String code) => switch (code) {
+    'can_add_project' => AppFeature.canAddProject,
+    'can_edit_project' => AppFeature.canEditProject,
+    'can_assign_photographers' => AppFeature.canAssignPhotographers,
+    'can_request_photographer' => AppFeature.canRequestPhotographer,
+    'can_request_design' => AppFeature.canRequestDesign,
+    'can_update_stages' => AppFeature.canUpdateStages,
+    'can_request_closure' => AppFeature.canRequestClosure,
+    'can_approve_closure' => AppFeature.canApproveClosure,
+    'can_manage_users' => AppFeature.canManageUsers,
+    'can_manage_permissions' => AppFeature.canManagePermissions,
+    'can_view_reports' => AppFeature.canViewReports,
+    'can_manage_attendance' => AppFeature.canManageAttendance,
+    'can_manage_wedding_projects' => AppFeature.canManageWeddingProjects,
+    _ => null, // can_manage_finance (inactive) + any unknown → ignored
+  };
 }
 
 /// Per-user feature flags. Defaults to all-false so a user is never granted
@@ -135,6 +176,7 @@ class FeaturePermissions {
     ),
     RoleType.weddingFinance => const FeaturePermissions(canManageFinance: true),
     RoleType.attendance => const FeaturePermissions(canManageAttendance: true),
+    RoleType.marketing ||
     RoleType.designer ||
     RoleType.personalPhoto ||
     RoleType.clientTracking => const FeaturePermissions(),

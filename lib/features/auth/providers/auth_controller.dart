@@ -10,10 +10,44 @@ import 'auth_state.dart';
 /// UI in later steps watches [authControllerProvider] for [AuthState] and
 /// calls these methods. No navigation or widgets here — pure state.
 class AuthController extends Notifier<AuthState> {
+  // Starts in the "restoring" state so the router never treats a not-yet-
+  // restored session as signed out (which would flash Entry before restore).
   @override
-  AuthState build() => const AuthState();
+  AuthState build() => const AuthState(isInitializing: true);
 
   AuthRepository get _auth => ref.read(authRepositoryProvider);
+
+  bool _initialized = false;
+
+  /// Restore a persisted Supabase session at startup (idempotent). Splash waits
+  /// for this to complete before routing. Resolves to:
+  ///   • signed-out when there is no session (or the account is disabled/deleted
+  ///     /invalid — the repository signs the bad session out), or
+  ///   • authenticated with the full user context when a valid session exists.
+  /// An unexpected restore failure resolves to signed-out with a safe message.
+  Future<void> initializeSession() async {
+    if (_initialized) return;
+    _initialized = true;
+    state = state.copyWith(isInitializing: true, errorMessage: null);
+    try {
+      final user = await _auth.currentUser();
+      if (user == null) {
+        state = const AuthState(); // initialized + signed out
+      } else {
+        state = AuthState(
+          currentUser: user,
+          selectedRole: user.hasMultipleRoles ? null : user.effectiveRole,
+        );
+      }
+    } on AuthException {
+      // Disabled/deleted/invalid persisted account → safe signed-out.
+      state = const AuthState();
+    } catch (_) {
+      state = const AuthState(
+        errorMessage: 'تعذّرت استعادة الجلسة، يرجى تسجيل الدخول',
+      );
+    }
+  }
 
   /// Attempt a login. On success the session is populated; for a single-role
   /// user the active role is set automatically. On failure [AuthState.errorMessage]
@@ -100,6 +134,13 @@ class AuthController extends Notifier<AuthState> {
     AuthFailure.invalidCredentials => 'اسم المستخدم أو كلمة المرور غير صحيحة',
     AuthFailure.accountDisabled => 'هذا الحساب موقوف، يرجى التواصل مع الإدارة',
     AuthFailure.notAuthenticated => 'يجب تسجيل الدخول أولاً',
+    AuthFailure.profileUnavailable =>
+      'تعذّر تحميل بيانات الحساب، يرجى المحاولة لاحقاً',
+    AuthFailure.sessionRestoreFailed =>
+      'تعذّرت استعادة الجلسة، يرجى تسجيل الدخول',
+    // Step 10.6 will enable the real password change.
+    AuthFailure.passwordChangeUnavailable =>
+      'سيتم تفعيل تغيير كلمة المرور في الخطوة التالية',
   };
 }
 

@@ -1,7 +1,26 @@
 import '../../core/models/user_model.dart';
 
-/// Why an auth operation failed. UI maps these to Arabic messages later.
-enum AuthFailure { invalidCredentials, accountDisabled, notAuthenticated }
+/// Why an auth operation failed. UI maps these to Arabic messages.
+enum AuthFailure {
+  /// Wrong username/password (never reveals whether the username exists).
+  invalidCredentials,
+
+  /// The account is inactive / soft-deleted and cannot be used.
+  accountDisabled,
+
+  /// No active session for an operation that requires one.
+  notAuthenticated,
+
+  /// Authenticated, but the caller's public profile/roles/permissions could not
+  /// be loaded or are invalid (the session is signed out to fail closed).
+  profileUnavailable,
+
+  /// Restoring a persisted session failed unexpectedly (fail closed).
+  sessionRestoreFailed,
+
+  /// Password change is not available yet (implemented in Step 10.6).
+  passwordChangeUnavailable,
+}
 
 /// Thrown by [AuthRepository] implementations on a failed operation.
 class AuthException implements Exception {

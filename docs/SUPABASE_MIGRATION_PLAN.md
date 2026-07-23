@@ -183,7 +183,16 @@ Backend/DB precedes Flutter. Order:
    never in Flutter. dart format clean, `flutter analyze` clean, new
    config/provider tests pass. No remote command; Production untouched.)*
 5. **Username login / session / profile loading** (`SupabaseAuthRepository`;
-   sign out / block inactive/deleted profiles).
+   sign out / block inactive/deleted profiles). *(Step 10.5 — **DONE (Flutter
+   only; no backend/remote change).** Real `SupabaseAuthRepository` wired via
+   `supabaseClientProvider`; username→hidden internal email in the data layer;
+   login loads own profile/active-roles/active-photo-types/effective-permissions
+   (role defaults scoped to the caller's OWN active role ids — never by code
+   alone); `RoleType.marketing` added; `UserModel.mustChangePassword` loaded but
+   NOT enforced; idempotent `initializeSession` restore; Splash waits for restore;
+   real `signOut`; `changePassword` deferred to 10.6. Tests override to
+   `MockAuthRepository`. analyze clean; full suite 218 pass / 5 pre-existing fail.
+   Production untouched.)*
 6. **Forced first password change** (redirect on `must_change_password` + the
    password-update operation).
 7. Admin **user-management integration** (wire create/reset/activate/roles).

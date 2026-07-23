@@ -51,15 +51,33 @@ Runs with **service_role** (an Edge Function secret), so it can create auth user
 
 ---
 
-## 4. Login — `SupabaseAuthRepository.login`
+## 4. Login — `SupabaseAuthRepository.login` — **DONE (Step 10.5)**
 
-1. `email = normalize(username) + '@users.sumou.internal'` (derived, no DB lookup, never shown).
-2. `signInWithPassword({ email, password })`.
-3. On success, load the profile; if `is_active = false` → `signOut()` + throw `AuthException(accountDisabled)`.
-4. On failure → `AuthException(invalidCredentials)`.
-5. Map profile + roles + **effective** permissions (override-then-role-default) → `UserModel`.
+Implemented in `lib/data/repositories/supabase/` and wired as the default
+`authRepositoryProvider` (tests override with `MockAuthRepository`). Full contract
++ DEV QA: `docs/qa/STEP_10_5_FLUTTER_AUTH_DEV_QA.md`.
+1. `email = normalize(username) + '@users.sumou.internal'` — built ONLY in the data
+   layer (`AuthIdentity`); never stored/returned/shown/logged. Invalid username →
+   `invalidCredentials` **before any network** request.
+2. `signInWithPassword({ email, password })` (username trimmed; password untouched,
+   never retained). Any sign-in error → `invalidCredentials` (never reveals whether
+   the username exists; no raw GoTrue/Postgres text).
+3. Load the caller's OWN profile; `is_active=false` / `deleted_at` set →
+   `signOut()` + `accountDisabled`; missing/id-mismatch → `signOut()` +
+   `profileUnavailable`. `UserModel.email` stays **null** (Auth email never mapped).
+4. Load active roles (unknown-active → fail closed; no-active → reject;
+   `default_role_id` must be an active role; `client_tracking` skipped; new
+   `RoleType.marketing`), active photographer types, and **effective** permissions.
+5. Effective permissions from DB rows: explicit `user_permissions` override wins
+   (incl. false), else OR of `role_permissions` defaults **scoped to the caller's
+   own active role ids** (never by code alone — admin oversight-RLS safety), active
+   permissions only; `can_manage_finance`/unknown never grant. Fail closed on any
+   query error.
 
-Keeps the exact `AuthRepository` interface, so the UI/providers don't change.
+`UserModel.mustChangePassword` is loaded but **not** enforced (Step 10.6). Session
+restoration uses idempotent `AuthController.initializeSession()`; Splash waits for
+it; `changePassword` is deferred (`passwordChangeUnavailable`). Keeps the exact
+`AuthRepository` interface — the UI/providers don't change.
 
 ---
 
@@ -159,7 +177,9 @@ is **not** a step here. The Auth build follows the approved sequence (see §11):
    `service_role` never in Flutter. `config/dev.json` gitignored;
    `config/dev.example.json` (placeholders) tracked. analyze clean; new tests pass.)*
 5. **Username login / session / profile loading** — `SupabaseAuthRepository`;
-   sign out / block inactive/deleted profiles.
+   sign out / block inactive/deleted profiles. *(**DONE — Step 10.5** (Flutter
+   only). Real login/restore/logout; own-role-scoped effective permissions;
+   `mustChangePassword` loaded not enforced; `changePassword` deferred. See §4.)*
 6. **Forced first password change** — redirect on `must_change_password` + the
    trusted completion operation that clears the flag (mechanism TBD; §11).
 7. **Admin user-management integration** — wire create/reset/activate/roles.

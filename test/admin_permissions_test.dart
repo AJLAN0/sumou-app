@@ -8,10 +8,11 @@ import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/shell/role_based_bottom_nav.dart';
+import 'test_helpers.dart';
 
 void main() {
   Future<void> openPermissions(WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

@@ -104,8 +104,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // Client tracking is public — accessible without employee login.
       if (loc == AppRoutes.track || loc == AppRoutes.trackResult) return null;
 
-      // Splash routes itself after a brief auth check.
+      // Splash routes itself once session restoration completes.
       if (loc == AppRoutes.splash) return null;
+
+      // While a persisted session is still being restored, hold protected/auth
+      // routes on Splash — never flash Entry before restoration completes.
+      if (auth.isInitializing) return AppRoutes.splash;
 
       const authFlow = {AppRoutes.entry, AppRoutes.login, AppRoutes.roleSelect};
 

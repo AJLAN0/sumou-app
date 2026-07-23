@@ -13,7 +13,7 @@ import 'test_helpers.dart';
 
 void main() {
   Future<void> openAdminDetails(WidgetTester tester, String projectName) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)
@@ -57,7 +57,7 @@ void main() {
   test(
     'closureRequestForProjectProvider returns the project request',
     () async {
-      final container = ProviderContainer();
+      final container = makeMockContainer();
       addTearDown(container.dispose);
       // p-4 has a seeded closure request; p-1 has none.
       final req = await container.read(

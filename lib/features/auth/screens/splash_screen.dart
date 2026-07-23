@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,9 +6,13 @@ import '../../../app/router.dart';
 import '../../../core/widgets/widgets.dart';
 import '../providers/auth_controller.dart';
 
-/// Opening screen. Shows branding briefly, then routes based on auth state:
-/// unauthenticated → entry, multi-role w/o selection → role select, otherwise
-/// the active role's home.
+/// Opening screen. Shows branding while the app restores a persisted Supabase
+/// session, then routes based on the restored auth state: unauthenticated →
+/// entry, multi-role w/o selection → role select, otherwise the role home.
+///
+/// It waits for BOTH a small minimum branding duration AND completion of
+/// [AuthController.initializeSession] before routing — the app never routes to
+/// Entry before restoration has finished.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -19,17 +21,30 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  static const Duration _delay = Duration(milliseconds: 1400);
-  Timer? _timer;
+  static const Duration _minBranding = Duration(milliseconds: 1200);
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(_delay, _route);
+    // Run after the first frame so restoration (which mutates the auth provider)
+    // never modifies a provider during the build phase.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _boot();
+    });
+  }
+
+  Future<void> _boot() async {
+    final controller = ref.read(authControllerProvider.notifier);
+    // Both must finish: branding minimum + session restoration.
+    await Future.wait<void>([
+      Future<void>.delayed(_minBranding),
+      controller.initializeSession(),
+    ]);
+    if (!mounted) return;
+    _route();
   }
 
   void _route() {
-    if (!mounted) return;
     final auth = ref.read(authControllerProvider);
     final String target;
     if (!auth.isAuthenticated) {
@@ -40,12 +55,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       target = homePathFor(auth.activeRole);
     }
     context.go(target);
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   @override

@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
+import 'test_helpers.dart';
 
 void main() {
   Future<void> bootToTrack(WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: SumouApp()));
+    await tester.pumpWidget(
+      ProviderScope(overrides: mockAuthOverrides(), child: const SumouApp()),
+    );
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     // From the entry screen (unauthenticated), open the public tracking screen.

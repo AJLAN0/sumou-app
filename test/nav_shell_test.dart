@@ -6,10 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'test_helpers.dart';
 
 void main() {
   Future<void> pumpAsManager(WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

@@ -14,24 +14,20 @@ Accounts are **password accounts** on an **internal, non-routable email** (`<use
 
 ---
 
-## 2. Bootstrap the first admin (one-time, manual)
+## 2. Bootstrap the first admin (one-time, manual — DEV)
 
-There are no users in the DB yet (only the catalog). The first admin can't be created "by an admin", so bootstrap once:
+The first admin can't be created "by an admin", so it is bootstrapped once,
+manually, in **DEV only**. The single **canonical** procedure is the
+placeholder-only template `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql` (SQL-Editor
+`DO` block): create the Auth user in the Dashboard with the internal email, then
+insert the matching `profiles` (same UUID, active `admin` default role,
+`must_change_password` set explicitly) + `user_roles` in one transaction — **no**
+`user_permissions` copies (admin capability resolves from `role_permissions` via
+`has_feature()`). Admin state may or may not already exist on DEV; the template's
+placeholder guard and username validation make it safe to run once.
 
-1. Dashboard → **Authentication → Users → Add user**: email `admin@users.sumou.internal`, set a password, tick **Auto Confirm User**. Copy the new user's **UUID**.
-2. Dashboard → **SQL Editor**, run (single transaction — satisfies the deferrable default-role FK):
-
-```sql
-begin;
-insert into public.profiles (id, username, full_name, default_role_id, is_active)
-values ('<AUTH_UUID>', 'admin', 'إدارة سمو',
-        (select id from public.roles where code = 'admin'), true);
-insert into public.user_roles (user_id, role_id)
-values ('<AUTH_UUID>', (select id from public.roles where code = 'admin'));
-commit;
-```
-
-Admin permissions then resolve from `role_permissions` (admin defaults from Step 2). Do this on **DEV** first; repeat on **PROD** when you go live.
+> **Production bootstrap is a separate, future release procedure** — do **not**
+> run it now, and do **not** reuse the DEV template against Production.
 
 ---
 
@@ -42,11 +38,12 @@ Runs with **service_role** (an Edge Function secret), so it can create auth user
 **Input:** `{ username, full_name, default_role, roles[], photo_types[] }` + the caller's JWT (Authorization header).
 
 **Steps:**
-1. **Authorize the caller:** verify the JWT → the caller is an **active admin** with `can_manage_users` (checked server-side against `profiles`/`user_roles`/permissions). Reject otherwise.
+1. **Authorize the caller:** verify the JWT → the caller is an **active admin** with **both `can_manage_users` AND `can_manage_permissions`** (checked server-side against `profiles`/`user_roles`/permissions; fail-closed on query errors). Reject otherwise. See the frozen operation-gate table in §12.
 2. **Normalize + validate** username (`^[a-z0-9._-]{2,50}$`); ensure it's not already taken.
 3. **Generate a strong temporary password** (e.g. 16+ random chars).
 4. `serviceClient.auth.admin.createUser({ email: '<username>@users.sumou.internal', password: <temp>, email_confirm: true, user_metadata: { username } })` — a **confirmed** account, **no email sent**.
-5. **Create the profile atomically** via a `security definer` RPC `create_staff_profile(user_id, username, full_name, default_role, roles[], photo_types[])` that, in ONE transaction, inserts `profiles` (with `must_change_password = true`), `user_roles` (incl. the default role), `user_photographer_types`, and — only when supplied — explicit `user_permissions` **overrides**. It does **NOT** copy `role_permissions` into `user_permissions`; role-default capabilities resolve at read time via `has_feature()`. (Compensation: if this step fails, the function deletes the just-created auth user to avoid an orphaned `auth.users` row.)
+5. **Create the profile atomically** via the service-only `security definer` RPC
+   `create_staff_profile(p_actor_id, p_user_id, p_username, p_full_name, p_default_role, p_roles[], p_photographer_types[], p_permission_overrides jsonb)` — **exact signature/behavior in §12**. In ONE transaction it inserts `profiles` (`is_active=true`, `must_change_password=true`), `user_roles` (incl. the default), `user_photographer_types`, and — only when supplied — explicit `user_permissions` **overrides**, plus the audit row. It **re-validates `p_actor_id`** (active admin + `can_manage_users` AND `can_manage_permissions`) since `auth.uid()` is not the admin in the service context, and it **NEVER** copies `role_permissions` into `user_permissions` (role defaults resolve via `has_feature()`). Compensation: if this step fails, the Edge Function deletes the just-created auth user (§9).
 6. **Audit** one minimal `audit_logs` row: `actor_id` = caller, `action` = `user.create`, `entity` = `profiles`, `entity_id` = new user id. **Never** log the password, the internal email, or any secret in `meta`.
 7. **Return `{ user, temp_password }` once** — the app shows the temp password to the admin to hand over. It is **never stored** (not in the DB, not in logs).
 
@@ -93,21 +90,41 @@ Keeps the exact `AuthRepository` interface, so the UI/providers don't change.
 
 ## 7. Dependency & sequencing (important)
 
-- **RLS prerequisite:** logging in and loading a profile requires RLS policies that let a user **read their own** `profiles` / `user_roles` / `user_permissions` (+ read the `roles`/`permissions` catalogs). Those are part of **Sprint 9 Step 6**. So this auth step needs **either** Step 6 done first **or** a minimal "self-read" policy subset bundled in.
-- The `admin-create-user` path itself works without RLS policies (service_role bypasses RLS), but the **app can't read data back** until the self-read policies exist.
-- **Recommendation:** implement the identity/access **self-read RLS policies** (a slice of Step 6) as the first task of the build, then the Edge Function + Flutter auth.
+- **RLS prerequisite — already satisfied.** Logging in and loading a profile
+  requires RLS policies that let a user **read their own** `profiles` /
+  `user_roles` / `user_permissions` (+ read the `roles`/`permissions` catalogs).
+  These identity/access **self-read RLS policies are completed and live on DEV**
+  (Sprint 9 Step 6.1, migration `20260714160000_identity_access_rls.sql`). **No
+  additional self-read RLS prerequisite is needed in Sprint 10** — the Auth build
+  starts directly at the create-user backend.
+- The `admin-create-user` path runs with service_role (bypasses RLS); the app
+  reads data back through the existing self-read policies.
 
 ---
 
-## 8. Build checklist (when approved)
+## 8. Build checklist — the approved eight-step Sprint 10 sequence
 
-1. RLS self-read policies for `profiles`/`user_roles`/`user_permissions`/`roles`/`permissions` (own-row + catalog read). *(migration)*
-2. `create_staff_profile` RPC (`security definer`). *(migration)*
-3. Edge Function `admin-create-user` (+ optional `admin-reset-password`); `supabase secrets set` for service_role. *(supabase/functions)*
-4. Add `supabase_flutter` package; initialize with URL + anon key via `--dart-define-from-file`. *(Flutter)*
-5. `SupabaseAuthRepository implements AuthRepository`; wire the "add user" flow to the Edge Function + temp-password dialog; wire `changePassword`. *(Flutter)*
-6. Swap `authRepositoryProvider` to Supabase (keep the mock for widget tests). *(Flutter)*
-7. Deploy functions + push RPC/policy migrations to DEV; manual end-to-end test; then PROD.
+Identity/access self-read RLS is **already done** (Step 6.1, live on DEV), so it
+is **not** a step here. The Auth build follows the approved sequence (see §11):
+
+1. **Auth schema readiness** — `profiles.must_change_password` (migration
+   `20260714210000`). *(done — prepared in code; pending manual DEV apply.)*
+2. **Admin create-user backend** — `create_staff_profile` `security definer` RPC
+   (needs an **explicit** `execute` grant — default function privileges are
+   hardened, Step 6.5) + `admin-create-user` Edge Function (service_role secret).
+3. **Admin reset-password backend** — `admin-reset-password` Edge Function.
+4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
+   `--dart-define-from-file`.
+5. **Username login / session / profile loading** — `SupabaseAuthRepository`;
+   sign out / block inactive/deleted profiles.
+6. **Forced first password change** — redirect on `must_change_password` + the
+   trusted completion operation that clears the flag (mechanism TBD; §11).
+7. **Admin user-management integration** — wire create/reset/activate/roles.
+8. **Auth QA**.
+
+> **Production deployment remains a separate, explicitly-approved future release**
+> — do not push functions/migrations to Production or perform any Production
+> action now. All apply steps in this checklist are **DEV-only** until then.
 
 ---
 
@@ -123,12 +140,13 @@ No project/team/closure logic, no finance/payments/Rekaz/notifications/FCM/push/
 
 ---
 
-## 11. Step 10.1 — Auth schema readiness (implemented)
+## 11. Step 10.1 — Auth schema readiness (prepared in code)
 
-Migration `supabase/migrations/20260714210000_auth_schema_readiness.sql` (applied
-by the owner to DEV). This is the schema-only groundwork before the Edge Functions
-and Flutter work — **no** Auth users, Edge Functions, Flutter, RPCs, policies, or
-secrets.
+Migration `supabase/migrations/20260714210000_auth_schema_readiness.sql` —
+**prepared in code; pending owner review and manual DEV application** (not yet
+applied to DEV, not on Production). This is the schema-only groundwork before the
+Edge Functions and Flutter work — **no** Auth users, Edge Functions, Flutter,
+RPCs, policies, or secrets.
 
 ### Approved Sprint 10 sequence
 1. **Auth schema readiness** ← this step (10.1)
@@ -144,10 +162,27 @@ secrets.
 `public.profiles.must_change_password boolean NOT NULL DEFAULT true`.
 Lifecycle: **true** at creation (temp password) → **false** on first successful
 self-change → **true** again on an admin reset. It drives the later forced
-change-password redirect (Step 10.6). **Backfill (deliberate):** pre-existing
-profiles are set to **false** so a manually-bootstrapped admin is not locked into
-a forced change once the redirect lands; new rows use the default (true). No
-password/token/OTP/secret column was added.
+change-password redirect (Step 10.6). No password/token/OTP/secret column added.
+
+**Backfill (deliberate, narrow):** only an existing **active, non-deleted** profile
+that holds the **active `admin` role** is set to **false** — the manually
+bootstrapped first admin, whose dashboard-set password is a real password. Every
+**other** existing profile keeps **true**: disabled, soft-deleted, and non-admin
+accounts are NOT exempted, so any pre-existing staff account (which would have been
+created with a temporary password) is still correctly forced to change. New rows
+use the default (true); on an empty database the backfill matches 0 rows.
+
+### Forced first-password-change — completion is NOT done in Step 10.1
+Step 10.1 only adds the **state** (`must_change_password`). Clearing it requires a
+**trusted** operation, because `profiles` has **no direct UPDATE policy**. A plain
+`auth.updateUser({ password })` changes the Supabase Auth password but does **not**
+clear the database flag. **Step 10.6** must implement the approved trusted
+completion (e.g. a narrow `security definer` RPC callable only by the
+authenticated owner for their own row, or an Edge Function) that sets
+`must_change_password = false` after a verified first change. **Do not** claim the
+forced first-password flow is complete, and **do not** build that operation now —
+the exact Step-10.6 mechanism (narrow RPC vs Edge Function, re-auth requirement)
+remains to be finalized before implementation.
 
 ### Username normalization — ownership
 - **Rule (deterministic):** `lower(btrim(username))`, validated `^[a-z0-9._-]{2,50}$`;
@@ -166,13 +201,18 @@ password/token/OTP/secret column was added.
   `auth.admin.createUser`. It is **never** displayed, **never** written to
   `audit_logs`, and **never** returned by a public RPC.
 
-### Contact email vs internal Auth email
-- `auth.users.email` = the hidden internal identity above.
+### Contact email vs internal Auth email — mapping rule
+- `auth.users.email` = the hidden internal login identity (`<username>@users.sumou.internal`).
 - **`public.profiles` has no `email` column** and Step 10.1 does not add one (the
-  internal Auth email must not be duplicated into a public column). A user's
-  optional public/contact email is **not** persisted server-side today and is
-  **never** the login identity. If a contact email is wanted later, it is a
-  separate, explicitly-approved column — distinct from the Auth identity.
+  internal Auth email must not be duplicated into a public column).
+- `UserModel.email` (Flutter) currently has **no backend profile source**. The
+  future `SupabaseProfileMapper`/`SupabaseAuthRepository` **must map
+  `UserModel.email` to `null`** — it must **never** expose `auth.users.email` as
+  `UserModel.email` (that would leak the hidden internal identity into the UI).
+- A user's optional public/contact email is **not** persisted server-side and is
+  **never** the login identity. Only if a separate public contact-email column is
+  explicitly approved later would the mapper source `UserModel.email` from it — a
+  distinct decision from the Auth identity, not part of Step 10.1.
 
 ### Permission codes
 No new permission codes are required or added. User management resolves through
@@ -201,9 +241,111 @@ Auth still accepts the password — the Step-10.5 session loader signs out / blo
 inactive/deleted profiles. No hard-delete of accounts.
 
 ### First-admin bootstrap (DEV only)
-See `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql` — a manual, one-time, placeholder-only
-DEV template: create the Auth user in the dashboard with the internal email, then
-insert the matching `profiles` + `user_roles` (admin) in one transaction with the
-same UUID; `must_change_password` per the bootstrap decision; **no**
-`user_permissions` copies; no real credentials committed; verification + cleanup/
-recovery included. Never creates a Production administrator.
+The single canonical procedure is `docs/qa/FIRST_ADMIN_BOOTSTRAP_DEV.sql` (see §2)
+— a manual, one-time, placeholder-only DEV template run in the SQL Editor (DEV
+database-owner context): a `DO $$` block with a placeholder-UUID guard, username
+normalization/validation, active-admin-role lookup, and `profiles` + `user_roles`
+inserted in one transaction with `must_change_password` explicitly chosen and **no**
+`user_permissions` inserts. Auth-user creation stays manual in the DEV Dashboard.
+No real credentials/project-ref/secrets. **Production bootstrap is a separate,
+future release procedure — never run it now.**
+
+---
+
+## 12. Step 10.2 — Admin create-user backend (implemented; DEV-pending)
+
+**Prepared in code; pending owner review, manual DEV apply + deploy.** Not on
+Production. Files: `supabase/migrations/20260714220000_admin_create_user_backend.sql`,
+`supabase/functions/admin-create-user/index.ts`,
+`supabase/functions/_shared/auth-utils.ts` (+ `.test.ts`),
+`docs/qa/STEP_10_2_ADMIN_CREATE_USER_DEV_QA.md`.
+
+### RPC signature & grant
+```
+public.create_staff_profile(
+  p_actor_id uuid, p_user_id uuid, p_username text, p_full_name text,
+  p_default_role text, p_roles text[], p_photographer_types text[] default '{}',
+  p_permission_overrides jsonb default '[]'
+) returns jsonb
+```
+`SECURITY DEFINER`, `search_path=''`, schema-qualified, no dynamic SQL. **EXECUTE
+revoked from PUBLIC/anon/authenticated; granted to `service_role` ONLY** (default
+privileges are hardened — Step 6.5 — so the grant is explicit). Inputs are stable
+**codes** (roles/permissions/photographer types), never UUIDs; it accepts **no**
+password/temp-password/internal-email/token/secret/`is_active`/`must_change_password`.
+
+Return `jsonb`: `{ id, username, full_name, default_role, roles[], photographer_types[],
+permission_overrides[], is_active:true, must_change_password:true }` — **never** the
+internal email, password, hash, token, or service-role data. The temp password is
+added only by the Edge Function HTTP response.
+
+### Authorization (defense-in-depth, in BOTH layers)
+- **Edge Function** (caller-scoped RLS client): `auth.getUser()` → active profile
+  (self policy only returns active/non-deleted) → active **admin** role →
+  effective **`can_manage_users` AND `can_manage_permissions`** (reusable
+  `callerHasFeature`: user override else OR of active-role defaults; **fails
+  closed** — any query error → 500, never treated as empty/false-negative pass).
+  It **never** trusts Flutter-supplied roles/permissions for authorization, and
+  uses `service_role` only **after** this passes.
+- **RPC** (service context, so `auth.uid()` is NOT the admin): re-validates the
+  supplied `p_actor_id` itself — active, non-deleted, active admin role, effective
+  **`can_manage_users` AND `can_manage_permissions`** (same override-first/active-
+  role-default resolution) — fail-closed. So authorization does not depend on the
+  Edge Function alone.
+
+### Normalization & internal email
+`normalizedUsername = username.trim().toLowerCase()`, validated `^[a-z0-9._-]{2,50}$`.
+The internal email `<normalizedUsername>@users.sumou.internal` is built **only** in
+the Edge Function, never accepted from the client, never returned or logged. The
+RPC additionally verifies `auth.users.email` matches the username (never echoing it).
+
+### Temporary password
+Generated in the Edge Function with `crypto.getRandomValues` (rejection-sampled, no
+`Math.random`): 20 chars from an unambiguous set (no `0/O/1/l/I`) guaranteeing ≥1
+lower/upper/digit/symbol. Never stored, never logged, never in `audit_logs`;
+returned **once** in the 201 body.
+
+### Atomic profile creation & audit
+The RPC does all public writes + the audit row in **one transaction**: `profiles`
+(`is_active=true`, `must_change_password=true`), `user_roles` (validated active
+roles incl. the default), `user_photographer_types` (active types),
+`user_permissions` (**explicit overrides only** — inserts nothing when none;
+**never** copies `role_permissions`), and one `audit_logs` row (`actor_id`,
+`action='user.create'`, `entity='profiles'`, `entity_id`, `meta` = counts only —
+no username/email/password/secret). Any failure rolls back everything.
+
+### Compensation
+Auth and public schema cannot share one SQL transaction, so: create the Auth user
+→ call the RPC → on RPC failure the Edge Function calls `auth.admin.deleteUser` for
+**only** the UUID it just created (never a pre-existing user; a taken username
+returns 409 before any Auth create). If cleanup also fails, it returns a generic
+provisioning failure and never leaks details.
+
+### Validation & rejections
+Inactive roles (`finance`/`wedding_finance`), non-catalog roles (`client_tracking`),
+inactive permissions (`can_manage_finance`), duplicate roles/types/overrides,
+missing default-in-roles, blank name, and malformed/un-normalized usernames are all
+rejected. **No email/notification/password delivery.** **No Production deployment.**
+
+### Authorization boundary — FROZEN operation gates
+Creating a user assigns at least one role and may set explicit permission
+overrides, so an admin who lacks `can_manage_permissions` must not bypass that
+restriction via account creation. The owner **froze** this rule (no new permission
+code introduced):
+
+| Operation | Required (effective) permissions |
+|---|---|
+| **Create user** | active admin + **`can_manage_users` AND `can_manage_permissions`** |
+| Reset password (Step 10.3) | active admin + `can_manage_users` |
+| Activate/deactivate / edit basic profile | active admin + `can_manage_users` |
+| Edit roles or permission overrides | active admin + `can_manage_permissions` |
+
+**`can_manage_users` alone cannot assign initial roles or permission overrides.**
+This gate is enforced in **both** layers: the Edge Function `authorizeAdmin`
+requires both permissions before any `service_role` use, and
+`create_staff_profile` independently re-checks both for `p_actor_id` (the RPC is
+authoritative — `auth.uid()` is not the admin in the service context). Both use
+the same **override-first, else OR-of-active-role-defaults** resolution, over
+**active** catalog rows only, and **fail closed** on any resolution/query error.
+Reset-password authorization is documented here for Step 10.3 and is **not
+implemented** in Step 10.2.

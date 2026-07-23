@@ -502,11 +502,32 @@ column to `public.profiles`:
 
 | Column | Type | Notes |
 |---|---|---|
-| `must_change_password` | `boolean` not null default **true** | first-login password gate (D2). true at creation → false on first self-change → true on admin reset. Backfill: pre-existing rows set to **false** (don't force a bootstrapped admin). |
+| `must_change_password` | `boolean` not null default **true** | first-login password gate (D2). true at creation → false on first self-change → true on admin reset. Backfill: **only existing active, non-deleted `admin`-role profiles → false**; all other existing rows keep true. |
 
 No other schema change. **`profiles` still has no `email` column** — the internal
-Auth email lives only on `auth.users` and is never duplicated here (D2). No
+Auth email lives only on `auth.users`, is never duplicated here (D2), and must
+never be mapped into `UserModel.email` (which maps to `null`). No
 password/token/OTP/secret column added. Username stays normalized + unique
 (`^[a-z0-9._-]{2,50}$`). RLS unchanged; the existing self/admin SELECT policies
-scope the new column; no profile write policy. See
-`docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §11.
+scope the new column; no profile write policy. Migration **prepared in code;
+pending manual DEV application**. See `docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §11.
+
+## 14. Step 10.2 note (admin create-user RPC)
+
+Migration `supabase/migrations/20260714220000_admin_create_user_backend.sql` adds
+one **service-only** function (no table/column/policy change):
+
+`public.create_staff_profile(p_actor_id uuid, p_user_id uuid, p_username text,
+p_full_name text, p_default_role text, p_roles text[], p_photographer_types text[]
+default '{}', p_permission_overrides jsonb default '[]') returns jsonb`
+
+`SECURITY DEFINER`, `search_path=''`, schema-qualified, no dynamic SQL. **EXECUTE:
+revoked from PUBLIC/anon/authenticated; granted to `service_role` only** (hardened
+default privileges, Step 6.5). Atomically inserts `profiles`(is_active=true,
+must_change_password=true) + `user_roles` + `user_photographer_types` + explicit
+`user_permissions` overrides + one `user.create` `audit_logs` row; re-validates the
+actor (active admin + can_manage_users); rejects inactive/unknown roles/types/
+permissions; **never copies `role_permissions` into `user_permissions`**; handles no
+passwords/internal-email/secrets. Called by the `admin-create-user` Edge Function.
+See `docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §12. **Prepared in code; pending manual
+DEV apply/deploy.**

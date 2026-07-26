@@ -44,10 +44,17 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  # Pinned exactly (no caret): must not float to a later 2.x on future resolves.
+  supabase_flutter: 2.15.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Used only by test/supabase_client_provider_test.dart to mock local storage
+  # so Supabase.initialize can run offline. Declared explicitly (it is a
+  # transitive dep of supabase_flutter) so the test import is not "undeclared".
+  shared_preferences: 2.5.3
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

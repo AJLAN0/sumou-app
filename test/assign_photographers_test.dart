@@ -8,11 +8,12 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'test_helpers.dart';
 
 void main() {
   // Opens a project's details screen, then the assign-photographers screen.
   Future<void> openAssign(WidgetTester tester, String projectName) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

@@ -6,12 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/widgets/widgets.dart';
+import 'test_helpers.dart';
 
 void main() {
   testWidgets(
     'Unauthenticated boot shows splash, then the entry screen in RTL',
     (tester) async {
-      await tester.pumpWidget(const ProviderScope(child: SumouApp()));
+      await tester.pumpWidget(
+        ProviderScope(overrides: mockAuthOverrides(), child: const SumouApp()),
+      );
 
       // Splash is shown first (the animated brand loader).
       await tester.pump();

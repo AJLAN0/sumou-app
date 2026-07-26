@@ -9,11 +9,12 @@ import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'test_helpers.dart';
 
 void main() {
   // Logs in as the manager, opens the "الطلبات" hub, then the closure inbox.
   Future<void> openRequests(WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

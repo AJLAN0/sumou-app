@@ -67,6 +67,12 @@ class RoleNavConfig {
       NavItem(label: moreLabel, icon: Icons.more_horiz),
     ],
     // ----- placeholder configs (later sprints) -----
+    // Marketing uses a minimal fallback shell until its dedicated UI lands
+    // (no new marketing screens are built in this step).
+    RoleType.marketing => const [
+      NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
+      NavItem(label: 'صفحتي', icon: Icons.person_outline),
+    ],
     RoleType.designer => const [
       NavItem(label: 'الرئيسية', icon: Icons.home_outlined),
       NavItem(label: 'طلبات التصميم', icon: Icons.brush_outlined),

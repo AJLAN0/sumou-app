@@ -8,10 +8,11 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/projects/providers/projects_providers.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
+import 'test_helpers.dart';
 
 void main() {
   Future<void> openCalendarAsPhotographer(WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)
@@ -68,7 +69,7 @@ void main() {
   testWidgets('manager reaches the calendar from the More menu', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)
@@ -92,7 +93,7 @@ void main() {
   test(
     'calendarProjectsProvider is empty for roles without projects',
     () async {
-      final container = ProviderContainer();
+      final container = makeMockContainer();
       addTearDown(container.dispose);
       await container
           .read(authControllerProvider.notifier)

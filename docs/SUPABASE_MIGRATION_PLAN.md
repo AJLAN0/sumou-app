@@ -158,10 +158,41 @@ Backend/DB precedes Flutter. Order:
    verification left ON). DB-verified: `create_staff_profile` is SECURITY DEFINER,
    `search_path=""`, EXECUTE = service_role only (public/anon/authenticated revoked);
    `has_feature` remains EXECUTE-able by `authenticated`. Production untouched.)*
-3. Admin **reset-password** backend — `admin-reset-password` Edge Function.
+3. Admin **reset-password** backend — `admin-reset-password` Edge Function +
+   `record_admin_password_reset` `security definer` RPC (migration
+   `20260714230000_admin_reset_password_backend.sql`; explicit `execute` grant to
+   `service_role` only — hardened defaults, Step 6.5). *(Step 10.3 — **APPLIED +
+   DEPLOYED to DEV `fnanhaflpsoggfoaqzes` on 2026-07-23.** Reset requires an active
+   admin + effective `can_manage_users` (NOT `can_manage_permissions`); caller
+   authz via the authenticated `has_feature` RPC; the RPC re-checks the actor.
+   Ordering: Auth password update BEFORE the RPC (no distributed txn), with a
+   preflight; on RPC-after-Auth failure the temp password is NOT exposed and the
+   recovery is an idempotent retry. DB-verified: `record_admin_password_reset` is
+   SECURITY DEFINER, `search_path=""`, EXECUTE service_role only; no profiles write
+   RLS policy. Local Deno gate green (fmt/check OK, 64 tests); smoke tests pass.
+   Production untouched.)*
 4. Flutter Supabase **initialization** (add `supabase_flutter`, env wiring).
+   *(Step 10.4 — **DONE.** `supabase_flutter 2.15.4` (pinned exactly); test-only
+   `shared_preferences 2.5.3` under dev_dependencies. `SupabaseConfig` reads
+   `SUPABASE_URL`/`SUPABASE_ANON_KEY` from `--dart-define-from-file`, validated
+   (URL restricted to hosted `https://<20-char-ref>.supabase.co`; non-placeholder),
+   key never logged; `bootstrap()`
+   fails-fast on bad config then `Supabase.initialize` once before `runApp`;
+   canonical `supabaseClientProvider` exposes the client. **Mock AuthRepository
+   still active — no login/session/profile/RPC/Edge calls.** `service_role`
+   never in Flutter. dart format clean, `flutter analyze` clean, new
+   config/provider tests pass. No remote command; Production untouched.)*
 5. **Username login / session / profile loading** (`SupabaseAuthRepository`;
-   sign out / block inactive/deleted profiles).
+   sign out / block inactive/deleted profiles). *(Step 10.5 — **DONE (Flutter
+   only; no backend/remote change).** Real `SupabaseAuthRepository` wired via
+   `supabaseClientProvider`; username→hidden internal email in the data layer;
+   login loads own profile/active-roles/active-photo-types/effective-permissions
+   (role defaults scoped to the caller's OWN active role ids — never by code
+   alone); `RoleType.marketing` added; `UserModel.mustChangePassword` loaded but
+   NOT enforced; idempotent `initializeSession` restore; Splash waits for restore;
+   real `signOut`; `changePassword` deferred to 10.6. Tests override to
+   `MockAuthRepository`. analyze clean; full suite 218 pass / 5 pre-existing fail.
+   Production untouched.)*
 6. **Forced first password change** (redirect on `must_change_password` + the
    password-update operation).
 7. Admin **user-management integration** (wire create/reset/activate/roles).

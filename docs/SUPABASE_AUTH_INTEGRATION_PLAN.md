@@ -51,31 +51,95 @@ Runs with **service_role** (an Edge Function secret), so it can create auth user
 
 ---
 
-## 4. Login — `SupabaseAuthRepository.login`
+## 4. Login — `SupabaseAuthRepository.login` — **DONE (Step 10.5)**
 
-1. `email = normalize(username) + '@users.sumou.internal'` (derived, no DB lookup, never shown).
-2. `signInWithPassword({ email, password })`.
-3. On success, load the profile; if `is_active = false` → `signOut()` + throw `AuthException(accountDisabled)`.
-4. On failure → `AuthException(invalidCredentials)`.
-5. Map profile + roles + **effective** permissions (override-then-role-default) → `UserModel`.
+Implemented in `lib/data/repositories/supabase/` and wired as the default
+`authRepositoryProvider` (tests override with `MockAuthRepository`). Full contract
++ DEV QA: `docs/qa/STEP_10_5_FLUTTER_AUTH_DEV_QA.md`.
+1. `email = normalize(username) + '@users.sumou.internal'` — built ONLY in the data
+   layer (`AuthIdentity`); never stored/returned/shown/logged. Invalid username →
+   `invalidCredentials` **before any network** request.
+2. `signInWithPassword({ email, password })` (username trimmed; password untouched,
+   never retained). Any sign-in error → `invalidCredentials` (never reveals whether
+   the username exists; no raw GoTrue/Postgres text).
+3. Load the caller's OWN profile; `is_active=false` / `deleted_at` set →
+   `signOut()` + `accountDisabled`; missing/id-mismatch → `signOut()` +
+   `profileUnavailable`. `UserModel.email` stays **null** (Auth email never mapped).
+4. Load active roles (unknown-active → fail closed; no-active → reject;
+   `default_role_id` must be an active role; `client_tracking` skipped; new
+   `RoleType.marketing`), active photographer types, and **effective** permissions.
+5. Effective permissions from DB rows: explicit `user_permissions` override wins
+   (incl. false), else OR of `role_permissions` defaults **scoped to the caller's
+   own active role ids** (never by code alone — admin oversight-RLS safety), active
+   permissions only; `can_manage_finance`/unknown never grant. Fail closed on any
+   query error.
 
-Keeps the exact `AuthRepository` interface, so the UI/providers don't change.
+`UserModel.mustChangePassword` is loaded but **not** enforced (Step 10.6). Session
+restoration uses idempotent `AuthController.initializeSession()`; Splash waits for
+it; `changePassword` is deferred (`passwordChangeUnavailable`). Keeps the exact
+`AuthRepository` interface — the UI/providers don't change.
 
 ---
 
 ## 5. Changing the password
 
-**User self-service (existing `ChangePasswordScreen` + `changePassword(currentPassword, newPassword)`):**
-1. Re-authenticate with the current password (sign in with `email` + `currentPassword`) to verify identity.
-2. `auth.updateUser({ password: newPassword })`. No service_role, no Edge Function.
+**User self-service — `change-own-password` Edge Function (service_role) — Step
+10.6A, implemented (pending DEV apply/deploy):**
+Backend for a signed-in staff user changing THEIR OWN password + clearing
+`must_change_password`. Full contract + DEV QA:
+`docs/qa/STEP_10_6_PASSWORD_CHANGE_DEV_QA.md`. Input is ONLY
+`{ current_password, new_password }`; identity (uid, username, internal email) is
+server-derived from the JWT.
+1. POST JSON, valid Bearer user. Authorize: **own ACTIVE, non-deleted profile** —
+   **no admin role and no feature permission** (any active staff may change its
+   own password). Fail-closed on read errors.
+2. Validate the new-password policy server-side (**12–72 chars; upper + lower +
+   digit + symbol; no leading/trailing whitespace**) and require it to **differ**
+   from the current password — both BEFORE any network client is built.
+3. Derive the hidden internal email in-function; **re-authenticate** the current
+   password on an **isolated anon client** (its own in-memory session — the
+   caller's live session is untouched; **no sessions are revoked**).
+4. `serviceClient.auth.admin.updateUserById(uid, { password })` — ONLY the
+   caller's Auth password — then `record_own_password_change(uid)` (clears
+   `must_change_password` + one `user.password_changed` audit row). Ordering is
+   Auth-update **before** the RPC (no distributed transaction). If the RPC fails
+   after the Auth update, a generic 500 is returned and the old password is NOT
+   restored — the safe retry uses the **new** password as `current_password`.
+5. Returns a safe summary only (`{ id, must_change_password:false, is_active }`);
+   never a password, internal email, or token. `Cache-Control: no-store`.
 
-**Admin reset — `admin-reset-password` Edge Function (service_role):**
-1. Authorize caller (**active, non-deleted admin** + `can_manage_users`); the target must be an **active, non-deleted** managed account. A normal user can never reset another user's password.
-2. Generate a new **temporary** password.
-3. `auth.admin.updateUserById(targetUserId, { password: <temp> })`.
-4. Set the target's `profiles.must_change_password = true` (via the trusted server context) so the next login forces a change.
-5. **Audit** `action = user.reset_password` (identifiers only — **no** password/email/secret).
-6. Return the temp password **once** for the admin to hand over. No email/notification delivery. The internal Auth email stays hidden throughout.
+The `service_role` key stays inside the Edge Function; Flutter never sees it. RPC
+grant matrix: `record_own_password_change(uuid)` = EXECUTE **service_role only**
+(public/anon/authenticated revoked), SECURITY DEFINER, `search_path=''`.
+*(**Flutter is NOT wired in this step (10.6A) — that is Step 10.6B.**)*
+
+**Admin reset — `admin-reset-password` Edge Function (service_role) — Step 10.3,
+APPLIED + DEPLOYED to DEV 2026-07-23:**
+Input is ONLY `{ user_id }`; the actor is the verified JWT. Full contract +
+DEV QA: `docs/qa/STEP_10_3_ADMIN_RESET_PASSWORD_DEV_QA.md`.
+1. Authorize caller (**active, non-deleted admin** + effective `can_manage_users`,
+   resolved via the authenticated `public.has_feature` RPC — **NOT**
+   `can_manage_permissions`; a reset assigns no roles/permissions). A normal user
+   can never reset another user's password. Fail-closed on any read error.
+2. **Target rules (frozen):** active → allowed; **inactive → allowed for admin
+   recovery but NOT reactivated**; **soft-deleted → rejected (404)**. Preflight the
+   target (exists + not soft-deleted) **before** any Auth change.
+3. Generate a new **temporary** password; `auth.admin.updateUserById(targetUserId,
+   { password: <temp> })`.
+4. `record_admin_password_reset(actor, target)` (service-only `security definer`
+   RPC): re-checks the actor, sets `profiles.must_change_password = true`, writes
+   the audit row atomically. **Never** changes is_active/roles/permissions/
+   username/name.
+5. **Audit** `action = user.password_reset` (identifiers + `{self_reset}` only —
+   **no** password/email/secret). **Self-reset is allowed**; the flag is still
+   forced true (the caller's session may persist until token expiry — no global
+   revocation here).
+6. Return the temp password **once** (200). **Ordering/partial-failure:** Auth and
+   the public schema are not one transaction; Auth-update precedes the RPC. If the
+   RPC fails *after* the Auth update, the temp password is **not** exposed and a
+   generic 500 is returned — recovery is an **idempotent retry** (the old password
+   is not restorable). No email/notification delivery; the internal Auth email
+   stays hidden throughout.
 
 ---
 
@@ -120,11 +184,28 @@ is **not** a step here. The Auth build follows the approved sequence (see §11):
    any Auth create; `no-store`/`nosniff` headers on every response). **Authenticated
    admin create-user QA is pending** a bootstrapped DEV admin + admin JWT — see
    `docs/qa/STEP_10_2_ADMIN_CREATE_USER_DEV_QA.md`.)*
-3. **Admin reset-password backend** — `admin-reset-password` Edge Function.
+3. **Admin reset-password backend** — `admin-reset-password` Edge Function +
+   `record_admin_password_reset` `security definer` RPC (migration
+   `20260714230000`, `service_role`-only EXECUTE). *(**APPLIED + DEPLOYED to DEV
+   2026-07-23.** Requires active admin + `can_manage_users` only; Auth-update-
+   then-RPC ordering with idempotent-retry recovery; DB-verified grant matrix;
+   local Deno gate green, 64 tests; smoke tests pass. JWT verification ON.)*
 4. **Flutter Supabase initialization** — add `supabase_flutter`; URL + anon key via
-   `--dart-define-from-file`.
+   `--dart-define-from-file`. *(**DONE — Step 10.4.** `supabase_flutter 2.15.4`
+   (pinned exactly). `lib/core/config/supabase_config.dart` reads/validates
+   `SUPABASE_URL` + `SUPABASE_ANON_KEY` — the URL must be a standard hosted
+   `https://<20-char-ref>.supabase.co` (no userInfo/port/path/query/fragment;
+   uppercase ref rejected), non-placeholder; anon key never logged/toString'd;
+   `lib/app/bootstrap.dart` fails-fast on bad config then calls
+   `Supabase.initialize` **once** before `runApp`; `lib/core/providers/supabase_providers.dart`
+   exposes the canonical `supabaseClientProvider`. **No** sign-in/session/profile/
+   RPC/Edge call — the app still uses the mock `authRepositoryProvider`.
+   `service_role` never in Flutter. `config/dev.json` gitignored;
+   `config/dev.example.json` (placeholders) tracked. analyze clean; new tests pass.)*
 5. **Username login / session / profile loading** — `SupabaseAuthRepository`;
-   sign out / block inactive/deleted profiles.
+   sign out / block inactive/deleted profiles. *(**DONE — Step 10.5** (Flutter
+   only). Real login/restore/logout; own-role-scoped effective permissions;
+   `mustChangePassword` loaded not enforced; `changePassword` deferred. See §4.)*
 6. **Forced first password change** — redirect on `must_change_password` + the
    trusted completion operation that clears the flag (mechanism TBD; §11).
 7. **Admin user-management integration** — wire create/reset/activate/roles.

@@ -52,6 +52,11 @@ app.*.map.json
 .env.*
 !.env.example
 
+# Flutter Supabase runtime config (--dart-define-from-file): real values stay
+# local; only `config/dev.example.json` (placeholders) is tracked.
+config/*.json
+!config/dev.example.json
+
 # Supabase local/dev artifacts and secrets
 supabase/.env
 supabase/.env.*

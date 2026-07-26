@@ -529,5 +529,28 @@ must_change_password=true) + `user_roles` + `user_photographer_types` + explicit
 actor (active admin + can_manage_users); rejects inactive/unknown roles/types/
 permissions; **never copies `role_permissions` into `user_permissions`**; handles no
 passwords/internal-email/secrets. Called by the `admin-create-user` Edge Function.
-See `docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §12. **Prepared in code; pending manual
-DEV apply/deploy.**
+See `docs/SUPABASE_AUTH_INTEGRATION_PLAN.md` §12. **APPLIED + DEPLOYED to DEV
+2026-07-23.**
+
+## 15. Step 10.3 note (admin reset-password RPC)
+
+Migration `supabase/migrations/20260714230000_admin_reset_password_backend.sql` adds
+one **service-only** function (no table/column/policy change):
+
+`public.record_admin_password_reset(p_actor_id uuid, p_target_user_id uuid)
+returns jsonb`
+
+`SECURITY DEFINER`, `search_path=''`, schema-qualified, no dynamic SQL. **EXECUTE:
+revoked from PUBLIC/anon/authenticated; granted to `service_role` only** (hardened
+default privileges, Step 6.5). Re-validates the actor (active, non-deleted, active
+admin, effective `can_manage_users` — **not** `can_manage_permissions`); validates
+the target (exists, **not soft-deleted**, matching `auth.users` row; **inactive
+targets allowed but NOT reactivated**); sets `profiles.must_change_password = true`
+(only — `updated_at` via the existing trigger) and writes one `user.password_reset`
+`audit_logs` row (`meta = {self_reset}` only) atomically. Changes no
+roles/permissions/is_active/username/name; handles no passwords/internal-email/
+secrets. Called by the `admin-reset-password` Edge Function **after** the Auth
+password update (Auth + public schema are not one transaction — see the Step 10.3
+DEV QA for the ordering/partial-failure contract). **APPLIED + DEPLOYED to DEV
+2026-07-23** (DB-verified: SECURITY DEFINER, `search_path=""`, EXECUTE service_role
+only; no profiles write RLS policy).

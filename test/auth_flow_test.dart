@@ -6,10 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
+import 'test_helpers.dart';
 
 void main() {
   Future<void> bootToEntry(WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: SumouApp()));
+    await tester.pumpWidget(
+      ProviderScope(overrides: mockAuthOverrides(), child: const SumouApp()),
+    );
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   }

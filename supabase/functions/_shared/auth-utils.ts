@@ -235,6 +235,80 @@ export function validateCreateUserInput(body: unknown): ValidationResult {
   };
 }
 
+// ---- reset-password input validation ----------------------------------------
+// The admin-reset-password Edge Function accepts ONLY a target profile UUID. The
+// actor is derived from the verified JWT; the new/temporary password, internal
+// email, flags, roles and permissions are all server-controlled and must never
+// be supplied by the client.
+export const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The ONLY top-level key accepted by admin-reset-password. */
+export const ALLOWED_RESET_KEYS = ["user_id"] as const;
+
+/** Keys the reset client must NEVER supply (everything sensitive but user_id). */
+export const FORBIDDEN_RESET_KEYS = [
+  "password",
+  "new_password",
+  "newPassword",
+  "temp_password",
+  "tempPassword",
+  "email",
+  "internal_email",
+  "internalEmail",
+  "actor_id",
+  "actorId",
+  "is_active",
+  "isActive",
+  "must_change_password",
+  "mustChangePassword",
+  "roles",
+  "permissions",
+  "permission_overrides",
+  "username",
+  "full_name",
+  "audit",
+  "meta",
+];
+
+export interface ResetPasswordInput {
+  user_id: string;
+}
+export type ResetValidationResult =
+  | { ok: true; value: ResetPasswordInput }
+  | { ok: false; error: string };
+
+/**
+ * Structural validation only: exactly one `user_id` that is a well-formed UUID.
+ * Existence / soft-delete / auth-row checks are enforced authoritatively by the
+ * service-only path (preflight read + record_admin_password_reset).
+ */
+export function validateResetPasswordInput(
+  body: unknown,
+): ResetValidationResult {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, error: "request body must be a JSON object" };
+  }
+  const o = body as Record<string, unknown>;
+
+  for (const k of FORBIDDEN_RESET_KEYS) {
+    if (k in o) return { ok: false, error: `field "${k}" is not allowed` };
+  }
+  const allowed = new Set<string>(ALLOWED_RESET_KEYS);
+  for (const k of Object.keys(o)) {
+    if (!allowed.has(k)) return { ok: false, error: `unknown field "${k}"` };
+  }
+
+  if (typeof o.user_id !== "string") {
+    return { ok: false, error: "user_id is required" };
+  }
+  const user_id = o.user_id.trim().toLowerCase();
+  if (!UUID_RE.test(user_id)) {
+    return { ok: false, error: "user_id must be a valid UUID" };
+  }
+  return { ok: true, value: { user_id } };
+}
+
 // ---- request framing helpers ------------------------------------------------
 
 /**
@@ -300,4 +374,129 @@ export async function readBoundedBody(
     offset += chunk.byteLength;
   }
   return { ok: true, bytes: out };
+}
+
+// ---- own-password-change input validation (Step 10.6A) ----------------------
+// The change-own-password Edge Function accepts ONLY the current + new password.
+// Identity (uid, username, internal email) is server-derived from the JWT and is
+// never accepted from the client.
+
+export const PASSWORD_MIN_LENGTH = 12;
+// 72 is the bcrypt input limit Supabase Auth enforces; cap here so the policy
+// and the backend agree instead of silently truncating.
+export const PASSWORD_MAX_LENGTH = 72;
+
+export const ALLOWED_PASSWORD_CHANGE_KEYS = [
+  "current_password",
+  "new_password",
+] as const;
+
+/** Keys the client must NEVER supply (identity/authorization are server-derived). */
+export const FORBIDDEN_PASSWORD_CHANGE_KEYS = [
+  "username",
+  "email",
+  "internal_email",
+  "internalEmail",
+  "user_id",
+  "userId",
+  "id",
+  "uuid",
+  "password",
+  "token",
+  "access_token",
+  "refresh_token",
+  "must_change_password",
+  "mustChangePassword",
+  "actor_id",
+];
+
+export interface PasswordChangeInput {
+  currentPassword: string;
+  newPassword: string;
+}
+export type PasswordChangeValidation =
+  | { ok: true; value: PasswordChangeInput }
+  | { ok: false; error: string };
+
+/**
+ * STRUCTURAL validation only: a strict allowlist of exactly `current_password`
+ * and `new_password`, both non-empty strings. The `new_password` POLICY is a
+ * separate step ([validateNewPassword]) so a policy failure is distinguishable
+ * from a shape failure, and the current password is verified by re-auth — not by
+ * this policy (it is whatever the account currently has).
+ */
+export function validatePasswordChangeInput(
+  body: unknown,
+): PasswordChangeValidation {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, error: "request body must be a JSON object" };
+  }
+  const o = body as Record<string, unknown>;
+  for (const k of FORBIDDEN_PASSWORD_CHANGE_KEYS) {
+    if (k in o) return { ok: false, error: `field "${k}" is not allowed` };
+  }
+  const allowed = new Set<string>(ALLOWED_PASSWORD_CHANGE_KEYS);
+  for (const k of Object.keys(o)) {
+    if (!allowed.has(k)) return { ok: false, error: `unknown field "${k}"` };
+  }
+  if (
+    typeof o.current_password !== "string" || o.current_password.length === 0
+  ) {
+    return { ok: false, error: "current_password is required" };
+  }
+  if (typeof o.new_password !== "string" || o.new_password.length === 0) {
+    return { ok: false, error: "new_password is required" };
+  }
+  return {
+    ok: true,
+    value: {
+      currentPassword: o.current_password,
+      newPassword: o.new_password,
+    },
+  };
+}
+
+export type NewPasswordValidation =
+  | { ok: true; value: string }
+  | { ok: false; error: string };
+
+/**
+ * Server-side new-password policy: 12–72 chars, at least one upper / lower /
+ * digit / symbol, and NO leading or trailing whitespace. A "symbol" is any
+ * character that is not a letter, digit, or whitespace. Never logs the value.
+ */
+export function validateNewPassword(raw: unknown): NewPasswordValidation {
+  if (typeof raw !== "string") {
+    return { ok: false, error: "new_password must be a string" };
+  }
+  const pw = raw;
+  if (/^\s|\s$/.test(pw)) {
+    return {
+      ok: false,
+      error: "new_password must not have leading or trailing whitespace",
+    };
+  }
+  if (pw.length < PASSWORD_MIN_LENGTH || pw.length > PASSWORD_MAX_LENGTH) {
+    return {
+      ok: false,
+      error:
+        `new_password must be ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} characters`,
+    };
+  }
+  if (!/[A-Z]/.test(pw)) {
+    return {
+      ok: false,
+      error: "new_password must include an uppercase letter",
+    };
+  }
+  if (!/[a-z]/.test(pw)) {
+    return { ok: false, error: "new_password must include a lowercase letter" };
+  }
+  if (!/[0-9]/.test(pw)) {
+    return { ok: false, error: "new_password must include a digit" };
+  }
+  if (!/[^A-Za-z0-9\s]/.test(pw)) {
+    return { ok: false, error: "new_password must include a symbol" };
+  }
+  return { ok: true, value: pw };
 }

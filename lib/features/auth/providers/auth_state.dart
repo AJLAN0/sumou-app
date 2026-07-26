@@ -10,6 +10,7 @@ class AuthState {
   const AuthState({
     this.currentUser,
     this.selectedRole,
+    this.isInitializing = false,
     this.isLoading = false,
     this.errorMessage,
   });
@@ -20,6 +21,11 @@ class AuthState {
   /// The role chosen by a multi-role user; null until chosen (or for a
   /// single-role user it is set automatically on login).
   final RoleType? selectedRole;
+
+  /// True while the app is still restoring a persisted session at startup.
+  /// "Not restored yet" is distinct from "signed out": the router keeps
+  /// employees on Splash until this becomes false.
+  final bool isInitializing;
 
   /// True while an auth operation is in flight.
   final bool isLoading;
@@ -56,6 +62,7 @@ class AuthState {
   AuthState copyWith({
     Object? currentUser = _unset,
     Object? selectedRole = _unset,
+    bool? isInitializing,
     bool? isLoading,
     Object? errorMessage = _unset,
   }) {
@@ -68,6 +75,7 @@ class AuthState {
           identical(selectedRole, _unset)
               ? this.selectedRole
               : selectedRole as RoleType?,
+      isInitializing: isInitializing ?? this.isInitializing,
       isLoading: isLoading ?? this.isLoading,
       errorMessage:
           identical(errorMessage, _unset)

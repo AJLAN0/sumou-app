@@ -12,6 +12,7 @@ import {
   normalizeUsername,
   TEMP_PASSWORD_LENGTH,
   validateCreateUserInput,
+  validateResetPasswordInput,
 } from "./auth-utils.ts";
 
 Deno.test("normalizeUsername trims + lowercases", () => {
@@ -293,4 +294,69 @@ Deno.test("input: extra key inside a permission override is rejected", () => {
       }],
     }).ok,
   );
+});
+
+// ---- validateResetPasswordInput (Step 10.3) ---------------------------------
+
+Deno.test("reset input: a lone valid user_id passes and is lowercased", () => {
+  const r = validateResetPasswordInput({
+    user_id: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+  });
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.value.user_id, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+  }
+});
+
+Deno.test("reset input: non-object / array bodies rejected", () => {
+  assertFalse(validateResetPasswordInput(null).ok);
+  assertFalse(validateResetPasswordInput("x").ok);
+  assertFalse(validateResetPasswordInput([]).ok);
+});
+
+Deno.test("reset input: missing user_id rejected", () => {
+  assertFalse(validateResetPasswordInput({}).ok);
+});
+
+Deno.test("reset input: invalid UUID rejected", () => {
+  assertFalse(validateResetPasswordInput({ user_id: "not-a-uuid" }).ok);
+  assertFalse(validateResetPasswordInput({ user_id: "12345" }).ok);
+  assertFalse(validateResetPasswordInput({ user_id: 123 }).ok);
+});
+
+Deno.test("reset input: unknown top-level field rejected (strict allowlist)", () => {
+  assertFalse(
+    validateResetPasswordInput({
+      user_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      extra: 1,
+    }).ok,
+  );
+});
+
+Deno.test("reset input: forbidden fields rejected (server-controlled)", () => {
+  for (
+    const k of [
+      "password",
+      "new_password",
+      "temp_password",
+      "email",
+      "internal_email",
+      "actor_id",
+      "is_active",
+      "must_change_password",
+      "roles",
+      "permissions",
+      "username",
+      "full_name",
+    ]
+  ) {
+    const body: Record<string, unknown> = {
+      user_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    };
+    body[k] = "x";
+    assertFalse(
+      validateResetPasswordInput(body).ok,
+      `expected "${k}" rejected`,
+    );
+  }
 });

@@ -10,11 +10,12 @@ import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/projects/submit_closure_request_screen.dart';
+import 'test_helpers.dart';
 
 void main() {
   // Logs in as the photographer, opens a project, opens the closure screen.
   Future<void> openClosure(WidgetTester tester, String projectName) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

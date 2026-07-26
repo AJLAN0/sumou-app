@@ -1,0 +1,7 @@
+# Keeps the functions directory tracked while empty.
+#
+# Sprint 9 Step 1: NO Edge Functions yet. A future `admin_create_user` Edge
+# Function is planned (decision D2) but NOT implemented in this step.
+#
+# NEVER create functions for: finance, payments, Rekaz, notifications, FCM,
+# push notifications, or reminders (see docs/BACKEND_SCOPE_GUARD.md).

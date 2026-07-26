@@ -14,7 +14,7 @@ import 'test_helpers.dart';
 
 void main() {
   Future<void> openEdit(WidgetTester tester, String projectName) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

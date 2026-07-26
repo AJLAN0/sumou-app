@@ -13,7 +13,7 @@ import 'test_helpers.dart';
 
 void main() {
   Future<void> pumpAdmin(WidgetTester tester) async {
-    final container = ProviderContainer();
+    final container = makeMockContainer();
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

@@ -43,3 +43,25 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ---------------------------------------------------------------------------
+# Secrets & environment (NEVER commit real keys)
+# ---------------------------------------------------------------------------
+# Real env files stay local; only `.env.example` is tracked.
+.env
+.env.*
+!.env.example
+
+# Flutter Supabase runtime config (--dart-define-from-file): real values stay
+# local; only `config/dev.example.json` (placeholders) is tracked.
+config/*.json
+!config/dev.example.json
+
+# Supabase local/dev artifacts and secrets
+supabase/.env
+supabase/.env.*
+supabase/.branches/
+supabase/.temp/
+# Never commit a service_role key anywhere.
+**/service_role*
+**/*service-role*

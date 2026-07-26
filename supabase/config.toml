@@ -1,0 +1,56 @@
+# Supabase local development config.
+# Docs: https://supabase.com/docs/guides/cli/config
+#
+# Sprint 9 Step 1 — Development Foundation ONLY.
+# This file configures the LOCAL Supabase stack. It contains NO secrets, NO
+# project reference, and NO remote link. Application tables, RLS, RPCs, and Edge
+# Functions are intentionally NOT defined yet (see docs/SUPABASE_DEV_SETUP.md).
+#
+# `project_id` is just a local stack name — it is not a secret and not a remote
+# project reference.
+project_id = "sumou-app"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Match the linked remote projects' Postgres major version (DEV/PROD are PG17).
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+# Local email testing inbox (dev only). Not a notifications feature — this is
+# the CLI's built-in local SMTP catcher and creates nothing in the app.
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+# The app logs in by username via an internal generated email
+# (normalized_username@users.sumou.internal) — see decision D2 in
+# docs/SUPABASE_CORE_PLAN.md. Documented here; not implemented this step.
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# Internal accounts do not require email confirmation (D2).
+enable_confirmations = false
+
+[storage]
+# File uploads are DEFERRED (decision D4 — links only for the first backend).
+enabled = false

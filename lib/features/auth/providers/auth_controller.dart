@@ -17,7 +17,8 @@ class AuthController extends Notifier<AuthState> {
 
   AuthRepository get _auth => ref.read(authRepositoryProvider);
 
-  bool _initialized = false;
+  /// The in-flight (or completed) restoration, so the operation is idempotent.
+  Future<void>? _initFuture;
 
   /// Restore a persisted Supabase session at startup (idempotent). Splash waits
   /// for this to complete before routing. Resolves to:
@@ -25,9 +26,14 @@ class AuthController extends Notifier<AuthState> {
   ///     /invalid — the repository signs the bad session out), or
   ///   • authenticated with the full user context when a valid session exists.
   /// An unexpected restore failure resolves to signed-out with a safe message.
-  Future<void> initializeSession() async {
-    if (_initialized) return;
-    _initialized = true;
+  ///
+  /// Concurrent callers await the SAME restoration: returning the cached future
+  /// (instead of an immediately-completed one) guarantees a second caller never
+  /// proceeds to route while the first restoration is still in flight — which
+  /// would route off a still-initializing state and could flash Entry.
+  Future<void> initializeSession() => _initFuture ??= _restoreSession();
+
+  Future<void> _restoreSession() async {
     state = state.copyWith(isInitializing: true, errorMessage: null);
     try {
       final user = await _auth.currentUser();
@@ -40,11 +46,16 @@ class AuthController extends Notifier<AuthState> {
         );
       }
     } on AuthException {
-      // Disabled/deleted/invalid persisted account → safe signed-out.
+      // Disabled/deleted/invalid persisted account → safe signed-out. Terminal:
+      // the repository already cleared the bad session, so no retry is wanted.
       state = const AuthState();
     } catch (_) {
-      state = const AuthState(
-        errorMessage: 'تعذّرت استعادة الجلسة، يرجى تسجيل الدخول',
+      // TRANSIENT failure (network/query): clear the cached future so a later
+      // call can retry — a one-off outage must not latch the app signed-out for
+      // the rest of its lifetime. The persisted session is left intact.
+      _initFuture = null;
+      state = AuthState(
+        errorMessage: _messageFor(AuthFailure.sessionRestoreFailed),
       );
     }
   }
@@ -56,7 +67,15 @@ class AuthController extends Notifier<AuthState> {
     required String username,
     required String password,
   }) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    // An explicit login supersedes startup restoration: clear isInitializing on
+    // every path (a stale `true` would hold the router on Splash and hide the
+    // error) and stop a late restore from overwriting this result.
+    _initFuture = Future<void>.value();
+    state = state.copyWith(
+      isLoading: true,
+      isInitializing: false,
+      errorMessage: null,
+    );
     try {
       final user = await _auth.login(username: username, password: password);
       state = AuthState(
@@ -66,6 +85,7 @@ class AuthController extends Notifier<AuthState> {
     } on AuthException catch (e) {
       state = state.copyWith(
         isLoading: false,
+        isInitializing: false,
         currentUser: null,
         selectedRole: null,
         errorMessage: _messageFor(e.reason),
@@ -73,6 +93,7 @@ class AuthController extends Notifier<AuthState> {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
+        isInitializing: false,
         errorMessage: 'حدث خطأ غير متوقع، حاول مرة أخرى',
       );
     }
@@ -92,8 +113,12 @@ class AuthController extends Notifier<AuthState> {
     state = state.copyWith(selectedRole: null);
   }
 
-  /// Sign out and reset to the initial state.
+  /// Sign out and reset to the signed-out state. Idempotent.
   Future<void> logout() async {
+    // Mark restoration settled so returning to Splash cannot re-query (and can
+    // never resurrect a just-cleared session). The reset state is NOT
+    // initializing, so the router goes straight to Entry.
+    _initFuture = Future<void>.value();
     await _auth.logout();
     state = const AuthState();
   }

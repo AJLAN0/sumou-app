@@ -69,6 +69,25 @@ failure → signed-out with a safe Arabic message. `AuthState.isInitializing`
 distinguishes "restoring" from "signed out"; the initial state is **restoring** so
 Entry never flashes before restoration.
 
+### Restoration hardening (final Step 10.5 pass)
+- **Concurrency:** `initializeSession()` caches and returns the **in-flight**
+  future (`_initFuture ??= _restoreSession()`), so a second caller awaits the same
+  restoration. Previously a concurrent caller got an already-completed future and
+  could route while restoration was still running (risking an Entry flash).
+- **Transient vs terminal failure:** a transient failure (network/query) clears the
+  cached future so a later call can **retry** — a one-off outage no longer latches
+  the app signed-out for its whole lifetime; the persisted session is left intact.
+  A terminal `AuthException` (disabled/deleted account) stays settled — the repo
+  already cleared the bad session, so the user must log in again.
+- **`isInitializing` never goes stale:** `login()` settles it on **every** path
+  (success and both failure paths) and marks restoration complete, so a login
+  attempt during startup can't leave the router pinned on Splash hiding the error,
+  and a late restore can't overwrite the login result.
+- **Logout** marks restoration settled too, so returning to Splash cannot re-query
+  or resurrect a just-cleared session.
+- The declared `AuthFailure.sessionRestoreFailed` is now actually used (the restore
+  message goes through the central `_messageFor` mapper instead of a literal).
+
 ## Splash / router
 Splash waits for BOTH a minimum branding duration AND `initializeSession()` before
 routing. The router holds protected/auth routes on Splash while `isInitializing`;
@@ -100,10 +119,12 @@ flutter test test/auth_identity_test.dart test/permissions_mapping_test.dart \
 - `supabase_auth_repository_test.dart` — login/roles/permissions/photo-types/
   restoration/logout/changePassword via a fake `AuthGateway` (`test/fakes/`).
 - `session_restoration_test.dart` — `initializeSession` states + idempotency +
-  logout reset + admin own-role scoping (no leak).
+  **concurrent callers share the in-flight future**, **transient failure retries**,
+  **terminal disabled-account does not retry**, **login settles `isInitializing`
+  on success and failure** + logout reset + admin own-role scoping (no leak).
 - Existing widget/flow/router tests pass through `mockAuthOverrides()`.
 
-Full suite (2026-07-23): **218 passed / 5 failed** — the 5 failures are the
+Full suite (2026-07-23, after the hardening pass): **223 passed / 5 failed** — the 5 failures are the
 **pre-existing** `assign_photographers_test.dart` (3) + `project_details_test.dart`
 (2) UI hit-test issues, unrelated to Step 10.5 (verified identical before this step).
 

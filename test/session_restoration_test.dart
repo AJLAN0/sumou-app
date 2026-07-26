@@ -81,6 +81,73 @@ void main() {
       expect(s.errorMessage, isNotNull);
     });
 
+    test(
+      'concurrent callers await the SAME restoration (no early routing)',
+      () async {
+        final g = FakeAuthGateway(
+          session: 'u1',
+          profile: profileRow(id: 'u1', defaultRoleId: 'r-manager'),
+          roles: [roleRow('r-manager', 'manager')],
+        );
+        final c = containerWith(g);
+        final ctrl = c.read(authControllerProvider.notifier);
+
+        // Start restoration, then call again while it is still in flight.
+        final first = ctrl.initializeSession();
+        final second = ctrl.initializeSession();
+        // The second caller gets the in-flight future — NOT an immediately
+        // completed one that would let it route on a still-initializing state.
+        expect(identical(first, second), isTrue);
+
+        await second;
+        final s = c.read(authControllerProvider);
+        expect(s.isInitializing, isFalse);
+        expect(s.isAuthenticated, isTrue);
+      },
+    );
+
+    test('a TRANSIENT restore failure can be retried', () async {
+      final g = FakeAuthGateway(
+        session: 'u1',
+        profile: profileRow(id: 'u1', defaultRoleId: 'r-manager'),
+        roles: [roleRow('r-manager', 'manager')],
+        errorOn: {'fetchProfile'},
+      );
+      final c = containerWith(g);
+      final ctrl = c.read(authControllerProvider.notifier);
+
+      await ctrl.initializeSession();
+      expect(c.read(authControllerProvider).isAuthenticated, isFalse);
+      expect(c.read(authControllerProvider).errorMessage, isNotNull);
+
+      // Outage clears → a retry must be possible (not latched signed-out).
+      g.errorOn = {};
+      await ctrl.initializeSession();
+      final s = c.read(authControllerProvider);
+      expect(s.isAuthenticated, isTrue);
+      expect(s.isInitializing, isFalse);
+      expect(s.errorMessage, isNull);
+    });
+
+    test('a TERMINAL disabled-account result is not retried', () async {
+      final g = FakeAuthGateway(
+        session: 'u1',
+        profile: profileRow(id: 'u1', isActive: false),
+        roles: [roleRow('r-manager', 'manager')],
+      );
+      final c = containerWith(g);
+      final ctrl = c.read(authControllerProvider.notifier);
+
+      await ctrl.initializeSession();
+      expect(c.read(authControllerProvider).isAuthenticated, isFalse);
+
+      // Even if the account were re-enabled, restoration stays settled — the
+      // repository already cleared the bad session; the user must log in again.
+      g.profile = profileRow(id: 'u1', defaultRoleId: 'r-manager');
+      await ctrl.initializeSession();
+      expect(c.read(authControllerProvider).isAuthenticated, isFalse);
+    });
+
     test('is idempotent (second call is a no-op)', () async {
       final g = FakeAuthGateway(
         session: 'u1',
@@ -96,6 +163,42 @@ void main() {
       await ctrl.initializeSession();
       // …but the second call is a no-op, so the user is still loaded.
       expect(c.read(authControllerProvider).isAuthenticated, isTrue);
+    });
+  });
+
+  group('login clears the initializing state', () {
+    test(
+      'a failed login while initializing does not leave isInitializing',
+      () async {
+        // Fresh controller → isInitializing is true; a login attempt must settle it
+        // on every path, or the router would hold Splash and hide the error.
+        final g = FakeAuthGateway(signInError: true);
+        final c = containerWith(g);
+        expect(c.read(authControllerProvider).isInitializing, isTrue);
+
+        await c
+            .read(authControllerProvider.notifier)
+            .login(username: 'manager', password: 'wrong');
+        final s = c.read(authControllerProvider);
+        expect(s.isInitializing, isFalse);
+        expect(s.isAuthenticated, isFalse);
+        expect(s.errorMessage, isNotNull);
+      },
+    );
+
+    test('a successful login settles initialization', () async {
+      final g = FakeAuthGateway(
+        userId: 'u1',
+        profile: profileRow(id: 'u1', defaultRoleId: 'r-manager'),
+        roles: [roleRow('r-manager', 'manager')],
+      );
+      final c = containerWith(g);
+      await c
+          .read(authControllerProvider.notifier)
+          .login(username: 'manager', password: 'x');
+      final s = c.read(authControllerProvider);
+      expect(s.isInitializing, isFalse);
+      expect(s.isAuthenticated, isTrue);
     });
   });
 

@@ -1,0 +1,138 @@
+-- =============================================================================
+-- Sprint 9 — DEV-ONLY manual QA script (DISPOSABLE). NOT a migration.
+--
+-- Purpose: exercise the applied Sprint 9 backend on the DEV project only.
+-- • Do NOT run against Production.
+-- • Contains NO real credentials/passwords. Test auth users must be created in
+--   the DEV dashboard (Authentication → Users) or via the future admin flow;
+--   this script only seeds profiles/roles/projects for already-created auth uids.
+-- • Everything is created under a 'qa-' / QA marker and removed by the CLEANUP
+--   block at the end. Run sections one at a time in the SQL editor.
+-- • RPC calls below assume you run them AS a signed-in user (set the request JWT),
+--   e.g. via the REST endpoint /rest/v1/rpc/<fn> or PostgREST "impersonation" in
+--   the dashboard. Running as the postgres/service role BYPASSES RLS and the
+--   auth.uid() gates, so it does NOT validate authorization — use a real JWT.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0) Prerequisites (manual): create 3 auth users in the DEV dashboard and paste
+--    their UUIDs here. No passwords are stored in this file.
+-- ---------------------------------------------------------------------------
+-- \set admin_uid  '00000000-0000-0000-0000-000000000000'
+-- \set mgr_uid    '00000000-0000-0000-0000-000000000000'
+-- \set photo_uid  '00000000-0000-0000-0000-000000000000'
+
+-- ---------------------------------------------------------------------------
+-- 1) Seed QA profiles + roles (run as postgres/service role; setup only).
+--    Uses a single transaction to satisfy the deferrable default-role FK.
+-- ---------------------------------------------------------------------------
+-- begin;
+-- insert into public.profiles (id, username, full_name, default_role_id, is_active) values
+--   (:'admin_uid','qa-admin','QA Admin',   (select id from public.roles where code='admin'),        true),
+--   (:'mgr_uid',  'qa-mgr',  'QA Manager', (select id from public.roles where code='manager'),      true),
+--   (:'photo_uid','qa-photo','QA Photographer',(select id from public.roles where code='photographer'),true);
+-- insert into public.user_roles (user_id, role_id) values
+--   (:'admin_uid',(select id from public.roles where code='admin')),
+--   (:'mgr_uid',  (select id from public.roles where code='manager')),
+--   (:'photo_uid',(select id from public.roles where code='photographer'));
+-- commit;
+
+-- ---------------------------------------------------------------------------
+-- 2) EXECUTE-GRANT CHECK (the Step-6.5 finding). Run as postgres.
+--    Expect: internal funcs have NO execute for anon/authenticated AFTER the fix
+--    migration; the RPCs keep it; track keeps anon+authenticated.
+-- ---------------------------------------------------------------------------
+-- select p.proname,
+--        has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_exec,
+--        has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_exec
+-- from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+-- where n.nspname='public'
+--   and p.proname in ('_apply_project_team','gen_project_serial','set_updated_at',
+--                     'create_project','assign_team_roles','is_available',
+--                     'track_project_by_serial')
+-- order by 1;
+--   -- PASS: _apply_project_team/gen_project_serial/set_updated_at → auth_exec=f, anon_exec=f
+--   --       create_project/assign_team_roles/is_available → auth_exec=t, anon_exec=f
+--   --       track_project_by_serial → auth_exec=t, anon_exec=t
+
+-- ---------------------------------------------------------------------------
+-- 3) RLS default-deny smoke (run as anon JWT). Every one MUST return 0 rows /
+--    permission denied; anon reaches data ONLY through the tracking RPC.
+-- ---------------------------------------------------------------------------
+-- set role anon;  -- (dashboard: use an anon JWT instead)
+-- select count(*) from public.projects;            -- expect: denied / 0
+-- select count(*) from public.project_links;       -- expect: denied / 0
+-- select count(*) from public.closure_requests;    -- expect: denied / 0
+-- select public.track_project_by_serial('ZZZ-0000-00');  -- expect: null (bad prefix)
+-- select public.track_project_by_serial('FLD-XXXX-XX');  -- expect: null (unknown)
+-- reset role;
+
+-- ---------------------------------------------------------------------------
+-- 4) Project write flow (run each AS the noted user's JWT).
+-- ---------------------------------------------------------------------------
+-- as qa-mgr:  select public.create_project('QA Field','QA Client','field',
+--                current_date, current_date + 5, 'qa notes', null, '[]'::jsonb);
+--   -- expect: a uuid; serial ~ '^FLD-[A-Z0-9]{4}-[A-Z0-9]{2}$'; 3 stages
+--   --         (stage 1 current, others pending); status 'active'; audit project.create.
+-- as qa-mgr:  select public.create_project('QA Social','QA Client','social',
+--                current_date, current_date + 5, null, null, '[]'::jsonb);
+--   -- expect: 7 stages; serial prefix 'SOC'.
+-- as qa-photo (NO can_add_project): create_project(...)  -- expect: 42501 not authorized.
+
+-- ---------------------------------------------------------------------------
+-- 5) Team assignment + availability (run AS qa-mgr for a project they manage).
+--    Replace <proj>, <photo_uid>, <photo_type_id> with real values.
+-- ---------------------------------------------------------------------------
+-- select public.assign_team_roles('<proj>', jsonb_build_array(
+--   jsonb_build_object('user_id','<photo_uid>','person_name','ignored',
+--     'value',0,'date', current_date::text,
+--     'photographer_type_ids', jsonb_build_array('<photo_type_id>'))));
+--   -- expect: uuid; project_team_members.person_name = the PROFILE full_name
+--   --         (NOT 'ignored'); one project.team.assign audit (member_count=1).
+-- -- Malformed JSON → clear 22023:
+-- select public.assign_team_roles('<proj>', '"notarray"'::jsonb);        -- invalid payload
+-- select public.assign_team_roles('<proj>', jsonb_build_array('x'));      -- member not object
+-- select public.assign_team_roles('<proj>', jsonb_build_array(
+--   jsonb_build_object('user_id','not-a-uuid','person_name','x','date',current_date::text)));
+-- -- Double-booking: assign the SAME photographer to a SECOND overlapping project
+-- --   on the same date → expect 'not available'. Marketing role on the same user
+-- --   → booking bypassed, BUT an active user_unavailability row covering the date
+-- --   (Asia/Riyadh) still blocks.
+
+-- ---------------------------------------------------------------------------
+-- 6) Closure workflow (submit as qa-photo assigned; approve/reject as qa-mgr).
+-- ---------------------------------------------------------------------------
+-- as qa-photo: select public.submit_closure_request('<active_proj>',
+--                'https://drive.example/x', 'https://drive.example/report', 'done');
+--   -- expect: uuid; project → pending_closure; a SECOND submit → P0001 (one pending).
+--   -- submit on a completed/pending_closure project → P0001 (status guard).
+-- as qa-mgr:  select public.approve_closure_request('<req>');
+--   -- expect: request approved+reviewed_at; project completed; all stages done;
+--   --         audit closure.approve (actor = manager). Repeat → 'not pending'.
+-- as qa-mgr:  select public.reject_closure_request('<req2>','needs rework');
+--   -- expect: rejected; project back to active; empty reason → 22023.
+-- as unauthorized user: approve_closure_request('<random-uuid>')
+--   -- expect: identical 'not found or access denied' for unknown AND unauthorized.
+
+-- ---------------------------------------------------------------------------
+-- 7) Teammate-value privacy (run AS qa-photo assigned to <proj>).
+-- ---------------------------------------------------------------------------
+-- select id, user_id, person_name, value from public.project_team_members
+--   where project_id = '<proj>';
+--   -- expect: ONLY the qa-photo's own row is visible (never teammates / their value).
+
+-- ---------------------------------------------------------------------------
+-- 8) user_unavailability privacy (run AS qa-mgr).
+-- ---------------------------------------------------------------------------
+-- select * from public.user_unavailability;  -- expect: 0 rows (managers have no access)
+--   -- run AS the owning user → sees only own rows; AS admin → sees all.
+
+-- ---------------------------------------------------------------------------
+-- 9) CLEANUP (run as postgres). Removes ALL QA data. Cascades drop team/stages/
+--    closures/links for the QA projects.
+-- ---------------------------------------------------------------------------
+-- delete from public.projects       where name like 'QA %';
+-- delete from public.audit_logs     where actor_id in (:'admin_uid',:'mgr_uid',:'photo_uid');
+-- delete from public.user_roles     where user_id in (:'admin_uid',:'mgr_uid',:'photo_uid');
+-- delete from public.profiles       where username like 'qa-%';
+-- -- (delete the auth users from the dashboard separately.)

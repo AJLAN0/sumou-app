@@ -43,3 +43,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ---------------------------------------------------------------------------
+# Secrets & environment (NEVER commit real keys)
+# ---------------------------------------------------------------------------
+# Real env files stay local; only `.env.example` is tracked.
+.env
+.env.*
+!.env.example
+
+# Supabase local/dev artifacts and secrets
+supabase/.env
+supabase/.env.*
+supabase/.branches/
+supabase/.temp/
+# Never commit a service_role key anywhere.
+**/service_role*
+**/*service-role*

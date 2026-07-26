@@ -49,6 +49,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final String target;
     if (!auth.isAuthenticated) {
       target = AppRoutes.entry;
+    } else if (auth.requiresPasswordChange) {
+      target = AppRoutes.changePassword;
     } else if (auth.needsRoleSelection) {
       target = AppRoutes.roleSelect;
     } else {

@@ -119,6 +119,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return AppRoutes.entry;
       }
 
+      // Forced password change outranks role selection and every staff route.
+      // The route itself is exempt to avoid a redirect loop. Public tracking
+      // was already exempted above.
+      if (auth.requiresPasswordChange) {
+        return loc == AppRoutes.changePassword
+            ? null
+            : AppRoutes.changePassword;
+      }
+
       // Signed in but a multi-role user hasn't chosen a role yet.
       if (auth.needsRoleSelection) {
         return loc == AppRoutes.roleSelect ? null : AppRoutes.roleSelect;

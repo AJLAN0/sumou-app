@@ -27,9 +27,8 @@ class UserModel {
   final bool active;
 
   /// Whether the backend requires this user to change their password on next
-  /// login (`profiles.must_change_password`). Step 10.5 **loads and preserves**
-  /// this flag only — no forced-change routing yet (that is Step 10.6). Defaults
-  /// to `false` for mock/test users.
+  /// login (`profiles.must_change_password`). Defaults to `false` for mock/test
+  /// users; authenticated routing enforces it before role selection/home.
   final bool mustChangePassword;
   final RoleType defaultRole;
   final List<RoleType> roles;

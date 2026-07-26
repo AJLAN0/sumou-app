@@ -77,8 +77,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), MockUsers.devPassword);
-    await tester.enterText(find.byType(TextField).at(1), 'newpass123');
-    await tester.enterText(find.byType(TextField).at(2), 'newpass123');
+    await tester.enterText(find.byType(TextField).at(1), 'N3w!Password2');
+    await tester.enterText(find.byType(TextField).at(2), 'N3w!Password2');
     await tester.tap(find.text('حفظ'));
     await tester.pumpAndSettle();
 

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
 import '../../../core/models/feature_permissions.dart';
 import '../../../core/models/role_type.dart';
 import '../../../core/models/user_model.dart';
+import '../../../features/profile/password_policy.dart';
 import '../auth_repository.dart';
 import 'auth_gateway.dart';
 import 'auth_identity.dart';
@@ -20,7 +21,6 @@ import 'auth_identity.dart';
 /// email is never returned, logged, displayed, or placed in [UserModel]
 /// (`email` stays null). RLS remains authoritative.
 ///
-/// `changePassword` is intentionally deferred to Step 10.6.
 class SupabaseAuthRepository implements AuthRepository {
   /// Production wiring: depends on the injected [SupabaseClient].
   SupabaseAuthRepository(SupabaseClient client)
@@ -170,11 +170,95 @@ class SupabaseAuthRepository implements AuthRepository {
     required String currentPassword,
     required String newPassword,
   }) async {
-    // Deferred to Step 10.6: no auth.updateUser, no re-auth, no flag clearing.
-    throw const AuthException(AuthFailure.passwordChangeUnavailable);
+    var session = _gateway.currentSession();
+    if (session == null) {
+      throw const AuthException(AuthFailure.notAuthenticated);
+    }
+
+    // Keep the caller authenticated when the access token expires between
+    // screen entry and submit. The gateway/client remains caller-scoped.
+    if (session.isExpired) {
+      try {
+        final refreshedUserId = await _awaitUsableSession();
+        if (refreshedUserId == null) {
+          throw const AuthException(AuthFailure.notAuthenticated);
+        }
+        session = AuthSessionInfo(userId: refreshedUserId, isExpired: false);
+      } on AuthException catch (error) {
+        if (error.reason == AuthFailure.notAuthenticated) rethrow;
+        throw const AuthException(AuthFailure.passwordChangeFailed);
+      } catch (_) {
+        throw const AuthException(AuthFailure.passwordChangeFailed);
+      }
+    }
+
+    if (currentPassword.isEmpty || newPassword.isEmpty) {
+      throw const AuthException(AuthFailure.invalidPasswordInput);
+    }
+    final policy = PasswordPolicy.validate(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    if (policy.failures.contains(PasswordPolicyFailure.matchesCurrent)) {
+      throw const AuthException(AuthFailure.invalidPasswordInput);
+    }
+    if (!policy.isValid) {
+      throw const AuthException(AuthFailure.weakPassword);
+    }
+
+    final PasswordChangeFunctionResponse response;
+    try {
+      response = await _gateway.invokeChangeOwnPassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+    } catch (_) {
+      throw const AuthException(AuthFailure.passwordChangeFailed);
+    }
+
+    if (response.status == 200) {
+      if (_isValidPasswordChangeSuccess(response.data, session.userId)) return;
+      throw const AuthException(AuthFailure.passwordChangeFailed);
+    }
+
+    final code = _passwordChangeErrorCode(response.data);
+    if (response.status == 401 && code == 'invalid_credentials') {
+      throw const AuthException(AuthFailure.currentPasswordIncorrect);
+    }
+    if (response.status == 401 && code == 'unauthenticated') {
+      throw const AuthException(AuthFailure.notAuthenticated);
+    }
+    if (response.status == 400 && code == 'weak_password') {
+      throw const AuthException(AuthFailure.weakPassword);
+    }
+    if (response.status == 400 && code == 'invalid_request') {
+      throw const AuthException(AuthFailure.invalidPasswordInput);
+    }
+    // Includes server errors and the documented Auth-updated/RPC-failed partial
+    // outcome. Never surface the backend message/details.
+    throw const AuthException(AuthFailure.passwordChangeFailed);
   }
 
   // ---- internals -----------------------------------------------------------
+
+  bool _isValidPasswordChangeSuccess(dynamic data, String expectedUserId) {
+    if (data is! Map || data.length != 1 || !data.containsKey('user')) {
+      return false;
+    }
+    final user = data['user'];
+    if (user is! Map || user.length != 3) return false;
+    return user['id'] == expectedUserId &&
+        user['must_change_password'] == false &&
+        user['is_active'] == true;
+  }
+
+  String? _passwordChangeErrorCode(dynamic data) {
+    if (data is! Map) return null;
+    final error = data['error'];
+    if (error is! Map) return null;
+    final code = error['code'];
+    return code is String ? code : null;
+  }
 
   /// BEST-EFFORT cleanup used when rejecting an unusable session. Swallows
   /// failures on purpose: the caller is already failing closed, and a cleanup

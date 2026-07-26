@@ -1,8 +1,10 @@
-# Step 10.6A — Own password-change backend: DEV QA (manual)
+# Step 10.6 — Own password change: DEV QA
 
-Backend-only (Edge Function + RPC). **DEV only**, never Production. **Pending owner
-apply/deploy** — this step runs no remote Supabase command. Flutter is **not** wired
-here (that is Step 10.6B).
+**DEV only**, never Production. Owner-confirmed backend status on 2026-07-26:
+migration `20260714240000_own_password_change_backend.sql` is applied,
+`change-own-password` is ACTIVE, and JWT verification remains enabled. Step 10.6B
+now connects Flutter to that backend. This implementation ran no remote Supabase
+command.
 
 ## What it is
 `change-own-password` Edge Function + `record_own_password_change` service-only RPC.
@@ -60,6 +62,31 @@ all other Auth errors return a generic `500`.
    for ONLY the caller → `record_own_password_change(uid)`.
 6. Return the safe summary once.
 
+## Flutter connection and forced flow (Step 10.6B)
+- `SupabaseAuthRepository.changePassword` invokes `change-own-password` through
+  the existing authenticated `SupabaseClient`; the body contains exactly
+  `current_password` and `new_password`. Flutter contains no `service_role` key
+  and sends no uid, username, email, or token field.
+- The repository requires a usable caller session and strictly validates the
+  success summary (`id` = session user, `must_change_password=false`,
+  `is_active=true`). A confirmed `invalid_credentials` maps separately; weak /
+  invalid input maps to safe typed failures; malformed responses, network errors,
+  server errors, and partial failures collapse to one generic safe failure.
+- Dart preflight policy mirrors 12–72 characters, upper/lower/digit/symbol, no
+  leading/trailing whitespace, and new ≠ current. It provides immediate UI
+  feedback only; the Edge Function remains authoritative.
+- On success the controller copies the current user with only
+  `mustChangePassword=false`; identity, roles, permissions, photo types, and
+  `selectedRole` are preserved. Failure leaves the flag true.
+- Router priority is public tracking → Splash restoration wait → authentication
+  → forced password change → role selection → role home. The password route is
+  exempt from its own guard. Public tracking remains public.
+- The existing mobile screen now has current/new/confirmation fields, individual
+  hide/show controls, inline policy feedback, loading/double-submit protection,
+  controller clearing, and blocked back navigation while forced. Logout remains
+  available. Forced success goes to role selection when still needed, otherwise
+  to the active role home.
+
 ## Ordering & partial-failure (no distributed transaction)
 Auth and the public schema are not one transaction; **Auth-update precedes the RPC.**
 - **Auth update fails** → the RPC is **not** called; generic `500`; nothing changed.
@@ -116,9 +143,29 @@ headers and absence of the supplied password, internal email, bearer token, and
 environment keys. Existing framing, policy, authorization, ordering, and safe
 success-summary cases remain covered.
 
-## Integration cases requiring DEV (owner; after apply + deploy)
+## Flutter focused checks — executed 2026-07-26, all green
+```bash
+dart format --output=none --set-exit-if-changed lib test
+
+flutter test \
+  test/auth_controller_test.dart \
+  test/session_restoration_test.dart \
+  test/router_test.dart \
+  test/change_password_test.dart \
+  test/supabase_auth_repository_test.dart
+```
+Results: format check **154 files / 0 changed**; focused Flutter tests
+**103 passed / 0 failed**. Covered: exact function request body; strict safe
+success/error mapping; client policy boundaries and requirements; success clears
+only the forced flag; failure retains it; forced routing after login and session
+restoration and before role selection; success to role selection/home; public
+tracking exemption; forced-screen logout/back protection; inline feedback,
+hide/show controls, and double-submit prevention. The full suite was not run per
+owner instruction.
+
+## Integration cases requiring DEV (owner; backend is active)
 Use a **disposable** DEV account; do **not** paste passwords/JWTs into chat.
-**Status: PENDING owner** — needs real DEV accounts.
+**Status: PENDING owner manual Flutter/DEV validation** — needs real DEV accounts.
 | # | Case | Expect |
 |---|---|---|
 | 1 | valid current + strong new (differs) | 200; `must_change_password=false`; one `user.password_changed` audit row |
@@ -133,5 +180,5 @@ Use a **disposable** DEV account; do **not** paste passwords/JWTs into chat.
 
 ## Scope
 No email/notification/recovery-link. No finance/payments/Rekaz. No admin
-create/reset integration. Flutter untouched (Step 10.6B). No forced-change routing
-beyond clearing the flag. Production untouched. Step 10.6B / 10.7 not started.
+create/reset integration. Production untouched. Migrations and Edge Functions were
+not modified by Step 10.6B. Step 10.7 not started.

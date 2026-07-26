@@ -18,6 +18,13 @@ class FakeAuthGateway implements AuthGateway {
     this.sessionExpired = false,
     this.errorOn = const <String>{},
     this.signOutError = false,
+    this.passwordChangeResponse = const PasswordChangeFunctionResponse(
+      status: 200,
+      data: {
+        'user': {'id': 'u1', 'must_change_password': false, 'is_active': true},
+      },
+    ),
+    this.passwordChangeError = false,
   });
 
   /// User id returned by a successful sign-in.
@@ -44,6 +51,11 @@ class FakeAuthGateway implements AuthGateway {
   /// When true, [signOut] throws (explicit logout must surface this).
   bool signOutError;
 
+  PasswordChangeFunctionResponse passwordChangeResponse;
+
+  /// When true, the function invocation throws a simulated SDK/network error.
+  bool passwordChangeError;
+
   /// Drives [onAuthEvents]; tests emit refresh/sign-out events or an error.
   final StreamController<AuthSessionEvent> authEvents =
       StreamController<AuthSessionEvent>.broadcast();
@@ -54,8 +66,11 @@ class FakeAuthGateway implements AuthGateway {
   int authEventSubscriptions = 0;
   int authEventCancellations = 0;
   int fetchProfileCalls = 0;
+  int passwordChangeCalls = 0;
   String? lastEmail;
   String? lastPassword;
+  String? lastCurrentPassword;
+  String? lastNewPassword;
   List<String>? lastRolePermissionIds;
 
   /// True when every auth-event subscription has been cleaned up.
@@ -127,6 +142,20 @@ class FakeAuthGateway implements AuthGateway {
   Future<void> signOut() async {
     signOutCalls++;
     if (signOutError) throw StateError('simulated sign-out failure');
+  }
+
+  @override
+  Future<PasswordChangeFunctionResponse> invokeChangeOwnPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    passwordChangeCalls++;
+    lastCurrentPassword = currentPassword;
+    lastNewPassword = newPassword;
+    if (passwordChangeError) {
+      throw StateError('simulated password-change network failure');
+    }
+    return passwordChangeResponse;
   }
 
   @override

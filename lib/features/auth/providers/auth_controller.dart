@@ -155,19 +155,36 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState();
   }
 
-  /// Change the signed-in user's password via the (mock) repository.
-  /// Returns true on success; on failure sets [AuthState.errorMessage].
+  /// Change the signed-in user's password through [AuthRepository].
+  ///
+  /// On success only `mustChangePassword` changes; identity, roles,
+  /// permissions, and the selected role remain intact. Failure never clears the
+  /// forced-change flag.
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
   }) async {
+    if (state.isLoading) return false;
+    final user = state.currentUser;
+    if (user == null) {
+      state = state.copyWith(
+        errorMessage: _messageFor(AuthFailure.notAuthenticated),
+      );
+      return false;
+    }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       await _auth.changePassword(
         currentPassword: currentPassword,
         newPassword: newPassword,
       );
-      state = state.copyWith(isLoading: false);
+      // Do not resurrect/overwrite a different auth state if logout or another
+      // login completed while the backend call was in flight.
+      if (state.currentUser?.id != user.id) return false;
+      state = state.copyWith(
+        currentUser: user.copyWith(mustChangePassword: false),
+        isLoading: false,
+      );
       return true;
     } on AuthException catch (e) {
       state = state.copyWith(
@@ -200,9 +217,11 @@ class AuthController extends Notifier<AuthState> {
     AuthFailure.logoutFailed => 'تعذّر تسجيل الخروج، حاول مرة أخرى',
     AuthFailure.sessionRestoreFailed =>
       'تعذّرت استعادة الجلسة، يرجى تسجيل الدخول',
-    // Step 10.6 will enable the real password change.
-    AuthFailure.passwordChangeUnavailable =>
-      'سيتم تفعيل تغيير كلمة المرور في الخطوة التالية',
+    AuthFailure.currentPasswordIncorrect => 'كلمة المرور الحالية غير صحيحة',
+    AuthFailure.weakPassword => 'كلمة المرور الجديدة لا تستوفي متطلبات الأمان',
+    AuthFailure.invalidPasswordInput => 'بيانات كلمة المرور غير صالحة',
+    AuthFailure.passwordChangeFailed =>
+      'تعذّر إكمال تغيير كلمة المرور، حاول مرة أخرى',
   };
 }
 

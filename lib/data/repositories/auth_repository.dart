@@ -27,8 +27,17 @@ enum AuthFailure {
   /// Restoring a persisted session failed unexpectedly (fail closed).
   sessionRestoreFailed,
 
-  /// Password change is not available yet (implemented in Step 10.6).
-  passwordChangeUnavailable,
+  /// The backend explicitly confirmed the supplied current password is wrong.
+  currentPasswordIncorrect,
+
+  /// The new password does not satisfy the server's password policy.
+  weakPassword,
+
+  /// The password-change input is invalid (including new == current).
+  invalidPasswordInput,
+
+  /// The password change failed unexpectedly or may be partially complete.
+  passwordChangeFailed,
 }
 
 /// Thrown by [AuthRepository] implementations on a failed operation.
@@ -57,8 +66,8 @@ abstract interface class AuthRepository {
   /// The currently authenticated user, or null if signed out.
   Future<UserModel?> currentUser();
 
-  /// Change the signed-in user's password. Throws [AuthException] when no
-  /// session exists or the current password is wrong.
+  /// Change the signed-in user's password through the trusted backend. Throws
+  /// [AuthException] with a safe typed reason; passwords are never returned.
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,

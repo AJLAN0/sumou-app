@@ -178,7 +178,7 @@ export async function reauthenticate(
   currentPassword: string,
 ): Promise<ReauthenticateResult> {
   try {
-    res = await anonClient.auth.signInWithPassword({
+    const res = await anonClient.auth.signInWithPassword({
       email: internalEmail,
       password: currentPassword,
     });
@@ -191,8 +191,6 @@ export async function reauthenticate(
   } catch {
     return "serverError";
   }
-  // No error but no session is unexpected — fail closed (not "wrong password").
-  return res.data?.session ? "success" : "serverError";
 }
 
 /**

@@ -310,8 +310,9 @@ class SupabaseUserRepository implements UserRepository {
   ) {
     final userId = _requiredString(row, 'user_id').toLowerCase();
     final roleId = _requiredString(row, 'role_id').toLowerCase();
-    if (!profiles.containsKey(userId) || !_uuid.hasMatch(roleId))
+    if (!profiles.containsKey(userId) || !_uuid.hasMatch(roleId)) {
       _invalidData();
+    }
     final embedded = row['role'];
     if (embedded is! Map) _invalidData();
     final roleRow = Map<String, dynamic>.from(embedded);

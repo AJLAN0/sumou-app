@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../auth/providers/auth_controller.dart';
 import 'providers/admin_providers.dart';
 import 'widgets/admin_chips.dart';
 
@@ -104,7 +106,7 @@ class AdminAccessPage extends StatelessWidget {
 }
 
 /// Unified access control: manage each user's **roles** (what they can navigate)
-/// and **permissions** (what actions they can take) from one place. Mock-backed.
+/// and **permissions** (what actions they can take) from one place.
 ///
 /// Roles and permissions were previously two separate screens; merging them
 /// lets the admin see and adjust both together, with a one-tap "apply the
@@ -146,9 +148,23 @@ class _AccessControlScreenState extends ConsumerState<AccessControlScreen> {
   @override
   Widget build(BuildContext context) {
     final usersAsync = ref.watch(usersListProvider);
+    final repository = ref.read(userRepositoryProvider);
+    final actor = ref.watch(authControllerProvider).currentUser;
+    final canEdit =
+        repository.capabilities.canEditRoles &&
+        repository.capabilities.canEditPermissions &&
+        (actor?.hasRole(RoleType.admin) ?? false) &&
+        (actor?.hasPermission(AppFeature.canManagePermissions) ?? false);
 
     return Column(
       children: [
+        if (!canEdit) ...[
+          const SumouErrorBox(
+            message:
+                'تعديل الأدوار والصلاحيات غير متاح حتى يجهز مسار الخادم الآمن.',
+          ),
+          const SizedBox(height: 12),
+        ],
         SumouTextField(
           hint: 'بحث بالاسم أو اسم المستخدم',
           prefixIcon: Icons.search,
@@ -176,7 +192,18 @@ class _AccessControlScreenState extends ConsumerState<AccessControlScreen> {
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error:
-                (_, __) => const Center(child: Text('تعذّر تحميل المستخدمين')),
+                (_, __) => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('تعذّر تحميل المستخدمين'),
+                      TextButton(
+                        onPressed: () => ref.invalidate(usersListProvider),
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                    ],
+                  ),
+                ),
             data: (users) {
               final filtered = users.where(_matches).toList();
               if (filtered.isEmpty) {
@@ -192,7 +219,7 @@ class _AccessControlScreenState extends ConsumerState<AccessControlScreen> {
                 itemBuilder:
                     (_, i) => _AccessCard(
                       user: filtered[i],
-                      onTap: () => _edit(filtered[i]),
+                      onTap: canEdit ? () => _edit(filtered[i]) : null,
                     ),
               );
             },
@@ -207,7 +234,7 @@ class _AccessCard extends StatelessWidget {
   const _AccessCard({required this.user, required this.onTap});
 
   final UserModel user;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -359,28 +386,38 @@ class _AccessEditSheetState extends ConsumerState<_AccessEditSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    final rolesResult = await repo.updateUserRoles(
-      widget.user.id,
-      defaultRole: _default,
-      roles: _roles.toList(),
-    );
-    final permsResult = await repo.updateUserPermissions(
-      widget.user.id,
-      _perms,
-    );
-    ref.invalidate(usersListProvider);
-    if (!mounted) return;
-    navigator.pop();
-    final ok2 = rolesResult != null && permsResult != null;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok2
-              ? 'تم تحديث الأدوار والصلاحيات'
-              : 'تعذّر تحديث الأدوار والصلاحيات',
+    try {
+      final rolesResult = await repo.updateUserRoles(
+        widget.user.id,
+        defaultRole: _default,
+        roles: _roles.toList(),
+      );
+      final permsResult = await repo.updateUserPermissions(
+        widget.user.id,
+        _perms,
+      );
+      ref.invalidate(usersListProvider);
+      if (!mounted) return;
+      navigator.pop();
+      final ok2 = rolesResult != null && permsResult != null;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok2
+                ? 'تم تحديث الأدوار والصلاحيات'
+                : 'تعذّر تحديث الأدوار والصلاحيات',
+          ),
         ),
-      ),
-    );
+      );
+    } on UserRepositoryException catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _snack(error.messageAr);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _snack('تعذّر تنفيذ العملية، حاول مرة أخرى');
+    }
   }
 
   @override
@@ -451,7 +488,7 @@ class _AccessEditSheetState extends ConsumerState<_AccessEditSheet> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final r in RoleType.values)
+                  for (final r in RoleType.values.where(_isAssignableStaffRole))
                     _SelectChip(
                       label: r.nameAr,
                       selected: _roles.contains(r),
@@ -650,3 +687,8 @@ class _SelectChip extends StatelessWidget {
     );
   }
 }
+
+bool _isAssignableStaffRole(RoleType role) =>
+    role != RoleType.finance &&
+    role != RoleType.weddingFinance &&
+    role != RoleType.clientTracking;

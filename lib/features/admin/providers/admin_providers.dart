@@ -7,3 +7,7 @@ import '../../../core/providers/repository_providers.dart';
 final usersListProvider = FutureProvider<List<UserModel>>(
   (ref) => ref.read(userRepositoryProvider).getUsers(),
 );
+
+final staffPhotoTypesProvider = FutureProvider(
+  (ref) => ref.read(userRepositoryProvider).getAvailablePhotoTypes(),
+);

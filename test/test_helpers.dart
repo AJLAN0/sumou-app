@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/core/providers/repository_providers.dart';
 import 'package:sumou_app/data/repositories/mock/mock_auth_repository.dart';
+import 'package:sumou_app/data/repositories/mock/mock_user_repository.dart';
 
 /// Overrides that keep tests/previews on the in-memory mock auth.
 ///
@@ -12,6 +13,7 @@ import 'package:sumou_app/data/repositories/mock/mock_auth_repository.dart';
 /// [MockAuthRepository] is created per call so tests don't share session state.
 List<Override> mockAuthOverrides() => [
   authRepositoryProvider.overrideWith((ref) => MockAuthRepository()),
+  userRepositoryProvider.overrideWith((ref) => MockUserRepository()),
 ];
 
 /// A [ProviderContainer] pinned to the mock auth repository (plus any [extra]

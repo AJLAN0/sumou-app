@@ -15,6 +15,15 @@ enum AuthFailure {
   /// be loaded or are invalid (the session is signed out to fail closed).
   profileUnavailable,
 
+  /// The caller's own profile row is not readable. RLS returns no row for a
+  /// missing, inactive, or soft-deleted account alike, so this is ONE generic
+  /// reason — it deliberately does not distinguish those cases to the client.
+  accountUnavailable,
+
+  /// An EXPLICIT sign-out failed. The user is still considered signed in;
+  /// authenticated state must not be cleared on this reason.
+  logoutFailed,
+
   /// Restoring a persisted session failed unexpectedly (fail closed).
   sessionRestoreFailed,
 

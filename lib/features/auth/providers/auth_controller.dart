@@ -20,6 +20,16 @@ class AuthController extends Notifier<AuthState> {
   /// The in-flight (or completed) restoration, so the operation is idempotent.
   Future<void>? _initFuture;
 
+  /// Monotonic token for auth operations. Replacing [_initFuture] does NOT
+  /// cancel work already awaiting inside a restore, so every restore captures
+  /// the generation at entry and re-checks it before EACH state write. A newer
+  /// login/logout bumps the generation, making any older in-flight restore
+  /// inert — it can never overwrite the newer result.
+  int _generation = 0;
+
+  /// Start a new auth operation and return its generation token.
+  int _beginOperation() => ++_generation;
+
   /// Restore a persisted Supabase session at startup (idempotent). Splash waits
   /// for this to complete before routing. Resolves to:
   ///   • signed-out when there is no session (or the account is disabled/deleted
@@ -34,9 +44,14 @@ class AuthController extends Notifier<AuthState> {
   Future<void> initializeSession() => _initFuture ??= _restoreSession();
 
   Future<void> _restoreSession() async {
+    final generation = _beginOperation();
+    // A newer login/logout has superseded this restore → drop its result.
+    bool superseded() => generation != _generation;
+
     state = state.copyWith(isInitializing: true, errorMessage: null);
     try {
       final user = await _auth.currentUser();
+      if (superseded()) return;
       if (user == null) {
         state = const AuthState(); // initialized + signed out
       } else {
@@ -48,8 +63,10 @@ class AuthController extends Notifier<AuthState> {
     } on AuthException {
       // Disabled/deleted/invalid persisted account → safe signed-out. Terminal:
       // the repository already cleared the bad session, so no retry is wanted.
+      if (superseded()) return;
       state = const AuthState();
     } catch (_) {
+      if (superseded()) return;
       // TRANSIENT failure (network/query): clear the cached future so a later
       // call can retry — a one-off outage must not latch the app signed-out for
       // the rest of its lifetime. The persisted session is left intact.
@@ -69,7 +86,9 @@ class AuthController extends Notifier<AuthState> {
   }) async {
     // An explicit login supersedes startup restoration: clear isInitializing on
     // every path (a stale `true` would hold the router on Splash and hide the
-    // error) and stop a late restore from overwriting this result.
+    // error) and bump the generation so an older in-flight restore can never
+    // overwrite this result.
+    _beginOperation();
     _initFuture = Future<void>.value();
     state = state.copyWith(
       isLoading: true,
@@ -113,13 +132,26 @@ class AuthController extends Notifier<AuthState> {
     state = state.copyWith(selectedRole: null);
   }
 
-  /// Sign out and reset to the signed-out state. Idempotent.
+  /// Sign out and reset to the signed-out state.
+  ///
+  /// If the EXPLICIT sign-out fails the session still exists, so the
+  /// authenticated state is deliberately KEPT (clearing it would strand the app
+  /// showing "signed out" while the session is live) and a safe message is set.
   Future<void> logout() async {
-    // Mark restoration settled so returning to Splash cannot re-query (and can
-    // never resurrect a just-cleared session). The reset state is NOT
-    // initializing, so the router goes straight to Entry.
+    // Mark restoration settled and bump the generation so an older in-flight
+    // restore cannot resurrect a just-cleared session.
+    _beginOperation();
     _initFuture = Future<void>.value();
-    await _auth.logout();
+    try {
+      await _auth.logout();
+    } on AuthException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        isInitializing: false,
+        errorMessage: _messageFor(e.reason),
+      );
+      return;
+    }
     state = const AuthState();
   }
 
@@ -161,6 +193,11 @@ class AuthController extends Notifier<AuthState> {
     AuthFailure.notAuthenticated => 'يجب تسجيل الدخول أولاً',
     AuthFailure.profileUnavailable =>
       'تعذّر تحميل بيانات الحساب، يرجى المحاولة لاحقاً',
+    // One generic message: never reveals whether the account is missing,
+    // inactive, or soft-deleted.
+    AuthFailure.accountUnavailable =>
+      'هذا الحساب غير متاح، يرجى التواصل مع الإدارة',
+    AuthFailure.logoutFailed => 'تعذّر تسجيل الخروج، حاول مرة أخرى',
     AuthFailure.sessionRestoreFailed =>
       'تعذّرت استعادة الجلسة، يرجى تسجيل الدخول',
     // Step 10.6 will enable the real password change.

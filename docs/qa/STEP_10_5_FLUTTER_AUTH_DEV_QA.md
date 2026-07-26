@@ -88,6 +88,41 @@ Entry never flashes before restoration.
 - The declared `AuthFailure.sessionRestoreFailed` is now actually used (the restore
   message goes through the central `_messageFor` mapper instead of a literal).
 
+### Auth hardening (second final pass)
+1. **Expired token → wait for a refreshed session before ANY profile query.**
+   A persisted-but-expired access token cannot pass RLS, so querying with it
+   returns "no rows" and would be misread as a disabled account. `currentUser()`
+   now checks `AuthSessionInfo.isExpired` and, when expired, awaits the SDK via
+   `onAuthEvents()`: **refresh** → proceed with the refreshed user id;
+   **signedOut/userDeleted** → clean signed-out (not an error); **stream error**
+   or **timeout** (default 10s, injectable) → `sessionRestoreFailed`. A
+   **race re-check** of `currentSession()` after subscribing covers the window
+   where the SDK already refreshed (or ended) the session and no event will ever
+   arrive. The subscription is **always cancelled** via `finally`, including on
+   timeout and error. An unexpired session never touches the stream.
+2. **Strict profile parsing.** `_parseProfile` validates every required field's
+   runtime type and raises a typed `profileUnavailable` — never an unhandled
+   `TypeError`. `must_change_password` and `is_active` must be real **bools**: a
+   null/string/int is rejected rather than silently coerced to `false` (which
+   would quietly drop a forced password change). `avatar_initials` may be null but
+   must otherwise be a string.
+3. **One generic `accountUnavailable`.** RLS returns no row for a missing,
+   inactive, or soft-deleted account alike, so an unreadable self-profile (and an
+   id mismatch) collapses into a single reason that does not disclose which case
+   it was, and triggers best-effort cleanup.
+4. **Best-effort cleanup vs explicit logout.** `_bestEffortSignOut()` swallows
+   failures on purpose (used when already failing closed, so cleanup errors cannot
+   mask the real reason). `logout()` is explicit: a failed sign-out raises
+   `logoutFailed`, and the controller then **keeps the authenticated state** and
+   shows a message — it never pretends the user is signed out while the session
+   still exists. A later successful logout clears it.
+5. **Operation generation guard.** Replacing `_initFuture` does not cancel work
+   already awaiting inside a restore, so `AuthController` keeps a monotonic
+   `_generation`; every restore captures it at entry and re-checks before **each**
+   state write, and login/logout bump it. An older in-flight restore is therefore
+   inert and can neither overwrite a newer login nor resurrect a session after
+   logout.
+
 ## Splash / router
 Splash waits for BOTH a minimum branding duration AND `initializeSession()` before
 routing. The router holds protected/auth routes on Splash while `isInitializing`;
@@ -121,10 +156,27 @@ flutter test test/auth_identity_test.dart test/permissions_mapping_test.dart \
 - `session_restoration_test.dart` — `initializeSession` states + idempotency +
   **concurrent callers share the in-flight future**, **transient failure retries**,
   **terminal disabled-account does not retry**, **login settles `isInitializing`
-  on success and failure** + logout reset + admin own-role scoping (no leak).
+  on success and failure**, **generation guard (a stale restore cannot overwrite a
+  newer login nor resurrect a session after logout)**, **explicit `logoutFailed`
+  keeps the user signed in + a later logout succeeds** + logout reset + admin
+  own-role scoping (no leak).
+- Expired-token refresh + strict-parsing coverage in
+  `supabase_auth_repository_test.dart`: refresh success (profile queried only
+  after the refresh), signedOut during refresh, stream error, timeout, both race
+  re-check windows, "valid session never subscribes", non-bool
+  `must_change_password`/`is_active` rejected, missing/wrong-typed required
+  strings rejected, `avatar_initials` typing, generic `accountUnavailable` for an
+  unreadable profile and an id mismatch, cleanup swallowing a signOut failure, and
+  explicit `logout()` surfacing `logoutFailed`. Subscription cancellation is
+  asserted on every refresh path.
 - Existing widget/flow/router tests pass through `mockAuthOverrides()`.
 
-Full suite (2026-07-23, after the hardening pass): **223 passed / 5 failed** — the 5 failures are the
+> After the second hardening pass the focused auth suites
+> (`supabase_auth_repository`, `session_restoration`, `auth_controller`, `router`)
+> run **74 passed / 0 failed**; `dart format` and `flutter analyze` are clean. The
+> full suite was **not** re-run in that pass (owner runs it manually).
+
+Full suite (2026-07-23, after the first hardening pass): **223 passed / 5 failed** — the 5 failures are the
 **pre-existing** `assign_photographers_test.dart` (3) + `project_details_test.dart`
 (2) UI hit-test issues, unrelated to Step 10.5 (verified identical before this step).
 

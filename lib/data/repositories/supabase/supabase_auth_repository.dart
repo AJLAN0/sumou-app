@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
 
 import '../../../core/models/feature_permissions.dart';
@@ -22,12 +24,20 @@ import 'auth_identity.dart';
 class SupabaseAuthRepository implements AuthRepository {
   /// Production wiring: depends on the injected [SupabaseClient].
   SupabaseAuthRepository(SupabaseClient client)
-    : _gateway = SupabaseAuthGateway(client);
+    : _gateway = SupabaseAuthGateway(client),
+      _refreshTimeout = defaultRefreshTimeout;
 
   /// Test wiring: inject a fake [AuthGateway] boundary (no live network).
-  SupabaseAuthRepository.withGateway(this._gateway);
+  SupabaseAuthRepository.withGateway(
+    this._gateway, {
+    Duration refreshTimeout = defaultRefreshTimeout,
+  }) : _refreshTimeout = refreshTimeout;
+
+  /// How long to wait for the SDK to refresh an expired token before failing.
+  static const Duration defaultRefreshTimeout = Duration(seconds: 10);
 
   final AuthGateway _gateway;
+  final Duration _refreshTimeout;
 
   @override
   Future<UserModel> login({
@@ -58,32 +68,102 @@ class SupabaseAuthRepository implements AuthRepository {
     try {
       return await _loadUserContext(authUserId);
     } on AuthException {
-      await _safeSignOut();
+      await _bestEffortSignOut();
       rethrow;
     } catch (_) {
-      await _safeSignOut();
+      await _bestEffortSignOut();
       throw const AuthException(AuthFailure.profileUnavailable);
     }
   }
 
   @override
   Future<UserModel?> currentUser() async {
-    final userId = _gateway.currentSessionUserId();
-    if (userId == null) return null; // no persisted session → signed out
+    final session = _gateway.currentSession();
+    if (session == null) return null; // no persisted session → signed out
+
+    // An EXPIRED persisted token cannot pass RLS: querying now would look like
+    // "no rows" and be misread as a disabled account. Wait for the SDK to
+    // refresh first; a failed refresh resolves to a clean signed-out.
+    var userId = session.userId;
+    if (session.isExpired) {
+      final refreshedUserId = await _awaitUsableSession();
+      if (refreshedUserId == null) return null; // signed out during refresh
+      userId = refreshedUserId;
+    }
+
     try {
       return await _loadUserContext(userId);
     } on AuthException {
-      // Persisted account is disabled/deleted/invalid → clear the session and
-      // let the caller resolve safely to signed-out.
-      await _safeSignOut();
+      // Persisted account is unusable (unreadable/disabled/invalid) → clear the
+      // session best-effort and let the caller resolve safely to signed-out.
+      await _bestEffortSignOut();
       rethrow;
     }
     // A non-AuthException (query/network failure) propagates so the caller can
     // surface a safe "restore failed" state WITHOUT signing out a valid session.
   }
 
+  /// Wait until the SDK produces a usable session for an expired token.
+  ///
+  /// Returns the user id on refresh, or `null` when the session ended
+  /// (signed out / user deleted) — a clean signed-out, not an error. Throws
+  /// [AuthFailure.sessionRestoreFailed] on a stream error or timeout. The
+  /// subscription is ALWAYS cancelled, including on timeout/error.
+  Future<String?> _awaitUsableSession() async {
+    final completer = Completer<String?>();
+    StreamSubscription<AuthSessionEvent>? sub;
+    try {
+      sub = _gateway.onAuthEvents().listen(
+        (event) {
+          if (completer.isCompleted) return;
+          switch (event.kind) {
+            case AuthSessionEventKind.refreshed:
+              completer.complete(event.userId);
+            case AuthSessionEventKind.signedOut:
+              completer.complete(null);
+            case AuthSessionEventKind.other:
+              break; // not decisive — keep waiting
+          }
+        },
+        onError: (_) {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              const AuthException(AuthFailure.sessionRestoreFailed),
+            );
+          }
+        },
+      );
+
+      // RACE RE-CHECK: the SDK may have refreshed (or ended the session) between
+      // the expiry check and this subscription, in which case no event is ever
+      // delivered and we would wait for the full timeout.
+      final now = _gateway.currentSession();
+      if (!completer.isCompleted) {
+        if (now == null) {
+          completer.complete(null); // session ended already
+        } else if (!now.isExpired) {
+          completer.complete(now.userId); // already refreshed
+        }
+      }
+
+      return await completer.future.timeout(_refreshTimeout);
+    } on TimeoutException {
+      throw const AuthException(AuthFailure.sessionRestoreFailed);
+    } finally {
+      await sub?.cancel();
+    }
+  }
+
   @override
-  Future<void> logout() => _safeSignOut();
+  Future<void> logout() async {
+    // EXPLICIT logout: unlike best-effort cleanup, a failure is surfaced so the
+    // caller does not clear authenticated state while the session still exists.
+    try {
+      await _gateway.signOut();
+    } catch (_) {
+      throw const AuthException(AuthFailure.logoutFailed);
+    }
+  }
 
   @override
   Future<void> changePassword({
@@ -96,11 +176,14 @@ class SupabaseAuthRepository implements AuthRepository {
 
   // ---- internals -----------------------------------------------------------
 
-  Future<void> _safeSignOut() async {
+  /// BEST-EFFORT cleanup used when rejecting an unusable session. Swallows
+  /// failures on purpose: the caller is already failing closed, and a cleanup
+  /// error must not mask the real reason. Distinct from the explicit [logout].
+  Future<void> _bestEffortSignOut() async {
     try {
       await _gateway.signOut();
     } catch (_) {
-      // Idempotent: ignore (e.g. already signed out).
+      // Ignored by design (e.g. already signed out / offline).
     }
   }
 
@@ -108,14 +191,18 @@ class SupabaseAuthRepository implements AuthRepository {
   /// effective permissions. Throws a typed [AuthException] on any problem.
   Future<UserModel> _loadUserContext(String authUserId) async {
     // 1) Profile (own row). A query error throws here → fail closed.
-    final profile = await _gateway.fetchProfile(authUserId);
-    if (profile == null || profile['id'] != authUserId) {
-      throw const AuthException(AuthFailure.profileUnavailable);
+    final profileRow = await _gateway.fetchProfile(authUserId);
+    // RLS returns NO ROW for a missing, inactive, or soft-deleted account alike
+    // (and for an id that is not the caller). Collapse all of those into ONE
+    // generic reason so the client cannot distinguish them.
+    if (profileRow == null || profileRow['id'] != authUserId) {
+      throw const AuthException(AuthFailure.accountUnavailable);
     }
-    if (profile['deleted_at'] != null || profile['is_active'] != true) {
+    final profile = _parseProfile(profileRow);
+    if (profile.deletedAt != null || !profile.isActive) {
       throw const AuthException(AuthFailure.accountDisabled);
     }
-    final defaultRoleId = profile['default_role_id'] as String?;
+    final defaultRoleId = profile.defaultRoleId;
 
     // 2) Active roles (own). Inactive/finance/wedding_finance are is_active=false
     //    and excluded. Unknown ACTIVE code fails closed (never mapped to manager).
@@ -145,7 +232,7 @@ class SupabaseAuthRepository implements AuthRepository {
       throw const AuthException(AuthFailure.profileUnavailable);
     }
     // The default role must resolve to one of the caller's active roles.
-    if (defaultRoleId == null || defaultRole == null) {
+    if (defaultRole == null) {
       throw const AuthException(AuthFailure.profileUnavailable);
     }
 
@@ -162,17 +249,57 @@ class SupabaseAuthRepository implements AuthRepository {
     final permissions = await _resolvePermissions(authUserId, activeRoleIds);
 
     return UserModel(
-      id: profile['id'] as String,
-      username: profile['username'] as String,
-      fullName: profile['full_name'] as String,
+      id: profile.id,
+      username: profile.username,
+      fullName: profile.fullName,
       email: null, // NEVER map the Auth email into UserModel
-      avatarInitials: profile['avatar_initials'] as String?,
+      avatarInitials: profile.avatarInitials,
       active: true,
-      mustChangePassword: profile['must_change_password'] == true,
+      mustChangePassword: profile.mustChangePassword,
       defaultRole: defaultRole,
       roles: activeRoles,
       photoTypes: photoTypes,
       permissions: permissions,
+    );
+  }
+
+  /// STRICT profile parsing. Every required field must be present with the
+  /// right runtime type — a malformed payload raises a typed, safe
+  /// [AuthFailure.profileUnavailable] instead of an unhandled `TypeError`.
+  /// In particular `must_change_password` must be a real bool: a null/string/int
+  /// must never be silently coerced to `false` (that would quietly drop a forced
+  /// password change).
+  _ProfileFields _parseProfile(Map<String, dynamic> row) {
+    String requireString(String key) {
+      final value = row[key];
+      if (value is! String || value.isEmpty) {
+        throw const AuthException(AuthFailure.profileUnavailable);
+      }
+      return value;
+    }
+
+    bool requireBool(String key) {
+      final value = row[key];
+      if (value is! bool) {
+        throw const AuthException(AuthFailure.profileUnavailable);
+      }
+      return value;
+    }
+
+    final avatar = row['avatar_initials'];
+    if (avatar != null && avatar is! String) {
+      throw const AuthException(AuthFailure.profileUnavailable);
+    }
+
+    return _ProfileFields(
+      id: requireString('id'),
+      username: requireString('username'),
+      fullName: requireString('full_name'),
+      avatarInitials: avatar as String?,
+      isActive: requireBool('is_active'),
+      mustChangePassword: requireBool('must_change_password'),
+      defaultRoleId: requireString('default_role_id'),
+      deletedAt: row['deleted_at'],
     );
   }
 
@@ -216,4 +343,27 @@ class SupabaseAuthRepository implements AuthRepository {
     }
     return perms;
   }
+}
+
+/// Validated profile columns (see `_parseProfile`). Never holds an Auth email.
+class _ProfileFields {
+  const _ProfileFields({
+    required this.id,
+    required this.username,
+    required this.fullName,
+    required this.avatarInitials,
+    required this.isActive,
+    required this.mustChangePassword,
+    required this.defaultRoleId,
+    required this.deletedAt,
+  });
+
+  final String id;
+  final String username;
+  final String fullName;
+  final String? avatarInitials;
+  final bool isActive;
+  final bool mustChangePassword;
+  final String defaultRoleId;
+  final Object? deletedAt;
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:sumou_app/data/repositories/supabase/auth_gateway.dart';
 
 /// In-memory [AuthGateway] for unit tests — no live network. Configurable rows,
@@ -13,7 +15,9 @@ class FakeAuthGateway implements AuthGateway {
     this.rolePermissions = const [],
     this.userPermissions = const [],
     this.session,
+    this.sessionExpired = false,
     this.errorOn = const <String>{},
+    this.signOutError = false,
   });
 
   /// User id returned by a successful sign-in.
@@ -31,15 +35,34 @@ class FakeAuthGateway implements AuthGateway {
   /// Persisted-session user id (null → signed out).
   String? session;
 
+  /// Whether the persisted access token is expired (needs a refresh first).
+  bool sessionExpired;
+
   /// Method names that should throw a simulated query error.
   Set<String> errorOn;
+
+  /// When true, [signOut] throws (explicit logout must surface this).
+  bool signOutError;
+
+  /// Drives [onAuthEvents]; tests emit refresh/sign-out events or an error.
+  final StreamController<AuthSessionEvent> authEvents =
+      StreamController<AuthSessionEvent>.broadcast();
 
   // ---- call recorders ----
   int signInCalls = 0;
   int signOutCalls = 0;
+  int authEventSubscriptions = 0;
+  int authEventCancellations = 0;
+  int fetchProfileCalls = 0;
   String? lastEmail;
   String? lastPassword;
   List<String>? lastRolePermissionIds;
+
+  /// True when every auth-event subscription has been cleaned up.
+  bool get allSubscriptionsCancelled =>
+      authEventSubscriptions == authEventCancellations;
+
+  Future<void> dispose() => authEvents.close();
 
   void _maybeThrow(String method) {
     if (errorOn.contains(method)) {
@@ -59,16 +82,56 @@ class FakeAuthGateway implements AuthGateway {
     return userId;
   }
 
+  /// Scripted responses for successive [currentSession] calls (last repeats).
+  /// Models the session changing BETWEEN the initial expiry check and the
+  /// race re-check — the only way to exercise that window deterministically.
+  List<AuthSessionInfo?>? sessionScript;
+  int currentSessionCalls = 0;
+
   @override
-  String? currentSessionUserId() => session;
+  AuthSessionInfo? currentSession() {
+    final index = currentSessionCalls++;
+    final script = sessionScript;
+    if (script != null && script.isNotEmpty) {
+      return script[index < script.length ? index : script.length - 1];
+    }
+    final id = session;
+    if (id == null) return null;
+    return AuthSessionInfo(userId: id, isExpired: sessionExpired);
+  }
+
+  @override
+  Stream<AuthSessionEvent> onAuthEvents() {
+    // Proxy that counts subscribe/cancel, so tests can assert the repository
+    // ALWAYS cleans up its subscription (including on timeout and stream error).
+    late final StreamController<AuthSessionEvent> proxy;
+    StreamSubscription<AuthSessionEvent>? inner;
+    proxy = StreamController<AuthSessionEvent>(
+      onListen: () {
+        authEventSubscriptions++;
+        inner = authEvents.stream.listen(
+          proxy.add,
+          onError: proxy.addError,
+          onDone: proxy.close,
+        );
+      },
+      onCancel: () async {
+        authEventCancellations++;
+        await inner?.cancel();
+      },
+    );
+    return proxy.stream;
+  }
 
   @override
   Future<void> signOut() async {
     signOutCalls++;
+    if (signOutError) throw StateError('simulated sign-out failure');
   }
 
   @override
   Future<Map<String, dynamic>?> fetchProfile(String userId) async {
+    fetchProfileCalls++;
     _maybeThrow('fetchProfile');
     return profile;
   }

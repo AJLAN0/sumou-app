@@ -6,6 +6,36 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// the repository holds all the testable business logic and can be exercised
 /// with a fake gateway — no live network. Every read throws on a query error
 /// (never returns empty on failure), so the repository can fail closed.
+/// A persisted session reduced to what the repository needs. No tokens.
+class AuthSessionInfo {
+  const AuthSessionInfo({required this.userId, required this.isExpired});
+
+  final String userId;
+
+  /// True when the access token is past its expiry and the SDK must refresh it
+  /// before any RLS-protected query can succeed.
+  final bool isExpired;
+}
+
+/// Auth lifecycle events reduced to the outcomes restoration cares about.
+enum AuthSessionEventKind {
+  /// A usable (refreshed / newly signed-in) session is available.
+  refreshed,
+
+  /// The session ended — refresh failed, the user signed out, or was deleted.
+  signedOut,
+
+  /// Anything else (user updated, password recovery…) — ignored by restoration.
+  other,
+}
+
+class AuthSessionEvent {
+  const AuthSessionEvent(this.kind, {this.userId});
+
+  final AuthSessionEventKind kind;
+  final String? userId;
+}
+
 abstract interface class AuthGateway {
   /// Sign in with the (internal) email; returns the authenticated user id.
   /// Throws on any failure (wrong credentials, unknown user, network).
@@ -14,8 +44,11 @@ abstract interface class AuthGateway {
     required String password,
   });
 
-  /// The persisted session's user id, or `null` when signed out.
-  String? currentSessionUserId();
+  /// The persisted session (id + expiry), or `null` when signed out.
+  AuthSessionInfo? currentSession();
+
+  /// Auth lifecycle events, used to await a token refresh before querying.
+  Stream<AuthSessionEvent> onAuthEvents();
 
   /// Idempotent sign-out.
   Future<void> signOut();
@@ -61,7 +94,35 @@ class SupabaseAuthGateway implements AuthGateway {
   }
 
   @override
-  String? currentSessionUserId() => _client.auth.currentSession?.user.id;
+  AuthSessionInfo? currentSession() {
+    final session = _client.auth.currentSession;
+    if (session == null) return null;
+    return AuthSessionInfo(
+      userId: session.user.id,
+      isExpired: session.isExpired,
+    );
+  }
+
+  @override
+  Stream<AuthSessionEvent> onAuthEvents() {
+    return _client.auth.onAuthStateChange.map((data) {
+      final userId = data.session?.user.id;
+      return switch (data.event) {
+        // A session is present again → usable for RLS-protected queries.
+        AuthChangeEvent.tokenRefreshed ||
+        AuthChangeEvent.signedIn ||
+        AuthChangeEvent.initialSession when userId != null => AuthSessionEvent(
+          AuthSessionEventKind.refreshed,
+          userId: userId,
+        ),
+        // Terminal: refresh failed / signed out / the account was deleted.
+        // ignore: deprecated_member_use
+        AuthChangeEvent.signedOut || AuthChangeEvent.userDeleted =>
+          const AuthSessionEvent(AuthSessionEventKind.signedOut),
+        _ => const AuthSessionEvent(AuthSessionEventKind.other),
+      };
+    });
+  }
 
   @override
   Future<void> signOut() => _client.auth.signOut();

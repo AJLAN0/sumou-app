@@ -35,12 +35,26 @@ const GOOD_NEW = "Str0ng!Passw0rd"; // 15 chars: upper/lower/digit/symbol
 // ---- fakes ------------------------------------------------------------------
 
 // deno-lint-ignore no-explicit-any
-function fakeUserClient(getUser: QueryResult, profile: QueryResult): any {
+function fakeUserClient(
+  getUser: QueryResult,
+  profile: QueryResult,
+  opts: { getUserThrows?: boolean; profileThrows?: boolean } = {},
+): any {
   return {
-    auth: { getUser: () => Promise.resolve(getUser) },
+    auth: {
+      getUser: () =>
+        opts.getUserThrows
+          ? Promise.reject(new Error("getUser network"))
+          : Promise.resolve(getUser),
+    },
     from: () => ({
       select: () => ({
-        eq: () => ({ maybeSingle: () => Promise.resolve(profile) }),
+        eq: () => ({
+          maybeSingle: () =>
+            opts.profileThrows
+              ? Promise.reject(new Error("profile network"))
+              : Promise.resolve(profile),
+        }),
       }),
     }),
   };
@@ -64,6 +78,8 @@ function fakeAnonClient(
 function fakeService(opts: {
   updateResult?: { data: unknown; error: unknown };
   rpcResult?: QueryResult;
+  updateThrows?: boolean;
+  rpcThrows?: boolean;
 }) {
   const calls: string[] = [];
   const updateArgs: { id?: string; password?: string } = {};
@@ -76,6 +92,9 @@ function fakeService(opts: {
           calls.push("update");
           updateArgs.id = id;
           updateArgs.password = o.password;
+          if (opts.updateThrows) {
+            return Promise.reject(new Error("updateUserById network"));
+          }
           return Promise.resolve(
             opts.updateResult ?? { data: { user: { id } }, error: null },
           );
@@ -85,6 +104,7 @@ function fakeService(opts: {
     rpc: (name: string, args: Record<string, unknown>) => {
       calls.push("rpc:" + name);
       Object.assign(rpcArgs, args);
+      if (opts.rpcThrows) return Promise.reject(new Error("rpc network"));
       return Promise.resolve(
         opts.rpcResult ??
           {
@@ -267,42 +287,120 @@ Deno.test("authorizeActiveStaff: profile query error → 500 (fail closed)", asy
   if (!r.ok) assertEquals(r.status, 500);
 });
 
-// ---- re-authentication (current password) -----------------------------------
+Deno.test("authorizeActiveStaff: getUser THROWS → safe 500", async () => {
+  const r = await authorizeActiveStaff(
+    fakeUserClient(OK_USER, ACTIVE_PROFILE, { getUserThrows: true }),
+  );
+  assert(!r.ok);
+  if (!r.ok) {
+    assertEquals(r.status, 500);
+    assertEquals(r.code, "server_error");
+  }
+});
 
-Deno.test("reauthenticate: correct password → true", async () => {
-  const ok = await reauthenticate(
+Deno.test("authorizeActiveStaff: profile query THROWS → safe 500", async () => {
+  const r = await authorizeActiveStaff(
+    fakeUserClient(OK_USER, ACTIVE_PROFILE, { profileThrows: true }),
+  );
+  assert(!r.ok);
+  if (!r.ok) assertEquals(r.status, 500);
+});
+
+Deno.test("authorizeActiveStaff: malformed username → 500 (fail closed pre-reauth)", async () => {
+  for (const bad of ["Manager", "has space", "a", "x".repeat(51), "bad@char"]) {
+    const r = await authorizeActiveStaff(
+      fakeUserClient(OK_USER, {
+        data: { id: "u1", is_active: true, username: bad },
+        error: null,
+      }),
+    );
+    assert(!r.ok, `username "${bad}" must be rejected`);
+    if (!r.ok) assertEquals(r.status, 500);
+  }
+});
+
+Deno.test("authorizeActiveStaff: profile id != uid → 500 (fail closed)", async () => {
+  const r = await authorizeActiveStaff(
+    fakeUserClient(OK_USER, {
+      data: { id: "someone-else", is_active: true, username: "manager" },
+      error: null,
+    }),
+  );
+  assert(!r.ok);
+  if (!r.ok) assertEquals(r.status, 500);
+});
+
+// ---- re-authentication (typed result) ---------------------------------------
+
+Deno.test("reauthenticate: correct password → success", async () => {
+  const r = await reauthenticate(
     fakeAnonClient({ data: { session: { access_token: "t" } }, error: null }),
     "manager@users.sumou.internal",
     "current",
   );
-  assertEquals(ok, true);
+  assertEquals(r, "success");
 });
 
-Deno.test("reauthenticate: wrong password (error) → false", async () => {
-  const ok = await reauthenticate(
-    fakeAnonClient({ data: { session: null }, error: { message: "invalid" } }),
+Deno.test("reauthenticate: CONFIRMED wrong password → invalidCredentials", async () => {
+  // GoTrue error code path.
+  const byCode = await reauthenticate(
+    fakeAnonClient({
+      data: { session: null },
+      error: { code: "invalid_credentials", status: 400, message: "x" },
+    }),
     "manager@users.sumou.internal",
     "wrong",
   );
-  assertEquals(ok, false);
+  assertEquals(byCode, "invalidCredentials");
+  // 400 + "Invalid login credentials" message path.
+  const byMessage = await reauthenticate(
+    fakeAnonClient({
+      data: { session: null },
+      error: { status: 400, message: "Invalid login credentials" },
+    }),
+    "manager@users.sumou.internal",
+    "wrong",
+  );
+  assertEquals(byMessage, "invalidCredentials");
 });
 
-Deno.test("reauthenticate: no session in response → false", async () => {
-  const ok = await reauthenticate(
+Deno.test("reauthenticate: rate limit / unexpected Auth error → serverError (not 401)", async () => {
+  const rate = await reauthenticate(
+    fakeAnonClient({
+      data: { session: null },
+      error: { code: "over_request_rate_limit", status: 429, message: "slow" },
+    }),
+    "manager@users.sumou.internal",
+    "x",
+  );
+  assertEquals(rate, "serverError");
+  const unexpected = await reauthenticate(
+    fakeAnonClient({
+      data: { session: null },
+      error: { status: 500, message: "internal" },
+    }),
+    "manager@users.sumou.internal",
+    "x",
+  );
+  assertEquals(unexpected, "serverError");
+});
+
+Deno.test("reauthenticate: no error but no session → serverError", async () => {
+  const r = await reauthenticate(
     fakeAnonClient({ data: { session: null }, error: null }),
     "manager@users.sumou.internal",
     "x",
   );
-  assertEquals(ok, false);
+  assertEquals(r, "serverError");
 });
 
-Deno.test("reauthenticate: thrown error → false (no leak)", async () => {
-  const ok = await reauthenticate(
+Deno.test("reauthenticate: THROWN error → serverError (no leak)", async () => {
+  const r = await reauthenticate(
     fakeAnonClient({ data: null, error: null }, { throws: true }),
     "manager@users.sumou.internal",
     "x",
   );
-  assertEquals(ok, false);
+  assertEquals(r, "serverError");
 });
 
 // ---- performOwnPasswordChange: ordering / partial failure -------------------

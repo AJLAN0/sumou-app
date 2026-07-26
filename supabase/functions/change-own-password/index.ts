@@ -27,6 +27,7 @@ import {
 import {
   buildInternalEmail,
   isJsonContentType,
+  isValidUsername,
   MAX_BODY_BYTES,
   normalizeUsername,
   readBoundedBody,
@@ -62,11 +63,24 @@ function errorResponse(
   return json({ error: { code, message } }, status, extra);
 }
 
+/** Shared generic 500 for any auth-check failure — never leaks the cause. */
+const authServerError = {
+  ok: false as const,
+  status: 500,
+  code: "server_error",
+  message: "authorization check failed",
+};
+
 /**
- * Authorize: authenticated + own ACTIVE, non-deleted profile. NO admin role and
- * NO feature permission are required — any active staff account may change its own
- * password. Returns the caller's uid + (normalized) username so the internal email
- * can be derived in-function. Fail closed: a query error → 500 (never empty).
+ * Authorize: authenticated + own ACTIVE, non-deleted profile with a WELL-FORMED
+ * identity. NO admin role and NO feature permission are required — any active
+ * staff account may change its own password. Returns the caller's uid + the
+ * NORMALIZED, validated username so the internal email can be derived in-function.
+ *
+ * Fail closed: a query error OR a THROWN SDK/network exception → generic 500
+ * (never treated as empty). A malformed stored identity (id ≠ uid, or a username
+ * that does not match `^[a-z0-9._-]{2,50}$`) → generic 500, BEFORE re-auth and
+ * before any service client is built.
  */
 export async function authorizeActiveStaff(
   userClient: SupabaseClient,
@@ -78,33 +92,36 @@ export async function authorizeActiveStaff(
     message: string;
   }
 > {
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData?.user) {
-    return {
-      ok: false,
-      status: 401,
-      code: "unauthenticated",
-      message: "invalid or missing session",
-    };
+  let uid: string;
+  try {
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return {
+        ok: false,
+        status: 401,
+        code: "unauthenticated",
+        message: "invalid or missing session",
+      };
+    }
+    uid = userData.user.id;
+  } catch {
+    // Thrown SDK/network error — never expose it.
+    return authServerError;
   }
-  const uid = userData.user.id;
 
   // The profiles self-read policy returns the row ONLY when active + not
   // soft-deleted, so a missing row means inactive/deleted/absent → reject.
-  const profileRes = await userClient
-    .from("profiles").select("id, is_active, username").eq("id", uid)
-    .maybeSingle();
-  if (profileRes.error) {
-    return {
-      ok: false,
-      status: 500,
-      code: "server_error",
-      message: "authorization check failed",
-    };
+  let row: { id?: string; is_active?: boolean; username?: string } | null;
+  try {
+    const profileRes = await userClient
+      .from("profiles").select("id, is_active, username").eq("id", uid)
+      .maybeSingle();
+    if (profileRes.error) return authServerError;
+    row = profileRes.data as typeof row;
+  } catch {
+    return authServerError;
   }
-  const row = profileRes.data as
-    | { id?: string; is_active?: boolean; username?: string }
-    | null;
+
   if (!row || row.is_active !== true || typeof row.username !== "string") {
     return {
       ok: false,
@@ -113,29 +130,61 @@ export async function authorizeActiveStaff(
       message: "not an active account",
     };
   }
-  return { ok: true, uid, username: row.username };
+
+  // Identity integrity (defense-in-depth): the row must be the caller's own, and
+  // the stored username must be a valid handle before it becomes an internal
+  // email. A malformed identity fails closed here — never proceeds to re-auth.
+  if (row.id !== uid) return authServerError;
+  const username = normalizeUsername(row.username);
+  if (!isValidUsername(username)) return authServerError;
+
+  return { ok: true, uid, username };
 }
+
+/** Outcome of re-authenticating the caller's current password. */
+export type ReauthResult = "success" | "invalidCredentials" | "serverError";
 
 /**
  * Verify the caller's CURRENT password without disturbing their live session, by
  * signing in on an ISOLATED anon client (its own in-memory, non-persisted
- * session). Returns true only on a clean sign-in. Any error/exception → false
- * (treated as an incorrect current password). Never logs the email/password.
+ * session). Never logs the email/password. Classification:
+ *   • `success` — a clean sign-in with a session.
+ *   • `invalidCredentials` — a CONFIRMED wrong-password Auth response ONLY
+ *     (GoTrue `invalid_credentials`, i.e. HTTP 400 "invalid login credentials").
+ *   • `serverError` — a thrown/network error, rate limiting (429), any other or
+ *     unexpected Auth error, or a no-error-but-no-session response.
+ * Only `invalidCredentials` should map to 401; everything else is a generic 500.
  */
 export async function reauthenticate(
   anonClient: SupabaseClient,
   internalEmail: string,
   currentPassword: string,
-): Promise<boolean> {
+): Promise<ReauthResult> {
+  let res: { data?: { session?: unknown } | null; error?: unknown };
   try {
-    const res = await anonClient.auth.signInWithPassword({
+    res = await anonClient.auth.signInWithPassword({
       email: internalEmail,
       password: currentPassword,
     });
-    return !res.error && !!res.data?.session;
   } catch {
-    return false;
+    // Thrown SDK/network error → not a confirmed invalid password.
+    return "serverError";
   }
+
+  const err = res.error as
+    | { code?: string; status?: number; message?: string }
+    | null
+    | undefined;
+  if (err) {
+    const message = typeof err.message === "string" ? err.message : "";
+    const confirmedInvalid = err.code === "invalid_credentials" ||
+      (err.status === 400 && /invalid[\s_-]*(login[\s_-]*)?credential/i.test(message));
+    // Only a confirmed wrong password is 401; rate limits / 5xx / anything else
+    // is a generic server error (never reveals the specifics).
+    return confirmedInvalid ? "invalidCredentials" : "serverError";
+  }
+  // No error but no session is unexpected — fail closed (not "wrong password").
+  return res.data?.session ? "success" : "serverError";
 }
 
 /**
@@ -149,10 +198,16 @@ export async function performOwnPasswordChange(
   newPassword: string,
 ): Promise<Response> {
   // 1) Update the caller's own Auth password (service_role). Sessions are not
-  //    revoked here.
-  const updated = await serviceClient.auth.admin.updateUserById(uid, {
-    password: newPassword,
-  });
+  //    revoked here. A thrown SDK/network error → the RPC is NOT reached.
+  let updated: { data?: { user?: unknown } | null; error?: unknown };
+  try {
+    updated = await serviceClient.auth.admin.updateUserById(uid, {
+      password: newPassword,
+    });
+  } catch {
+    console.error("change-own-password: auth.updateUserById threw");
+    return errorResponse("server_error", "could not change the password", 500);
+  }
   if (updated.error || !updated.data?.user) {
     console.error("change-own-password: auth.updateUserById failed");
     // Auth update FAILED → the RPC is NOT called; nothing to clean up.
@@ -161,13 +216,26 @@ export async function performOwnPasswordChange(
 
   // 2) Finalize: clear must_change_password + audit, atomically, via the
   //    service-only RPC (which independently re-validates the caller).
-  const rpc = await serviceClient.rpc("record_own_password_change", {
-    p_user_id: uid,
-  });
+  // PARTIAL FAILURE (RPC error OR thrown): the Auth password already changed but
+  // the flag/audit was NOT recorded. We do NOT restore the old password (not
+  // available). Generic 500; the safe retry uses the NEW password as
+  // current_password.
+  let rpc: { data?: unknown; error?: unknown };
+  try {
+    rpc = await serviceClient.rpc("record_own_password_change", {
+      p_user_id: uid,
+    });
+  } catch {
+    console.error(
+      "change-own-password: record_own_password_change threw after Auth update",
+    );
+    return errorResponse(
+      "server_error",
+      "password change could not be completed",
+      500,
+    );
+  }
   if (rpc.error) {
-    // PARTIAL FAILURE: the Auth password already changed but the flag/audit was
-    // NOT recorded. We do NOT restore the old password (not available). Generic
-    // 500; the safe retry uses the NEW password as current_password.
     console.error(
       "change-own-password: record_own_password_change failed after Auth update",
     );
@@ -255,23 +323,33 @@ export async function handleRequest(req: Request): Promise<Response> {
   const uid = authz.uid;
 
   // Derive the hidden internal email in-function (never accepted/returned/logged).
-  const internalEmail = buildInternalEmail(normalizeUsername(authz.username));
+  // authz.username is already normalized + validated.
+  const internalEmail = buildInternalEmail(authz.username);
 
   // Re-authenticate the CURRENT password on an isolated anon client (its own
   // in-memory session; the caller's live session is untouched, none revoked).
   const reauthClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const reauthed = await reauthenticate(
+  const reauth = await reauthenticate(
     reauthClient,
     internalEmail,
     currentPassword,
   );
-  if (!reauthed) {
+  if (reauth === "invalidCredentials") {
+    // ONLY a confirmed wrong current password is 401.
     return errorResponse(
       "invalid_credentials",
       "current password is incorrect",
       401,
+    );
+  }
+  if (reauth === "serverError") {
+    // Thrown / rate-limited / network / unexpected Auth error → generic 500.
+    return errorResponse(
+      "server_error",
+      "could not verify the current password",
+      500,
     );
   }
 

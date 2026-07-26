@@ -33,7 +33,45 @@ class AuthSessionEvent {
   const AuthSessionEvent(this.kind, {this.userId});
 
   final AuthSessionEventKind kind;
+
+  /// Only ever set for [AuthSessionEventKind.refreshed] — i.e. a session that
+  /// actually exists and is NOT expired. An expired event never carries an id.
   final String? userId;
+}
+
+/// Pure classification of a Supabase auth event (exposed for unit tests).
+///
+/// A `tokenRefreshed` / `signedIn` / `initialSession` event is only USABLE when
+/// a session exists AND it is not expired — the SDK emits `initialSession` (and
+/// can emit `signedIn`) while the restored token is still expired, and treating
+/// that as usable would run RLS queries with a dead token and misread the empty
+/// result as a disabled account. Such an event is therefore **non-decisive**
+/// ([AuthSessionEventKind.other]): restoration keeps waiting for a real refresh
+/// (or the timeout). `signedOut` / `userDeleted` stay terminal.
+AuthSessionEvent classifyAuthEvent(
+  AuthChangeEvent event, {
+  required String? sessionUserId,
+  required bool sessionIsExpired,
+}) {
+  final usable = sessionUserId != null && !sessionIsExpired;
+  switch (event) {
+    case AuthChangeEvent.tokenRefreshed:
+    case AuthChangeEvent.signedIn:
+    case AuthChangeEvent.initialSession:
+      return usable
+          ? AuthSessionEvent(
+            AuthSessionEventKind.refreshed,
+            userId: sessionUserId,
+          )
+          // Expired (or session-less) → keep waiting; never leak a user id.
+          : const AuthSessionEvent(AuthSessionEventKind.other);
+    case AuthChangeEvent.signedOut:
+    // ignore: deprecated_member_use
+    case AuthChangeEvent.userDeleted:
+      return const AuthSessionEvent(AuthSessionEventKind.signedOut);
+    default:
+      return const AuthSessionEvent(AuthSessionEventKind.other);
+  }
 }
 
 abstract interface class AuthGateway {
@@ -106,21 +144,13 @@ class SupabaseAuthGateway implements AuthGateway {
   @override
   Stream<AuthSessionEvent> onAuthEvents() {
     return _client.auth.onAuthStateChange.map((data) {
-      final userId = data.session?.user.id;
-      return switch (data.event) {
-        // A session is present again → usable for RLS-protected queries.
-        AuthChangeEvent.tokenRefreshed ||
-        AuthChangeEvent.signedIn ||
-        AuthChangeEvent.initialSession when userId != null => AuthSessionEvent(
-          AuthSessionEventKind.refreshed,
-          userId: userId,
-        ),
-        // Terminal: refresh failed / signed out / the account was deleted.
-        // ignore: deprecated_member_use
-        AuthChangeEvent.signedOut || AuthChangeEvent.userDeleted =>
-          const AuthSessionEvent(AuthSessionEventKind.signedOut),
-        _ => const AuthSessionEvent(AuthSessionEventKind.other),
-      };
+      final session = data.session;
+      return classifyAuthEvent(
+        data.event,
+        sessionUserId: session?.user.id,
+        // A restored-but-expired session is NOT usable for RLS queries.
+        sessionIsExpired: session?.isExpired ?? true,
+      );
     });
   }
 

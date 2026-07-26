@@ -116,7 +116,28 @@ Entry never flashes before restoration.
    `logoutFailed`, and the controller then **keeps the authenticated state** and
    shows a message — it never pretends the user is signed out while the session
    still exists. A later successful logout clears it.
-5. **Operation generation guard.** Replacing `_initFuture` does not cancel work
+5. **Auth event classification (final pass).** `tokenRefreshed` / `signedIn` /
+   `initialSession` count as usable **only when a session exists AND
+   `isExpired == false`**. The SDK emits `initialSession` (and can emit
+   `signedIn`) while the restored token is still expired; treating that as usable
+   would query RLS with a dead token and misread the empty result as a disabled
+   account. An expired such event is therefore **non-decisive** — restoration
+   keeps waiting for a real refresh (or the timeout) — and it **never carries a
+   user id**. `signedOut` / `userDeleted` stay terminal regardless of expiry, and
+   unrelated events (e.g. `userUpdated`) remain non-decisive. The mapping lives in
+   the pure, unit-tested `classifyAuthEvent(...)`.
+6. **Profile parsing (final pass).** In addition to the strict types:
+   `username` must match the frozen `^[a-z0-9._-]{2,50}$` (reusing
+   `AuthIdentity.isValid`, so a corrupted/unnormalized row can never become a
+   usable identity); `full_name`, `id`, and `default_role_id` must be non-blank
+   after trimming (whitespace-only is malformed); `deleted_at` must be SQL NULL or
+   an actual PostgREST timestamptz string (ISO-8601, `DateTime.tryParse`-able) —
+   a number/bool/unparseable string is rejected rather than being read as "not
+   deleted", which would revive a soft-deleted account. All of these stay
+   `profileUnavailable`. The row is now parsed **before** the id comparison, so a
+   malformed payload reports as malformed instead of masquerading as an id
+   mismatch (a well-formed row for another user still yields `accountUnavailable`).
+7. **Operation generation guard.** Replacing `_initFuture` does not cancel work
    already awaiting inside a restore, so `AuthController` keeps a monotonic
    `_generation`; every restore captures it at entry and re-checks before **each**
    state write, and login/logout bump it. An older in-flight restore is therefore
@@ -173,8 +194,17 @@ flutter test test/auth_identity_test.dart test/permissions_mapping_test.dart \
 
 > After the second hardening pass the focused auth suites
 > (`supabase_auth_repository`, `session_restoration`, `auth_controller`, `router`)
-> run **74 passed / 0 failed**; `dart format` and `flutter analyze` are clean. The
-> full suite was **not** re-run in that pass (owner runs it manually).
+> run **74 passed / 0 failed**; `dart format` and `flutter analyze` are clean.
+>
+> After the final validation fix (event classification + parser tightening),
+> `supabase_auth_repository_test.dart` + `session_restoration_test.dart` run
+> **75 passed / 0 failed**; format and analyze clean. Added regression tests:
+> expired `initialSession`/`signedIn` do **not** complete restoration (and a
+> subsequent real refresh does), a non-expired `initialSession` **may** complete
+> it, `signedOut`/`userDeleted` stay terminal, expired events carry no user id,
+> plus whitespace-only `full_name`, malformed `username`, malformed `deleted_at`,
+> a real timestamptz meaning disabled, and blank `id`/`default_role_id`.
+> The full suite was **not** re-run in these passes (owner runs it manually).
 
 Full suite (2026-07-23, after the first hardening pass): **223 passed / 5 failed** — the 5 failures are the
 **pre-existing** `assign_photographers_test.dart` (3) + `project_details_test.dart`

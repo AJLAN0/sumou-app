@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 import 'package:sumou_app/core/models/feature_permissions.dart';
 import 'package:sumou_app/core/models/role_type.dart';
 import 'package:sumou_app/data/repositories/auth_repository.dart';
@@ -529,6 +530,155 @@ void main() {
     });
   });
 
+  // ---- Auth event classification (expired events are non-decisive) --------
+  group('auth event classification', () {
+    test(
+      'tokenRefreshed/signedIn/initialSession are usable only when unexpired',
+      () {
+        for (final event in [
+          AuthChangeEvent.tokenRefreshed,
+          AuthChangeEvent.signedIn,
+          AuthChangeEvent.initialSession,
+        ]) {
+          final ok = classifyAuthEvent(
+            event,
+            sessionUserId: 'u1',
+            sessionIsExpired: false,
+          );
+          expect(ok.kind, AuthSessionEventKind.refreshed, reason: '$event');
+          expect(ok.userId, 'u1');
+
+          // Expired → non-decisive, and NEVER carries a user id.
+          final expired = classifyAuthEvent(
+            event,
+            sessionUserId: 'u1',
+            sessionIsExpired: true,
+          );
+          expect(expired.kind, AuthSessionEventKind.other, reason: '$event');
+          expect(expired.userId, isNull, reason: '$event must not leak an id');
+
+          // No session at all → also non-decisive.
+          final none = classifyAuthEvent(
+            event,
+            sessionUserId: null,
+            sessionIsExpired: false,
+          );
+          expect(none.kind, AuthSessionEventKind.other);
+          expect(none.userId, isNull);
+        }
+      },
+    );
+
+    test('signedOut/userDeleted stay terminal regardless of expiry', () {
+      for (final expired in [true, false]) {
+        expect(
+          classifyAuthEvent(
+            AuthChangeEvent.signedOut,
+            sessionUserId: null,
+            sessionIsExpired: expired,
+          ).kind,
+          AuthSessionEventKind.signedOut,
+        );
+        expect(
+          classifyAuthEvent(
+            // ignore: deprecated_member_use
+            AuthChangeEvent.userDeleted,
+            sessionUserId: 'u1',
+            sessionIsExpired: expired,
+          ).kind,
+          AuthSessionEventKind.signedOut,
+        );
+      }
+    });
+
+    test('unrelated events are non-decisive', () {
+      expect(
+        classifyAuthEvent(
+          AuthChangeEvent.userUpdated,
+          sessionUserId: 'u1',
+          sessionIsExpired: false,
+        ).kind,
+        AuthSessionEventKind.other,
+      );
+    });
+  });
+
+  group('expired events do not complete restoration', () {
+    FakeAuthGateway expiredGw() => FakeAuthGateway(
+      session: 'u1',
+      sessionExpired: true,
+      profile: profileRow(id: 'u1', defaultRoleId: 'r-manager'),
+      roles: [roleRow('r-manager', 'manager')],
+    );
+
+    /// Emits the event exactly as the real gateway would classify it.
+    void emit(
+      FakeAuthGateway g,
+      AuthChangeEvent event, {
+      required bool expired,
+    }) => g.authEvents.add(
+      classifyAuthEvent(event, sessionUserId: 'u1', sessionIsExpired: expired),
+    );
+
+    test('an EXPIRED initialSession does not complete restoration', () async {
+      final g = expiredGw();
+      addTearDown(g.dispose);
+      var settled = false;
+      final future = SupabaseAuthRepository.withGateway(
+        g,
+        refreshTimeout: const Duration(milliseconds: 300),
+      ).currentUser().whenComplete(() => settled = true);
+      await Future<void>.delayed(Duration.zero);
+
+      emit(g, AuthChangeEvent.initialSession, expired: true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(settled, isFalse, reason: 'expired event must not be decisive');
+      expect(g.fetchProfileCalls, 0);
+
+      // A real refresh then completes it.
+      emit(g, AuthChangeEvent.tokenRefreshed, expired: false);
+      expect(await future, isNotNull);
+      expect(g.allSubscriptionsCancelled, isTrue);
+    });
+
+    test('an EXPIRED signedIn does not complete restoration', () async {
+      final g = expiredGw();
+      addTearDown(g.dispose);
+      var settled = false;
+      final future = SupabaseAuthRepository.withGateway(
+        g,
+        refreshTimeout: const Duration(milliseconds: 300),
+      ).currentUser().whenComplete(() => settled = true);
+      await Future<void>.delayed(Duration.zero);
+
+      emit(g, AuthChangeEvent.signedIn, expired: true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(settled, isFalse);
+      expect(g.fetchProfileCalls, 0);
+
+      emit(g, AuthChangeEvent.signedIn, expired: false);
+      expect(await future, isNotNull);
+    });
+
+    test('a NON-expired initialSession may complete restoration', () async {
+      final g = expiredGw();
+      addTearDown(g.dispose);
+      final future =
+          SupabaseAuthRepository.withGateway(
+            g,
+            refreshTimeout: const Duration(milliseconds: 300),
+          ).currentUser();
+      await Future<void>.delayed(Duration.zero);
+
+      emit(g, AuthChangeEvent.initialSession, expired: false);
+      final user = await future;
+      expect(user, isNotNull);
+      expect(user!.id, 'u1');
+      expect(g.fetchProfileCalls, 1);
+      expect(g.allSubscriptionsCancelled, isTrue);
+    });
+  });
+
   // ---- (2) Strict profile parsing (never a TypeError) ----------------------
   group('strict profile parsing', () {
     Future<Object?> loginErrWith(Map<String, dynamic> row) {
@@ -590,6 +740,75 @@ void main() {
         await repoWith(g).login(username: 'manager', password: 'x'),
         isNotNull,
       );
+    });
+
+    test('whitespace-only full_name is rejected', () async {
+      for (final blank in ['   ', '\t', '\n  ']) {
+        final err = await loginErrWith(profileRow()..['full_name'] = blank);
+        expect(
+          failureOf(err!),
+          AuthFailure.profileUnavailable,
+          reason: 'blank full_name ${blank.codeUnits} must be rejected',
+        );
+      }
+    });
+
+    test(
+      'malformed username is rejected (frozen ^[a-z0-9._-]{2,50}\$)',
+      () async {
+        for (final bad in [
+          'A', // too short + uppercase
+          'Manager', // uppercase
+          'has space',
+          'bad@char',
+          'x', // too short
+          'y' * 51, // too long
+          '   ', // blank
+        ]) {
+          final err = await loginErrWith(profileRow()..['username'] = bad);
+          expect(
+            failureOf(err!),
+            AuthFailure.profileUnavailable,
+            reason: 'username "$bad" must be rejected',
+          );
+        }
+      },
+    );
+
+    test(
+      'malformed deleted_at is rejected (never read as "not deleted")',
+      () async {
+        for (final bad in <Object>[123, true, 'not-a-timestamp', '']) {
+          final err = await loginErrWith(profileRow()..['deleted_at'] = bad);
+          expect(
+            failureOf(err!),
+            AuthFailure.profileUnavailable,
+            reason: 'deleted_at "$bad" must be rejected',
+          );
+        }
+      },
+    );
+
+    test('a real PostgREST timestamp in deleted_at means disabled', () async {
+      final g = FakeAuthGateway(
+        profile: profileRow(deletedAt: '2024-05-01T12:34:56.789123+00:00'),
+        roles: [roleRow('r-manager', 'manager')],
+      );
+      final err = await repoWith(g)
+          .login(username: 'manager', password: 'x')
+          .then<Object?>((_) => null, onError: (e) => e);
+      expect(failureOf(err!), AuthFailure.accountDisabled);
+    });
+
+    test('blank id / default_role_id are rejected', () async {
+      for (final key in ['id', 'default_role_id']) {
+        final err = await loginErrWith(profileRow()..[key] = '   ');
+        expect(
+          failureOf(err!),
+          AuthFailure.profileUnavailable,
+          reason: 'blank $key must be rejected',
+        );
+      }
     });
 
     test('a well-formed profile still parses (bools preserved)', () async {

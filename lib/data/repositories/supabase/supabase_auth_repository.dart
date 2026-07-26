@@ -192,13 +192,18 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<UserModel> _loadUserContext(String authUserId) async {
     // 1) Profile (own row). A query error throws here → fail closed.
     final profileRow = await _gateway.fetchProfile(authUserId);
-    // RLS returns NO ROW for a missing, inactive, or soft-deleted account alike
-    // (and for an id that is not the caller). Collapse all of those into ONE
-    // generic reason so the client cannot distinguish them.
-    if (profileRow == null || profileRow['id'] != authUserId) {
+    // RLS returns NO ROW for a missing, inactive, or soft-deleted account alike.
+    // Collapse those into ONE generic reason so the client cannot tell them apart.
+    if (profileRow == null) {
       throw const AuthException(AuthFailure.accountUnavailable);
     }
+    // Parse FIRST so a malformed payload is reported as malformed
+    // (profileUnavailable) rather than masquerading as an id mismatch.
     final profile = _parseProfile(profileRow);
+    // A well-formed row for someone else is also "unavailable" to this caller.
+    if (profile.id != authUserId) {
+      throw const AuthException(AuthFailure.accountUnavailable);
+    }
     if (profile.deletedAt != null || !profile.isActive) {
       throw const AuthException(AuthFailure.accountDisabled);
     }
@@ -270,36 +275,57 @@ class SupabaseAuthRepository implements AuthRepository {
   /// must never be silently coerced to `false` (that would quietly drop a forced
   /// password change).
   _ProfileFields _parseProfile(Map<String, dynamic> row) {
-    String requireString(String key) {
+    // Every rejection uses the SAME typed reason — a malformed payload must
+    // never surface as an unhandled TypeError nor leak which field was bad.
+    Never reject() => throw const AuthException(AuthFailure.profileUnavailable);
+
+    /// A required identifier/text column: present, a String, non-blank once
+    /// trimmed (a whitespace-only value is malformed, not a valid name/id).
+    String requireNonBlank(String key) {
       final value = row[key];
-      if (value is! String || value.isEmpty) {
-        throw const AuthException(AuthFailure.profileUnavailable);
-      }
-      return value;
+      if (value is! String) reject();
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) reject();
+      return trimmed;
     }
 
     bool requireBool(String key) {
       final value = row[key];
-      if (value is! bool) {
-        throw const AuthException(AuthFailure.profileUnavailable);
-      }
+      if (value is! bool) reject();
       return value;
     }
 
     final avatar = row['avatar_initials'];
-    if (avatar != null && avatar is! String) {
-      throw const AuthException(AuthFailure.profileUnavailable);
+    if (avatar != null && avatar is! String) reject();
+
+    // The username is the login identity: it must satisfy the SAME frozen rule
+    // the backend enforces (`^[a-z0-9._-]{2,50}$`), so a corrupted/unnormalized
+    // row can never become a usable identity in the app.
+    final username = requireNonBlank('username');
+    if (!AuthIdentity.isValid(username)) reject();
+
+    // `deleted_at` is either SQL NULL or a PostgREST timestamptz string
+    // (ISO-8601). Anything else (number, bool, unparseable text) is malformed —
+    // it must NOT be treated as "not deleted", which would revive a
+    // soft-deleted account.
+    final rawDeletedAt = row['deleted_at'];
+    DateTime? deletedAt;
+    if (rawDeletedAt != null) {
+      if (rawDeletedAt is! String) reject();
+      final parsed = DateTime.tryParse(rawDeletedAt);
+      if (parsed == null) reject();
+      deletedAt = parsed;
     }
 
     return _ProfileFields(
-      id: requireString('id'),
-      username: requireString('username'),
-      fullName: requireString('full_name'),
+      id: requireNonBlank('id'),
+      username: username,
+      fullName: requireNonBlank('full_name'),
       avatarInitials: avatar as String?,
       isActive: requireBool('is_active'),
       mustChangePassword: requireBool('must_change_password'),
-      defaultRoleId: requireString('default_role_id'),
-      deletedAt: row['deleted_at'],
+      defaultRoleId: requireNonBlank('default_role_id'),
+      deletedAt: deletedAt,
     );
   }
 
@@ -365,5 +391,5 @@ class _ProfileFields {
   final bool isActive;
   final bool mustChangePassword;
   final String defaultRoleId;
-  final Object? deletedAt;
+  final DateTime? deletedAt;
 }

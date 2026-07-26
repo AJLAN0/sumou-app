@@ -31,16 +31,35 @@ Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-test-key");
 type QueryResult = { data: unknown; error: unknown };
 
 const GOOD_NEW = "Str0ng!Passw0rd"; // 15 chars: upper/lower/digit/symbol
+const CURRENT_PASSWORD = "Curr3nt!Passw0rd";
+const INTERNAL_EMAIL = "manager@users.sumou.internal";
+const BEARER_TOKEN = "abc.def.ghi";
 
 // ---- fakes ------------------------------------------------------------------
 
 // deno-lint-ignore no-explicit-any
-function fakeUserClient(getUser: QueryResult, profile: QueryResult): any {
+function fakeUserClient(
+  getUser: QueryResult,
+  profile: QueryResult,
+  opts: { getUserThrows?: boolean; profileThrows?: boolean } = {},
+): any {
   return {
-    auth: { getUser: () => Promise.resolve(getUser) },
+    auth: {
+      getUser: () =>
+        opts.getUserThrows
+          ? Promise.reject(new Error(`getUser leaked ${BEARER_TOKEN}`))
+          : Promise.resolve(getUser),
+    },
     from: () => ({
       select: () => ({
-        eq: () => ({ maybeSingle: () => Promise.resolve(profile) }),
+        eq: () => ({
+          maybeSingle: () =>
+            opts.profileThrows
+              ? Promise.reject(
+                new Error(`profile leaked ${CURRENT_PASSWORD}`),
+              )
+              : Promise.resolve(profile),
+        }),
       }),
     }),
   };
@@ -64,6 +83,8 @@ function fakeAnonClient(
 function fakeService(opts: {
   updateResult?: { data: unknown; error: unknown };
   rpcResult?: QueryResult;
+  updateThrows?: boolean;
+  rpcThrows?: boolean;
 }) {
   const calls: string[] = [];
   const updateArgs: { id?: string; password?: string } = {};
@@ -76,6 +97,11 @@ function fakeService(opts: {
           calls.push("update");
           updateArgs.id = id;
           updateArgs.password = o.password;
+          if (opts.updateThrows) {
+            return Promise.reject(
+              new Error(`Auth leaked ${GOOD_NEW} ${INTERNAL_EMAIL}`),
+            );
+          }
           return Promise.resolve(
             opts.updateResult ?? { data: { user: { id } }, error: null },
           );
@@ -85,6 +111,11 @@ function fakeService(opts: {
     rpc: (name: string, args: Record<string, unknown>) => {
       calls.push("rpc:" + name);
       Object.assign(rpcArgs, args);
+      if (opts.rpcThrows) {
+        return Promise.reject(
+          new Error(`RPC leaked ${GOOD_NEW} ${BEARER_TOKEN}`),
+        );
+      }
       return Promise.resolve(
         opts.rpcResult ??
           {
@@ -95,6 +126,20 @@ function fakeService(opts: {
     },
   };
   return { client, calls, updateArgs, rpcArgs };
+}
+
+// deno-lint-ignore no-explicit-any
+function fakeClientFactory(clients: any[]) {
+  const createdWithKeys: string[] = [];
+  let anonIndex = 0;
+  return {
+    createdWithKeys,
+    factory: (_url: string, key: string) => {
+      createdWithKeys.push(key);
+      if (key === "service-test-key") return clients[2];
+      return clients[anonIndex++];
+    },
+  };
 }
 
 const OK_USER: QueryResult = { data: { user: { id: "u1" } }, error: null };
@@ -108,7 +153,7 @@ function req(
   {
     method = "POST",
     contentType = "application/json" as string | null,
-    bearer = "Bearer abc.def.ghi" as string | null,
+    bearer = `Bearer ${BEARER_TOKEN}` as string | null,
   } = {},
 ): Request {
   const headers: Record<string, string> = {};
@@ -117,29 +162,62 @@ function req(
   return new Request("http://x", { method, headers, body });
 }
 
+function validReq(): Request {
+  return req(JSON.stringify({
+    current_password: CURRENT_PASSWORD,
+    new_password: GOOD_NEW,
+  }));
+}
+
+async function assertSafeErrorResponse(
+  res: Response,
+  expectedStatus: number,
+): Promise<{ error: { code: string; message: string } }> {
+  assertEquals(res.status, expectedStatus);
+  assertEquals(res.headers.get("Content-Type"), "application/json");
+  assertEquals(res.headers.get("Cache-Control"), "no-store, max-age=0");
+  assertEquals(res.headers.get("Pragma"), "no-cache");
+  assertEquals(res.headers.get("X-Content-Type-Options"), "nosniff");
+
+  const text = await res.text();
+  for (
+    const secret of [
+      CURRENT_PASSWORD,
+      GOOD_NEW,
+      INTERNAL_EMAIL,
+      BEARER_TOKEN,
+      "anon-test-key",
+      "service-test-key",
+      "access_token",
+    ]
+  ) {
+    assert(!text.includes(secret), `response leaked "${secret}"`);
+  }
+  return JSON.parse(text);
+}
+
 // ---- request framing --------------------------------------------------------
 
 Deno.test("handleRequest: GET → 405 + Allow: POST", async () => {
   const res = await handleRequest(new Request("http://x", { method: "GET" }));
-  assertEquals(res.status, 405);
+  await assertSafeErrorResponse(res, 405);
   assertEquals(res.headers.get("Allow"), "POST");
-  assertEquals(res.headers.get("Cache-Control"), "no-store, max-age=0");
 });
 
 Deno.test("handleRequest: wrong Content-Type → 415", async () => {
   const res = await handleRequest(req("{}", { contentType: "text/plain" }));
-  assertEquals(res.status, 415);
+  await assertSafeErrorResponse(res, 415);
 });
 
 Deno.test("handleRequest: missing bearer → 401", async () => {
   const res = await handleRequest(req("{}", { bearer: null }));
-  assertEquals(res.status, 401);
+  await assertSafeErrorResponse(res, 401);
 });
 
 Deno.test("handleRequest: malformed JSON → 400", async () => {
   const res = await handleRequest(req("{"));
-  assertEquals(res.status, 400);
-  assertEquals((await res.json()).error.code, "invalid_request");
+  const body = await assertSafeErrorResponse(res, 400);
+  assertEquals(body.error.code, "invalid_request");
 });
 
 Deno.test("handleRequest: unknown field → 400 (strict allowlist)", async () => {
@@ -150,7 +228,7 @@ Deno.test("handleRequest: unknown field → 400 (strict allowlist)", async () =>
       username: "x",
     })),
   );
-  assertEquals(res.status, 400);
+  await assertSafeErrorResponse(res, 400);
 });
 
 Deno.test("handleRequest: weak new_password → 400 weak_password (pre-network)", async () => {
@@ -159,16 +237,15 @@ Deno.test("handleRequest: weak new_password → 400 weak_password (pre-network)"
       JSON.stringify({ current_password: "whatever", new_password: "short" }),
     ),
   );
-  assertEquals(res.status, 400);
-  assertEquals((await res.json()).error.code, "weak_password");
+  const body = await assertSafeErrorResponse(res, 400);
+  assertEquals(body.error.code, "weak_password");
 });
 
 Deno.test("handleRequest: same new/current password → 400 (pre-network)", async () => {
   const res = await handleRequest(
     req(JSON.stringify({ current_password: GOOD_NEW, new_password: GOOD_NEW })),
   );
-  assertEquals(res.status, 400);
-  const body = await res.json();
+  const body = await assertSafeErrorResponse(res, 400);
   assert(body.error.message.includes("differ"));
 });
 
@@ -267,42 +344,186 @@ Deno.test("authorizeActiveStaff: profile query error → 500 (fail closed)", asy
   if (!r.ok) assertEquals(r.status, 500);
 });
 
+Deno.test("authorizeActiveStaff: normalized username is returned", async () => {
+  const r = await authorizeActiveStaff(
+    fakeUserClient(OK_USER, {
+      data: { id: "u1", is_active: true, username: "  Manager  " },
+      error: null,
+    }),
+  );
+  assert(r.ok);
+  if (r.ok) assertEquals(r.username, "manager");
+});
+
 // ---- re-authentication (current password) -----------------------------------
 
-Deno.test("reauthenticate: correct password → true", async () => {
-  const ok = await reauthenticate(
+Deno.test("reauthenticate: correct password → success", async () => {
+  const result = await reauthenticate(
     fakeAnonClient({ data: { session: { access_token: "t" } }, error: null }),
-    "manager@users.sumou.internal",
+    INTERNAL_EMAIL,
     "current",
   );
-  assertEquals(ok, true);
+  assertEquals(result, "success");
 });
 
-Deno.test("reauthenticate: wrong password (error) → false", async () => {
-  const ok = await reauthenticate(
-    fakeAnonClient({ data: { session: null }, error: { message: "invalid" } }),
-    "manager@users.sumou.internal",
+Deno.test("reauthenticate: confirmed wrong password → invalidCredentials", async () => {
+  const result = await reauthenticate(
+    fakeAnonClient({
+      data: { session: null },
+      error: { code: "invalid_credentials", message: "invalid" },
+    }),
+    INTERNAL_EMAIL,
     "wrong",
   );
-  assertEquals(ok, false);
+  assertEquals(result, "invalidCredentials");
 });
 
-Deno.test("reauthenticate: no session in response → false", async () => {
-  const ok = await reauthenticate(
+Deno.test("reauthenticate: no session in response → serverError", async () => {
+  const result = await reauthenticate(
     fakeAnonClient({ data: { session: null }, error: null }),
-    "manager@users.sumou.internal",
+    INTERNAL_EMAIL,
     "x",
   );
-  assertEquals(ok, false);
+  assertEquals(result, "serverError");
 });
 
-Deno.test("reauthenticate: thrown error → false (no leak)", async () => {
-  const ok = await reauthenticate(
+Deno.test("reauthenticate: thrown error → serverError", async () => {
+  const result = await reauthenticate(
     fakeAnonClient({ data: null, error: null }, { throws: true }),
-    "manager@users.sumou.internal",
+    INTERNAL_EMAIL,
     "x",
   );
-  assertEquals(ok, false);
+  assertEquals(result, "serverError");
+});
+
+Deno.test("reauthenticate: rate limit/unexpected Auth error → serverError", async () => {
+  for (const code of ["over_request_rate_limit", "unexpected_failure"]) {
+    const result = await reauthenticate(
+      fakeAnonClient({
+        data: { session: null },
+        error: { code, message: `must not leak ${CURRENT_PASSWORD}` },
+      }),
+      INTERNAL_EMAIL,
+      CURRENT_PASSWORD,
+    );
+    assertEquals(result, "serverError");
+  }
+});
+
+// ---- hardened HTTP failure paths --------------------------------------------
+
+Deno.test("handleRequest: getUser throws → safe 500", async () => {
+  const f = fakeClientFactory([
+    fakeUserClient(OK_USER, ACTIVE_PROFILE, { getUserThrows: true }),
+  ]);
+  const res = await handleRequest(validReq(), f.factory);
+  const body = await assertSafeErrorResponse(res, 500);
+  assertEquals(body.error.code, "server_error");
+  assertEquals(f.createdWithKeys, ["anon-test-key"]);
+});
+
+Deno.test("handleRequest: profile query throws → safe 500", async () => {
+  const f = fakeClientFactory([
+    fakeUserClient(OK_USER, ACTIVE_PROFILE, { profileThrows: true }),
+  ]);
+  const res = await handleRequest(validReq(), f.factory);
+  const body = await assertSafeErrorResponse(res, 500);
+  assertEquals(body.error.code, "server_error");
+  assertEquals(f.createdWithKeys, ["anon-test-key"]);
+});
+
+Deno.test("handleRequest: malformed username/id rejected before re-auth/service clients", async () => {
+  for (
+    const profile of [
+      {
+        data: { id: "different-user", is_active: true, username: "manager" },
+        error: null,
+      },
+      {
+        data: { id: "u1", is_active: true, username: "bad name" },
+        error: null,
+      },
+    ]
+  ) {
+    const f = fakeClientFactory([fakeUserClient(OK_USER, profile)]);
+    const res = await handleRequest(validReq(), f.factory);
+    const body = await assertSafeErrorResponse(res, 500);
+    assertEquals(body.error.code, "server_error");
+    // Only the caller-scoped client exists; neither re-auth nor service exists.
+    assertEquals(f.createdWithKeys, ["anon-test-key"]);
+  }
+});
+
+Deno.test("handleRequest: confirmed wrong current password → 401", async () => {
+  const f = fakeClientFactory([
+    fakeUserClient(OK_USER, ACTIVE_PROFILE),
+    fakeAnonClient({
+      data: { session: null },
+      error: {
+        code: "invalid_credentials",
+        message: `must not leak ${CURRENT_PASSWORD}`,
+      },
+    }),
+  ]);
+  const res = await handleRequest(validReq(), f.factory);
+  const body = await assertSafeErrorResponse(res, 401);
+  assertEquals(body.error.code, "invalid_credentials");
+  assertEquals(f.createdWithKeys, ["anon-test-key", "anon-test-key"]);
+});
+
+Deno.test("handleRequest: re-auth network/service errors → safe 500", async () => {
+  const failures = [
+    fakeAnonClient({ data: null, error: null }, { throws: true }),
+    fakeAnonClient({
+      data: { session: null },
+      error: {
+        code: "over_request_rate_limit",
+        message: `must not leak ${INTERNAL_EMAIL}`,
+      },
+    }),
+  ];
+  for (const failure of failures) {
+    const f = fakeClientFactory([
+      fakeUserClient(OK_USER, ACTIVE_PROFILE),
+      failure,
+    ]);
+    const res = await handleRequest(validReq(), f.factory);
+    const body = await assertSafeErrorResponse(res, 500);
+    assertEquals(body.error.code, "server_error");
+    assertEquals(f.createdWithKeys, ["anon-test-key", "anon-test-key"]);
+  }
+});
+
+Deno.test("handleRequest: updateUserById throws → safe 500 and RPC skipped", async () => {
+  const service = fakeService({ updateThrows: true });
+  const f = fakeClientFactory([
+    fakeUserClient(OK_USER, ACTIVE_PROFILE),
+    fakeAnonClient({
+      data: { session: { access_token: BEARER_TOKEN } },
+      error: null,
+    }),
+    service.client,
+  ]);
+  const res = await handleRequest(validReq(), f.factory);
+  const body = await assertSafeErrorResponse(res, 500);
+  assertEquals(body.error.code, "server_error");
+  assertEquals(service.calls, ["update"]);
+});
+
+Deno.test("handleRequest: RPC throws after Auth update → safe 500 partial failure", async () => {
+  const service = fakeService({ rpcThrows: true });
+  const f = fakeClientFactory([
+    fakeUserClient(OK_USER, ACTIVE_PROFILE),
+    fakeAnonClient({
+      data: { session: { access_token: BEARER_TOKEN } },
+      error: null,
+    }),
+    service.client,
+  ]);
+  const res = await handleRequest(validReq(), f.factory);
+  const body = await assertSafeErrorResponse(res, 500);
+  assertEquals(body.error.code, "server_error");
+  assertEquals(service.calls, ["update", "rpc:record_own_password_change"]);
 });
 
 // ---- performOwnPasswordChange: ordering / partial failure -------------------
@@ -328,10 +549,8 @@ Deno.test("performOwnPasswordChange: Auth update fails → 500, RPC NOT called",
     updateResult: { data: null, error: { message: "auth down" } },
   });
   const res = await performOwnPasswordChange(f.client, "u1", GOOD_NEW);
-  assertEquals(res.status, 500);
+  await assertSafeErrorResponse(res, 500);
   assert(!f.calls.some((c) => c.startsWith("rpc:"))); // RPC skipped
-  const body = await res.json();
-  assert(!JSON.stringify(body).includes(GOOD_NEW));
 });
 
 Deno.test("performOwnPasswordChange: RPC fails AFTER Auth update → generic 500", async () => {
@@ -339,9 +558,7 @@ Deno.test("performOwnPasswordChange: RPC fails AFTER Auth update → generic 500
     rpcResult: { data: null, error: { message: "flag failed" } },
   });
   const res = await performOwnPasswordChange(f.client, "u1", GOOD_NEW);
-  assertEquals(res.status, 500);
+  await assertSafeErrorResponse(res, 500);
   // Auth update ran, then the RPC ran and failed — order proves the sequence.
   assertEquals(f.calls, ["update", "rpc:record_own_password_change"]);
-  const body = await res.json();
-  assert(!JSON.stringify(body).includes(GOOD_NEW)); // no secret leak
 });

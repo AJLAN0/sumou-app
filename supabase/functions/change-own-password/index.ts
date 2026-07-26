@@ -27,6 +27,7 @@ import {
 import {
   buildInternalEmail,
   isJsonContentType,
+  isValidUsername,
   MAX_BODY_BYTES,
   normalizeUsername,
   readBoundedBody,
@@ -78,7 +79,18 @@ export async function authorizeActiveStaff(
     message: string;
   }
 > {
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  let userData;
+  let userErr;
+  try {
+    ({ data: userData, error: userErr } = await userClient.auth.getUser());
+  } catch {
+    return {
+      ok: false,
+      status: 500,
+      code: "server_error",
+      message: "authorization check failed",
+    };
+  }
   if (userErr || !userData?.user) {
     return {
       ok: false,
@@ -91,9 +103,19 @@ export async function authorizeActiveStaff(
 
   // The profiles self-read policy returns the row ONLY when active + not
   // soft-deleted, so a missing row means inactive/deleted/absent → reject.
-  const profileRes = await userClient
-    .from("profiles").select("id, is_active, username").eq("id", uid)
-    .maybeSingle();
+  let profileRes;
+  try {
+    profileRes = await userClient
+      .from("profiles").select("id, is_active, username").eq("id", uid)
+      .maybeSingle();
+  } catch {
+    return {
+      ok: false,
+      status: 500,
+      code: "server_error",
+      message: "authorization check failed",
+    };
+  }
   if (profileRes.error) {
     return {
       ok: false,
@@ -105,7 +127,7 @@ export async function authorizeActiveStaff(
   const row = profileRes.data as
     | { id?: string; is_active?: boolean; username?: string }
     | null;
-  if (!row || row.is_active !== true || typeof row.username !== "string") {
+  if (!row || row.is_active !== true) {
     return {
       ok: false,
       status: 403,
@@ -113,28 +135,48 @@ export async function authorizeActiveStaff(
       message: "not an active account",
     };
   }
-  return { ok: true, uid, username: row.username };
+  const username = normalizeUsername(row.username);
+  if (row.id !== uid || !isValidUsername(username)) {
+    return {
+      ok: false,
+      status: 500,
+      code: "server_error",
+      message: "authorization check failed",
+    };
+  }
+  return { ok: true, uid, username };
 }
+
+export type ReauthenticateResult =
+  | "success"
+  | "invalidCredentials"
+  | "serverError";
 
 /**
  * Verify the caller's CURRENT password without disturbing their live session, by
  * signing in on an ISOLATED anon client (its own in-memory, non-persisted
- * session). Returns true only on a clean sign-in. Any error/exception → false
- * (treated as an incorrect current password). Never logs the email/password.
+ * session). Only Auth's explicit invalid_credentials response means the password
+ * is wrong. Thrown/network/rate-limit/unexpected responses fail as server errors.
+ * Never logs the email/password or raw SDK errors.
  */
 export async function reauthenticate(
   anonClient: SupabaseClient,
   internalEmail: string,
   currentPassword: string,
-): Promise<boolean> {
+): Promise<ReauthenticateResult> {
   try {
     const res = await anonClient.auth.signInWithPassword({
       email: internalEmail,
       password: currentPassword,
     });
-    return !res.error && !!res.data?.session;
+    if (res.error) {
+      return res.error.code === "invalid_credentials"
+        ? "invalidCredentials"
+        : "serverError";
+    }
+    return res.data?.session ? "success" : "serverError";
   } catch {
-    return false;
+    return "serverError";
   }
 }
 
@@ -150,9 +192,16 @@ export async function performOwnPasswordChange(
 ): Promise<Response> {
   // 1) Update the caller's own Auth password (service_role). Sessions are not
   //    revoked here.
-  const updated = await serviceClient.auth.admin.updateUserById(uid, {
-    password: newPassword,
-  });
+  let updated;
+  try {
+    updated = await serviceClient.auth.admin.updateUserById(uid, {
+      password: newPassword,
+    });
+  } catch {
+    console.error("change-own-password: auth.updateUserById threw");
+    // Auth update did not return success → never call the finalization RPC.
+    return errorResponse("server_error", "could not change the password", 500);
+  }
   if (updated.error || !updated.data?.user) {
     console.error("change-own-password: auth.updateUserById failed");
     // Auth update FAILED → the RPC is NOT called; nothing to clean up.
@@ -161,9 +210,21 @@ export async function performOwnPasswordChange(
 
   // 2) Finalize: clear must_change_password + audit, atomically, via the
   //    service-only RPC (which independently re-validates the caller).
-  const rpc = await serviceClient.rpc("record_own_password_change", {
-    p_user_id: uid,
-  });
+  let rpc;
+  try {
+    rpc = await serviceClient.rpc("record_own_password_change", {
+      p_user_id: uid,
+    });
+  } catch {
+    console.error(
+      "change-own-password: record_own_password_change threw after Auth update",
+    );
+    return errorResponse(
+      "server_error",
+      "password change could not be completed",
+      500,
+    );
+  }
   if (rpc.error) {
     // PARTIAL FAILURE: the Auth password already changed but the flag/audit was
     // NOT recorded. We do NOT restore the old password (not available). Generic
@@ -182,7 +243,22 @@ export async function performOwnPasswordChange(
   return json({ user: rpc.data }, 200);
 }
 
-export async function handleRequest(req: Request): Promise<Response> {
+interface ClientOptions {
+  global?: { headers?: Record<string, string> };
+  auth?: { autoRefreshToken?: boolean; persistSession?: boolean };
+}
+type ClientFactory = (
+  url: string,
+  key: string,
+  options: ClientOptions,
+) => SupabaseClient;
+const defaultClientFactory: ClientFactory = (url, key, options) =>
+  createClient(url, key, options);
+
+export async function handleRequest(
+  req: Request,
+  clientFactory: ClientFactory = defaultClientFactory,
+): Promise<Response> {
   if (req.method !== "POST") {
     return errorResponse("method_not_allowed", "use POST", 405, {
       "Allow": "POST",
@@ -246,7 +322,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   // Caller-scoped client (RLS) for authentication + authorization.
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  const userClient = clientFactory(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: auth } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -255,30 +331,41 @@ export async function handleRequest(req: Request): Promise<Response> {
   const uid = authz.uid;
 
   // Derive the hidden internal email in-function (never accepted/returned/logged).
-  const internalEmail = buildInternalEmail(normalizeUsername(authz.username));
+  const internalEmail = buildInternalEmail(authz.username);
 
   // Re-authenticate the CURRENT password on an isolated anon client (its own
   // in-memory session; the caller's live session is untouched, none revoked).
-  const reauthClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  const reauthClient = clientFactory(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const reauthed = await reauthenticate(
+  const reauthResult = await reauthenticate(
     reauthClient,
     internalEmail,
     currentPassword,
   );
-  if (!reauthed) {
+  if (reauthResult === "invalidCredentials") {
     return errorResponse(
       "invalid_credentials",
       "current password is incorrect",
       401,
     );
   }
+  if (reauthResult === "serverError") {
+    return errorResponse(
+      "server_error",
+      "current password could not be verified",
+      500,
+    );
+  }
 
   // Service client — built ONLY after caller auth + re-auth + validation succeed.
-  const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const serviceClient = clientFactory(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  );
 
   return await performOwnPasswordChange(serviceClient, uid, newPassword);
 }
@@ -286,5 +373,5 @@ export async function handleRequest(req: Request): Promise<Response> {
 // Start the server only when run as the entry point — so tests can import the
 // exported handler/units without binding a port.
 if (import.meta.main) {
-  Deno.serve(handleRequest);
+  Deno.serve((req) => handleRequest(req));
 }

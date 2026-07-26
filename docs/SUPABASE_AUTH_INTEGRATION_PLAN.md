@@ -83,9 +83,35 @@ it; `changePassword` is deferred (`passwordChangeUnavailable`). Keeps the exact
 
 ## 5. Changing the password
 
-**User self-service (existing `ChangePasswordScreen` + `changePassword(currentPassword, newPassword)`):**
-1. Re-authenticate with the current password (sign in with `email` + `currentPassword`) to verify identity.
-2. `auth.updateUser({ password: newPassword })`. No service_role, no Edge Function.
+**User self-service — `change-own-password` Edge Function (service_role) — Step
+10.6A, implemented (pending DEV apply/deploy):**
+Backend for a signed-in staff user changing THEIR OWN password + clearing
+`must_change_password`. Full contract + DEV QA:
+`docs/qa/STEP_10_6_PASSWORD_CHANGE_DEV_QA.md`. Input is ONLY
+`{ current_password, new_password }`; identity (uid, username, internal email) is
+server-derived from the JWT.
+1. POST JSON, valid Bearer user. Authorize: **own ACTIVE, non-deleted profile** —
+   **no admin role and no feature permission** (any active staff may change its
+   own password). Fail-closed on read errors.
+2. Validate the new-password policy server-side (**12–72 chars; upper + lower +
+   digit + symbol; no leading/trailing whitespace**) and require it to **differ**
+   from the current password — both BEFORE any network client is built.
+3. Derive the hidden internal email in-function; **re-authenticate** the current
+   password on an **isolated anon client** (its own in-memory session — the
+   caller's live session is untouched; **no sessions are revoked**).
+4. `serviceClient.auth.admin.updateUserById(uid, { password })` — ONLY the
+   caller's Auth password — then `record_own_password_change(uid)` (clears
+   `must_change_password` + one `user.password_changed` audit row). Ordering is
+   Auth-update **before** the RPC (no distributed transaction). If the RPC fails
+   after the Auth update, a generic 500 is returned and the old password is NOT
+   restored — the safe retry uses the **new** password as `current_password`.
+5. Returns a safe summary only (`{ id, must_change_password:false, is_active }`);
+   never a password, internal email, or token. `Cache-Control: no-store`.
+
+The `service_role` key stays inside the Edge Function; Flutter never sees it. RPC
+grant matrix: `record_own_password_change(uuid)` = EXECUTE **service_role only**
+(public/anon/authenticated revoked), SECURITY DEFINER, `search_path=''`.
+*(**Flutter is NOT wired in this step (10.6A) — that is Step 10.6B.**)*
 
 **Admin reset — `admin-reset-password` Edge Function (service_role) — Step 10.3,
 APPLIED + DEPLOYED to DEV 2026-07-23:**

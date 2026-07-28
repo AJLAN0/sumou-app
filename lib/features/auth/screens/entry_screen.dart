@@ -16,9 +16,9 @@ class EntryScreen extends StatelessWidget {
     // Size the logo to the screen so it reads clearly on any device, while
     // keeping sensible min/max bounds. The source art is wordmark-width, so we
     // size by width and let the height follow the aspect ratio.
-    final logoWidth = (MediaQuery.sizeOf(context).width * 0.68).clamp(
-      220.0,
-      360.0,
+    final logoWidth = (MediaQuery.sizeOf(context).width * 0.468).clamp(
+      162.0,
+      252.0,
     );
     return SumouScaffold(
       body: Column(

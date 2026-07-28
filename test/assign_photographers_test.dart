@@ -30,8 +30,17 @@ void main() {
     await tester.pumpAndSettle();
 
     // Team management now lives inside the "تعديل المشروع" hub.
-    await scrollAndTapCard(tester, 'تعديل المشروع');
-    await scrollAndTapCard(tester, 'إدارة الفريق');
+    await tester.scrollUntilVisible(
+      find.text('تعديل المشروع'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.text('تعديل المشروع'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تعديل المشروع'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إدارة الفريق'));
+    await tester.pumpAndSettle();
   }
 
   testWidgets('opens the assign screen with summary and current team', (

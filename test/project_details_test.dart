@@ -51,8 +51,8 @@ void main() {
 
   testWidgets('manager sees exactly the two main actions', (tester) async {
     await openDetails(tester, 'تصوير ميداني — مهرجان الرياض');
-    // Actions are at the bottom of a lazy ListView. Scroll to the last action so
-    // the whole action group is built and visible together before asserting.
+    // Actions are at the bottom of a lazy ListView. Scroll to the last manager
+    // action so the whole action group is built and visible before asserting.
     await tester.scrollUntilVisible(
       find.text('إنهاء المشروع'),
       300,
@@ -69,7 +69,15 @@ void main() {
     tester,
   ) async {
     await openDetails(tester, 'تصوير ميداني — مهرجان الرياض');
-    await scrollAndTapCard(tester, 'تعديل المشروع');
+    await tester.scrollUntilVisible(
+      find.text('تعديل المشروع'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.text('تعديل المشروع'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('تعديل المشروع'));
+    await tester.pumpAndSettle();
 
     // The hub merges the three project-management flows.
     expect(find.text('تعديل بيانات المشروع'), findsOneWidget);

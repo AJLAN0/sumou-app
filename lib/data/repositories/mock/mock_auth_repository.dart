@@ -1,4 +1,5 @@
 import '../../../core/models/user_model.dart';
+import '../../../features/profile/password_policy.dart';
 import '../auth_repository.dart';
 import 'mock_users.dart';
 
@@ -58,9 +59,23 @@ class MockAuthRepository implements AuthRepository {
     if (session == null) {
       throw const AuthException(AuthFailure.notAuthenticated);
     }
+    if (currentPassword.isEmpty || newPassword.isEmpty) {
+      throw const AuthException(AuthFailure.invalidPasswordInput);
+    }
+    final policy = PasswordPolicy.validate(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    if (policy.failures.contains(PasswordPolicyFailure.matchesCurrent)) {
+      throw const AuthException(AuthFailure.invalidPasswordInput);
+    }
+    if (!policy.isValid) {
+      throw const AuthException(AuthFailure.weakPassword);
+    }
     if (_passwords[session.username] != currentPassword) {
-      throw const AuthException(AuthFailure.invalidCredentials);
+      throw const AuthException(AuthFailure.currentPasswordIncorrect);
     }
     _passwords[session.username] = newPassword;
+    _session = session.copyWith(mustChangePassword: false);
   }
 }

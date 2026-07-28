@@ -4,14 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'providers/admin_providers.dart';
 
-/// Open the add/edit user form. Pass [user] to edit, or omit to create a new
-/// account. Saves through the user repository and refreshes [usersListProvider].
-Future<void> showUserFormSheet(BuildContext context, {UserModel? user}) {
-  return showModalBottomSheet<void>(
+/// Open the add/edit user form. Create returns the one-operation provisioning
+/// result so the caller can show and then clear the temporary password.
+Future<UserProvisioningResult?> showUserFormSheet(
+  BuildContext context, {
+  UserModel? user,
+}) {
+  return showModalBottomSheet<UserProvisioningResult>(
     context: context,
     backgroundColor: AppColors.surface,
     isScrollControlled: true,
@@ -38,10 +42,9 @@ class _UserFormSheet extends ConsumerStatefulWidget {
 class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
   late final TextEditingController _name;
   late final TextEditingController _username;
-  late final TextEditingController _email;
-  late final TextEditingController _photoTypes;
   late RoleType _default;
   late Set<RoleType> _roles;
+  late Set<String> _photoTypeCodes;
   late bool _active;
   bool _saving = false;
 
@@ -53,10 +56,9 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
     final u = widget.user;
     _name = TextEditingController(text: u?.fullName ?? '');
     _username = TextEditingController(text: u?.username ?? '');
-    _email = TextEditingController(text: u?.email ?? '');
-    _photoTypes = TextEditingController(text: (u?.photoTypes ?? []).join('، '));
     _default = u?.defaultRole ?? RoleType.manager;
     _roles = {...(u?.roles ?? const []), _default};
+    _photoTypeCodes = {...(u?.photoTypes ?? const [])};
     _active = u?.active ?? true;
   }
 
@@ -64,8 +66,6 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
   void dispose() {
     _name.dispose();
     _username.dispose();
-    _email.dispose();
-    _photoTypes.dispose();
     super.dispose();
   }
 
@@ -87,13 +87,6 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
     }
   }
 
-  List<String> _parsePhotoTypes() =>
-      _photoTypes.text
-          .split(RegExp(r'[،,]'))
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-
   Future<void> _save() async {
     final name = _name.text.trim();
     final username = _username.text.trim();
@@ -110,59 +103,68 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
       return;
     }
     _roles.add(_default); // keep the invariant
-    final email = _email.text.trim().isEmpty ? null : _email.text.trim();
-    final photoTypes = _parsePhotoTypes();
 
     setState(() => _saving = true);
     final repo = ref.read(userRepositoryProvider);
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    final UserModel? result;
-    if (_isEdit) {
-      result = await repo.updateUser(
-        widget.user!.id,
-        fullName: name,
-        username: username,
-        email: email,
-        defaultRole: _default,
-        roles: _roles.toList(),
-        photoTypes: photoTypes,
-        active: _active,
-      );
-    } else {
-      result = await repo.createUser(
-        fullName: name,
-        username: username,
-        email: email,
-        defaultRole: _default,
-        roles: _roles.toList(),
-        photoTypes: photoTypes,
-        // New accounts start with the default permission set for their role.
-        permissions: FeaturePermissions.defaultsFor(_default),
-        active: _active,
-      );
-    }
+    try {
+      if (_isEdit) {
+        final result = await repo.updateUser(
+          widget.user!.id,
+          fullName: name,
+          username: username,
+          email: null,
+          defaultRole: _default,
+          roles: _roles.toList(),
+          photoTypes: _photoTypeCodes.toList(),
+          active: _active,
+        );
+        if (!mounted) return;
+        if (result == null) {
+          setState(() => _saving = false);
+          _snack('تعذّر الحفظ، قد يكون اسم المستخدم مستخدماً بالفعل');
+          return;
+        }
+        ref.invalidate(usersListProvider);
+        navigator.pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم تحديث المستخدم')));
+        return;
+      }
 
-    if (!mounted) return;
-    if (result == null) {
+      final provisioned = await repo.provisionUser(
+        fullName: name,
+        username: username,
+        defaultRole: _default,
+        roles: _roles.toList(),
+        photographerTypeCodes: _photoTypeCodes.toList(),
+      );
+      if (!mounted) {
+        provisioned.temporaryPassword.clear();
+        return;
+      }
+      ref.invalidate(usersListProvider);
+      navigator.pop(provisioned);
+    } on UserRepositoryException catch (error) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      _snack('تعذّر الحفظ، قد يكون اسم المستخدم مستخدماً بالفعل');
-      return;
+      _snack(error.messageAr);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _snack('تعذّر تنفيذ العملية، حاول مرة أخرى');
     }
-    ref.invalidate(usersListProvider);
-    navigator.pop();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(_isEdit ? 'تم تحديث المستخدم' : 'تم إضافة المستخدم'),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final capabilities = ref.read(userRepositoryProvider).capabilities;
+    final photoTypes = ref.watch(staffPhotoTypesProvider);
     final defaultOptions =
         _roles.toList()..sort((a, b) => a.index.compareTo(b.index));
+    final roleOptions = RoleType.values.where(_isAssignableStaffRole);
 
     return SafeArea(
       child: ConstrainedBox(
@@ -199,19 +201,51 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
                 prefixIcon: Icons.alternate_email,
               ),
               const SizedBox(height: 12),
-              SumouTextField(
-                controller: _email,
-                label: 'البريد الإلكتروني (اختياري)',
-                hint: 'name@example.com',
-                keyboardType: TextInputType.emailAddress,
-                prefixIcon: Icons.mail_outline,
-              ),
-              const SizedBox(height: 12),
-              SumouTextField(
-                controller: _photoTypes,
-                label: 'أنواع التصوير (اختياري)',
-                hint: 'افصل بينها بفاصلة',
-                prefixIcon: Icons.camera_alt_outlined,
+              Text('أنواع التصوير (اختياري)', style: AppTextStyles.label),
+              const SizedBox(height: 8),
+              photoTypes.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error:
+                    (_, __) => Column(
+                      children: [
+                        const SumouErrorBox(
+                          message: 'تعذّر تحميل أنواع التصوير',
+                        ),
+                        TextButton(
+                          onPressed:
+                              () => ref.invalidate(staffPhotoTypesProvider),
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                data:
+                    (options) =>
+                        options.isEmpty
+                            ? Text(
+                              'لا توجد أنواع تصوير متاحة',
+                              style: AppTextStyles.bodyMuted,
+                            )
+                            : Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final option in options)
+                                  _SelectChip(
+                                    label: option.nameAr,
+                                    selected: _photoTypeCodes.contains(
+                                      option.code,
+                                    ),
+                                    onTap:
+                                        () => setState(() {
+                                          if (!_photoTypeCodes.add(
+                                            option.code,
+                                          )) {
+                                            _photoTypeCodes.remove(option.code);
+                                          }
+                                        }),
+                                  ),
+                              ],
+                            ),
               ),
               const SizedBox(height: 20),
               Text('الدور الافتراضي', style: AppTextStyles.label),
@@ -235,7 +269,7 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final r in RoleType.values)
+                  for (final r in roleOptions)
                     _SelectChip(
                       label: r.nameAr,
                       selected: _roles.contains(r),
@@ -243,31 +277,33 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
-              SumouCard(
-                color: AppColors.surfaceSecondary,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('الحساب مفعّل', style: AppTextStyles.body),
-                          Text(
-                            'المستخدم غير المفعّل لا يستطيع تسجيل الدخول',
-                            style: AppTextStyles.label,
-                          ),
-                        ],
+              if (_isEdit && capabilities.canSetActive) ...[
+                const SizedBox(height: 16),
+                SumouCard(
+                  color: AppColors.surfaceSecondary,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('الحساب مفعّل', style: AppTextStyles.body),
+                            Text(
+                              'المستخدم غير المفعّل لا يستطيع تسجيل الدخول',
+                              style: AppTextStyles.label,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Switch(
-                      value: _active,
-                      activeColor: AppColors.accentGreen,
-                      onChanged: (v) => setState(() => _active = v),
-                    ),
-                  ],
+                      Switch(
+                        value: _active,
+                        activeColor: AppColors.accentGreen,
+                        onChanged: (v) => setState(() => _active = v),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 20),
               SumouButton(
                 label: _isEdit ? 'حفظ التغييرات' : 'إضافة المستخدم',
@@ -282,6 +318,11 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
     );
   }
 }
+
+bool _isAssignableStaffRole(RoleType role) =>
+    role != RoleType.finance &&
+    role != RoleType.weddingFinance &&
+    role != RoleType.clientTracking;
 
 /// Selectable pill chip (reused by the role pickers above).
 class _SelectChip extends StatelessWidget {

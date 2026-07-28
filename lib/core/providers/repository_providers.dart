@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/repositories.dart';
 import '../../data/repositories/mock/mock_repositories.dart';
 import '../../data/repositories/supabase/supabase_auth_repository.dart';
+import '../../data/repositories/supabase/supabase_user_repository.dart';
 import 'supabase_providers.dart';
 
 /// Repository dependency-injection providers.
 ///
-/// Auth is now Supabase-backed in the normal app; the other repositories still
-/// return in-memory mocks until their Supabase implementations land. Callers
+/// Auth and admin users are Supabase-backed in the normal app; other repositories
+/// still return in-memory mocks until their Supabase implementations land. Callers
 /// depend on the abstract interfaces, so swapping an implementation here (or
 /// overriding in a [ProviderScope]) needs no changes above.
 ///
@@ -20,7 +21,7 @@ final authRepositoryProvider = Provider<AuthRepository>(
 );
 
 final userRepositoryProvider = Provider<UserRepository>(
-  (ref) => MockUserRepository(),
+  (ref) => SupabaseUserRepository(ref.watch(supabaseClientProvider)),
 );
 
 final permissionRepositoryProvider = Provider<PermissionRepository>(

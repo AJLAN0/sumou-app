@@ -17,6 +17,10 @@ class MockUserRepository implements UserRepository {
 
   String _newId() => 'u-new-${DateTime.now().millisecondsSinceEpoch}-${_seq++}';
 
+  @override
+  UserRepositoryCapabilities get capabilities =>
+      const UserRepositoryCapabilities.mock();
+
   bool _usernameTaken(String username, {String? exceptId}) {
     final target = username.trim().toLowerCase();
     return _users.any(
@@ -26,6 +30,60 @@ class MockUserRepository implements UserRepository {
 
   @override
   Future<List<UserModel>> getUsers() async => List.unmodifiable(_users);
+
+  @override
+  Future<List<StaffPhotoTypeOption>> getAvailablePhotoTypes() async {
+    final names =
+        _users.expand((user) => user.photoTypes).toSet().toList()..sort();
+    return [
+      for (final name in names) StaffPhotoTypeOption(code: name, nameAr: name),
+    ];
+  }
+
+  @override
+  Future<UserProvisioningResult> provisionUser({
+    required String fullName,
+    required String username,
+    required RoleType defaultRole,
+    required List<RoleType> roles,
+    List<String> photographerTypeCodes = const [],
+    Map<AppFeature, bool> permissionOverrides = const {},
+  }) async {
+    var permissions = FeaturePermissions.defaultsFor(defaultRole);
+    for (final entry in permissionOverrides.entries) {
+      permissions = permissions.setFeature(entry.key, entry.value);
+    }
+    final user = await createUser(
+      fullName: fullName,
+      username: username,
+      defaultRole: defaultRole,
+      roles: roles,
+      photoTypes: photographerTypeCodes,
+      permissions: permissions,
+    );
+    if (user == null) {
+      throw const UserRepositoryException(UserRepositoryFailure.invalidInput);
+    }
+    return UserProvisioningResult(
+      userId: user.id,
+      temporaryPassword: OneTimePassword('Mock-Temp-Password1!'),
+    );
+  }
+
+  @override
+  Future<UserPasswordResetResult> resetPassword(String userId) async {
+    final user = await getUserById(userId);
+    if (user == null) {
+      throw const UserRepositoryException(UserRepositoryFailure.userNotFound);
+    }
+    final index = _users.indexWhere((candidate) => candidate.id == userId);
+    _users[index] = user.copyWith(mustChangePassword: true);
+    return UserPasswordResetResult(
+      userId: userId,
+      mustChangePassword: true,
+      temporaryPassword: OneTimePassword('Mock-Reset-Password1!'),
+    );
+  }
 
   @override
   Future<UserModel?> createUser({

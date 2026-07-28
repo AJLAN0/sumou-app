@@ -6,9 +6,12 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../auth/providers/auth_controller.dart';
 import 'providers/admin_providers.dart';
+import 'temporary_password_dialog.dart';
 import 'user_form_sheet.dart';
 import 'widgets/admin_chips.dart';
 
@@ -55,8 +58,8 @@ class AdminUsersPage extends StatelessWidget {
   }
 }
 
-/// Admin users management: mobile cards with search + filters, plus full CRUD —
-/// add, edit, activate/deactivate, and remove accounts (mock-backed).
+/// Admin users management: real RLS reads plus trusted create/reset operations.
+/// Other mutations stay available only in explicit mock repositories.
 class UsersScreen extends ConsumerStatefulWidget {
   const UsersScreen({super.key});
 
@@ -67,6 +70,7 @@ class UsersScreen extends ConsumerStatefulWidget {
 class _UsersScreenState extends ConsumerState<UsersScreen> {
   String _query = '';
   _UserFilter _filter = _UserFilter.all;
+  final Set<String> _busyUserIds = {};
 
   bool _matches(UserModel user) {
     final q = _query.trim().toLowerCase();
@@ -78,6 +82,11 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
   }
 
   Future<void> _showUserSheet(UserModel user) {
+    final repo = ref.read(userRepositoryProvider);
+    final actor = ref.read(authControllerProvider).currentUser;
+    final isAdmin = actor?.hasRole(RoleType.admin) ?? false;
+    final canManageUsers =
+        isAdmin && (actor?.hasPermission(AppFeature.canManageUsers) ?? false);
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surface,
@@ -89,6 +98,12 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
       builder:
           (sheetContext) => _UserDetailSheet(
             user: user,
+            canToggleActive: canManageUsers && repo.capabilities.canSetActive,
+            canEdit: canManageUsers && repo.capabilities.canEditProfile,
+            canResetPassword:
+                canManageUsers && repo.capabilities.canResetPassword,
+            showDelete: canManageUsers && repo.capabilities.canDelete,
+            busy: _busyUserIds.contains(user.id),
             onToggleActive: () {
               Navigator.of(sheetContext).pop();
               _toggleActive(user);
@@ -97,12 +112,71 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               Navigator.of(sheetContext).pop();
               showUserFormSheet(context, user: user);
             },
+            onResetPassword: () {
+              Navigator.of(sheetContext).pop();
+              _resetPassword(user);
+            },
             onDelete: () {
               Navigator.of(sheetContext).pop();
               _deleteUser(user);
             },
           ),
     );
+  }
+
+  Future<void> _createUser() async {
+    final result = await showUserFormSheet(context);
+    if (result == null) return;
+    if (!mounted) {
+      result.temporaryPassword.clear();
+      return;
+    }
+    await showTemporaryPasswordDialog(
+      context,
+      password: result.temporaryPassword,
+      title: 'تم إنشاء المستخدم',
+    );
+  }
+
+  Future<void> _resetPassword(UserModel user) async {
+    if (_busyUserIds.contains(user.id)) return;
+    final confirmed = await showSumouConfirmSheet(
+      context,
+      title: 'إعادة تعيين كلمة المرور',
+      message:
+          'سيتم إنشاء كلمة مرور مؤقتة لـ ${user.fullName} وإلزامه بتغييرها عند تسجيل الدخول.',
+      confirmLabel: 'إعادة التعيين',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _busyUserIds.add(user.id));
+    try {
+      final result = await ref
+          .read(userRepositoryProvider)
+          .resetPassword(user.id);
+      ref.invalidate(usersListProvider);
+      if (!mounted) {
+        result.temporaryPassword.clear();
+        return;
+      }
+      await showTemporaryPasswordDialog(
+        context,
+        password: result.temporaryPassword,
+        title: 'تمت إعادة تعيين كلمة المرور',
+      );
+    } on UserRepositoryException catch (error) {
+      if (mounted) _showMessage(error.messageAr);
+    } catch (_) {
+      if (mounted) _showMessage('تعذّر تنفيذ العملية، حاول مرة أخرى');
+    } finally {
+      if (mounted) setState(() => _busyUserIds.remove(user.id));
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _deleteUser(UserModel user) async {
@@ -116,14 +190,20 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     if (!ok) return;
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final removed = await ref.read(userRepositoryProvider).deleteUser(user.id);
-    ref.invalidate(usersListProvider);
-    if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(removed ? 'تم حذف المستخدم' : 'تعذّر حذف المستخدم'),
-      ),
-    );
+    try {
+      final removed = await ref
+          .read(userRepositoryProvider)
+          .deleteUser(user.id);
+      ref.invalidate(usersListProvider);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(removed ? 'تم حذف المستخدم' : 'تعذّر حذف المستخدم'),
+        ),
+      );
+    } on UserRepositoryException catch (error) {
+      if (mounted) _showMessage(error.messageAr);
+    }
   }
 
   Future<void> _toggleActive(UserModel user) async {
@@ -141,32 +221,44 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     if (!ok) return;
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final updated = await ref
-        .read(userRepositoryProvider)
-        .setUserActive(user.id, activate);
-    ref.invalidate(usersListProvider);
-    if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          updated == null
-              ? 'تعذّر تحديث الحالة'
-              : (activate ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم'),
+    try {
+      final updated = await ref
+          .read(userRepositoryProvider)
+          .setUserActive(user.id, activate);
+      ref.invalidate(usersListProvider);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            updated == null
+                ? 'تعذّر تحديث الحالة'
+                : (activate ? 'تم تفعيل المستخدم' : 'تم تعطيل المستخدم'),
+          ),
         ),
-      ),
-    );
+      );
+    } on UserRepositoryException catch (error) {
+      if (mounted) _showMessage(error.messageAr);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final usersAsync = ref.watch(usersListProvider);
+    final repository = ref.read(userRepositoryProvider);
+    final actor = ref.watch(authControllerProvider).currentUser;
+    final isAdmin = actor?.hasRole(RoleType.admin) ?? false;
+    final canCreate =
+        repository.capabilities.canCreate &&
+        isAdmin &&
+        (actor?.hasPermission(AppFeature.canManageUsers) ?? false) &&
+        (actor?.hasPermission(AppFeature.canManagePermissions) ?? false);
 
     return Column(
       children: [
         SumouButton(
           label: 'إضافة مستخدم',
           icon: Icons.person_add_alt_1,
-          onPressed: () => showUserFormSheet(context),
+          onPressed: canCreate ? _createUser : null,
         ),
         const SizedBox(height: 12),
         SumouTextField(
@@ -196,13 +288,27 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error:
-                (_, __) => const Center(child: Text('تعذّر تحميل المستخدمين')),
+                (_, __) => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('تعذّر تحميل المستخدمين'),
+                      TextButton(
+                        onPressed: () => ref.invalidate(usersListProvider),
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                    ],
+                  ),
+                ),
             data: (users) {
               final filtered = users.where(_matches).toList();
               if (filtered.isEmpty) {
-                return const SumouEmptyState(
+                return SumouEmptyState(
                   title: 'لا يوجد مستخدمون',
-                  message: 'لا توجد نتائج مطابقة',
+                  message:
+                      users.isEmpty
+                          ? 'لم تتم إضافة مستخدمين بعد'
+                          : 'لا توجد نتائج مطابقة',
                   icon: Icons.group_outlined,
                 );
               }
@@ -285,14 +391,26 @@ class _UserCard extends StatelessWidget {
 class _UserDetailSheet extends StatelessWidget {
   const _UserDetailSheet({
     required this.user,
+    required this.canToggleActive,
+    required this.canEdit,
+    required this.canResetPassword,
+    required this.showDelete,
+    required this.busy,
     required this.onToggleActive,
     required this.onEdit,
+    required this.onResetPassword,
     required this.onDelete,
   });
 
   final UserModel user;
+  final bool canToggleActive;
+  final bool canEdit;
+  final bool canResetPassword;
+  final bool showDelete;
+  final bool busy;
   final VoidCallback onToggleActive;
   final VoidCallback onEdit;
+  final VoidCallback onResetPassword;
   final VoidCallback onDelete;
 
   @override
@@ -373,28 +491,41 @@ class _UserDetailSheet extends StatelessWidget {
                 ),
               const SizedBox(height: 24),
               SumouButton(
-                label: user.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم',
+                label:
+                    canToggleActive
+                        ? (user.active ? 'تعطيل المستخدم' : 'تفعيل المستخدم')
+                        : 'تفعيل وتعطيل المستخدم (غير متاح)',
                 icon: user.active ? Icons.block : Icons.check_circle_outline,
                 variant:
                     user.active
                         ? SumouButtonVariant.danger
                         : SumouButtonVariant.primary,
-                onPressed: onToggleActive,
+                onPressed: canToggleActive && !busy ? onToggleActive : null,
               ),
               const SizedBox(height: 10),
               SumouButton(
-                label: 'تعديل البيانات',
+                label: canEdit ? 'تعديل البيانات' : 'تعديل البيانات (غير متاح)',
                 variant: SumouButtonVariant.secondary,
                 icon: Icons.edit_outlined,
-                onPressed: onEdit,
+                onPressed: canEdit && !busy ? onEdit : null,
               ),
               const SizedBox(height: 10),
               SumouButton(
-                label: 'حذف المستخدم',
-                variant: SumouButtonVariant.danger,
-                icon: Icons.delete_outline,
-                onPressed: onDelete,
+                label: 'إعادة تعيين كلمة المرور',
+                variant: SumouButtonVariant.secondary,
+                icon: Icons.password_outlined,
+                loading: busy,
+                onPressed: canResetPassword && !busy ? onResetPassword : null,
               ),
+              if (showDelete) ...[
+                const SizedBox(height: 10),
+                SumouButton(
+                  label: 'حذف المستخدم',
+                  variant: SumouButtonVariant.danger,
+                  icon: Icons.delete_outline,
+                  onPressed: busy ? null : onDelete,
+                ),
+              ],
             ],
           ),
         ),

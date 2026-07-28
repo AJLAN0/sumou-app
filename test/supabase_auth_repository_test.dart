@@ -861,7 +861,7 @@ void main() {
     );
   });
 
-  // ---- Logout + deferred changePassword ------------------------------------
+  // ---- Logout + real changePassword Edge Function --------------------------
   group('logout / changePassword', () {
     test('logout calls signOut and is idempotent', () async {
       final g = FakeAuthGateway();
@@ -871,12 +871,141 @@ void main() {
       expect(g.signOutCalls, 2);
     });
 
-    test('changePassword is deferred to Step 10.6', () async {
-      final g = FakeAuthGateway();
-      final err = await repoWith(g)
-          .changePassword(currentPassword: 'a', newPassword: 'b')
-          .then<Object?>((_) => null, onError: (e) => e);
-      expect(failureOf(err!), AuthFailure.passwordChangeUnavailable);
+    test('function request body has only current_password + new_password', () {
+      final body = passwordChangeRequestBody(
+        currentPassword: 'Current!Pass1',
+        newPassword: 'N3w!Password2',
+      );
+      expect(body, {
+        'current_password': 'Current!Pass1',
+        'new_password': 'N3w!Password2',
+      });
+      expect(body.keys, hasLength(2));
+      expect(body, isNot(contains('user_id')));
+      expect(body, isNot(contains('email')));
+      expect(body, isNot(contains('token')));
     });
+
+    test(
+      'valid safe response succeeds and passes passwords unchanged',
+      () async {
+        final g = FakeAuthGateway(session: 'u1');
+        await repoWith(g).changePassword(
+          currentPassword: 'Current!Pass1',
+          newPassword: 'N3w!Password2',
+        );
+        expect(g.passwordChangeCalls, 1);
+        expect(g.lastCurrentPassword, 'Current!Pass1');
+        expect(g.lastNewPassword, 'N3w!Password2');
+      },
+    );
+
+    test('no authenticated session fails before function invocation', () async {
+      final g = FakeAuthGateway(session: null);
+      final err = await repoWith(g)
+          .changePassword(
+            currentPassword: 'Current!Pass1',
+            newPassword: 'N3w!Password2',
+          )
+          .then<Object?>((_) => null, onError: (e) => e);
+      expect(failureOf(err!), AuthFailure.notAuthenticated);
+      expect(g.passwordChangeCalls, 0);
+    });
+
+    test('confirmed incorrect current password maps separately', () async {
+      final g = FakeAuthGateway(
+        session: 'u1',
+        passwordChangeResponse: const PasswordChangeFunctionResponse(
+          status: 401,
+          data: {
+            'error': {
+              'code': 'invalid_credentials',
+              'message': 'raw backend message must not be surfaced',
+            },
+          },
+        ),
+      );
+      final err = await repoWith(g)
+          .changePassword(
+            currentPassword: 'Wrong!Password1',
+            newPassword: 'N3w!Password2',
+          )
+          .then<Object?>((_) => null, onError: (e) => e);
+      expect(failureOf(err!), AuthFailure.currentPasswordIncorrect);
+      expect((err as AuthException).message, isNull);
+    });
+
+    test('weak/invalid server input maps to safe typed failures', () async {
+      for (final entry
+          in {
+            'weak_password': AuthFailure.weakPassword,
+            'invalid_request': AuthFailure.invalidPasswordInput,
+          }.entries) {
+        final g = FakeAuthGateway(
+          session: 'u1',
+          passwordChangeResponse: PasswordChangeFunctionResponse(
+            status: 400,
+            data: {
+              'error': {
+                'code': entry.key,
+                'message': 'raw policy details must not be surfaced',
+              },
+            },
+          ),
+        );
+        final err = await repoWith(g)
+            .changePassword(
+              currentPassword: 'Current!Pass1',
+              newPassword: 'N3w!Password2',
+            )
+            .then<Object?>((_) => null, onError: (e) => e);
+        expect(failureOf(err!), entry.value);
+        expect((err as AuthException).message, isNull);
+      }
+    });
+
+    test(
+      'server/partial, network, and malformed success are generic',
+      () async {
+        final failures = [
+          FakeAuthGateway(
+            session: 'u1',
+            passwordChangeResponse: const PasswordChangeFunctionResponse(
+              status: 500,
+              data: {
+                'error': {
+                  'code': 'server_error',
+                  'message': 'partial failure details',
+                },
+              },
+            ),
+          ),
+          FakeAuthGateway(session: 'u1', passwordChangeError: true),
+          FakeAuthGateway(
+            session: 'u1',
+            passwordChangeResponse: const PasswordChangeFunctionResponse(
+              status: 200,
+              data: {
+                'user': {
+                  'id': 'someone-else',
+                  'must_change_password': false,
+                  'is_active': true,
+                },
+              },
+            ),
+          ),
+        ];
+        for (final g in failures) {
+          final err = await repoWith(g)
+              .changePassword(
+                currentPassword: 'Current!Pass1',
+                newPassword: 'N3w!Password2',
+              )
+              .then<Object?>((_) => null, onError: (e) => e);
+          expect(failureOf(err!), AuthFailure.passwordChangeFailed);
+          expect((err as AuthException).message, isNull);
+        }
+      },
+    );
   });
 }

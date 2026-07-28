@@ -57,12 +57,12 @@ void main() {
       await auth.login(username: 'admin', password: MockUsers.devPassword);
       await auth.changePassword(
         currentPassword: MockUsers.devPassword,
-        newPassword: 'new-dev-pass',
+        newPassword: 'N3w!DevPassword',
       );
       await auth.logout();
       final user = await auth.login(
         username: 'admin',
-        password: 'new-dev-pass',
+        password: 'N3w!DevPassword',
       );
       expect(user.username, 'admin');
     });

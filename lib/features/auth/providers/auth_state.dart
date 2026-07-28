@@ -38,6 +38,9 @@ class AuthState {
   /// Whether a user is signed in.
   bool get isAuthenticated => currentUser != null;
 
+  /// Whether the authenticated user must complete the forced password flow.
+  bool get requiresPasswordChange => currentUser?.mustChangePassword ?? false;
+
   /// Alias for [isAuthenticated] (per requested helper name).
   bool get hasActiveUser => currentUser != null;
 

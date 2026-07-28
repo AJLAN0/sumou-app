@@ -62,7 +62,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('تحديث كلمة المرور'), findsOneWidget);
 
-    await tester.tap(find.text('حفظ'));
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(SumouButton, 'حفظ'));
     await tester.pumpAndSettle();
     expect(find.text('يرجى تعبئة جميع الحقول'), findsOneWidget);
   });
@@ -77,9 +79,11 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), MockUsers.devPassword);
-    await tester.enterText(find.byType(TextField).at(1), 'newpass123');
-    await tester.enterText(find.byType(TextField).at(2), 'newpass123');
-    await tester.tap(find.text('حفظ'));
+    await tester.enterText(find.byType(TextField).at(1), 'N3w!Password2');
+    await tester.enterText(find.byType(TextField).at(2), 'N3w!Password2');
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(SumouButton, 'حفظ'));
     await tester.pumpAndSettle();
 
     expect(find.text('تم تغيير كلمة المرور بنجاح'), findsOneWidget);

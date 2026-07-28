@@ -3,9 +3,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/core/models/models.dart';
+import 'package:sumou_app/core/providers/repository_providers.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'test_helpers.dart';
+
+const _forcedMultiUser = UserModel(
+  id: 'u-forced',
+  fullName: 'مستخدم مؤقت',
+  username: 'forced',
+  defaultRole: RoleType.manager,
+  roles: [RoleType.manager, RoleType.photographer],
+  mustChangePassword: true,
+  permissions: FeaturePermissions(canAddProject: true, canRequestClosure: true),
+);
 
 void main() {
   ProviderContainer makeContainer() {
@@ -93,5 +104,61 @@ void main() {
     final s = c.read(authControllerProvider);
     expect(s.isAuthenticated, isFalse);
     expect(s.selectedRole, isNull);
+  });
+
+  test('successful password change clears only the forced flag', () async {
+    final repository = MockAuthRepository(
+      accounts: const [
+        MockAccount(user: _forcedMultiUser, password: 'Current!Pass1'),
+      ],
+    );
+    final c = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWith((ref) => repository)],
+    );
+    addTearDown(c.dispose);
+    final controller = controllerOf(c);
+    await controller.login(username: 'forced', password: 'Current!Pass1');
+    controller.selectRole(RoleType.photographer);
+    final before = c.read(authControllerProvider);
+
+    final ok = await controller.changePassword(
+      currentPassword: 'Current!Pass1',
+      newPassword: 'N3w!Password2',
+    );
+
+    final after = c.read(authControllerProvider);
+    expect(ok, isTrue);
+    expect(after.currentUser!.mustChangePassword, isFalse);
+    expect(after.currentUser!.id, before.currentUser!.id);
+    expect(after.currentUser!.roles, same(before.currentUser!.roles));
+    expect(
+      after.currentUser!.permissions,
+      same(before.currentUser!.permissions),
+    );
+    expect(after.selectedRole, RoleType.photographer);
+  });
+
+  test('failed password change keeps forced flag true', () async {
+    final repository = MockAuthRepository(
+      accounts: const [
+        MockAccount(user: _forcedMultiUser, password: 'Current!Pass1'),
+      ],
+    );
+    final c = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWith((ref) => repository)],
+    );
+    addTearDown(c.dispose);
+    final controller = controllerOf(c);
+    await controller.login(username: 'forced', password: 'Current!Pass1');
+
+    final ok = await controller.changePassword(
+      currentPassword: 'Wrong!Password1',
+      newPassword: 'N3w!Password2',
+    );
+
+    final state = c.read(authControllerProvider);
+    expect(ok, isFalse);
+    expect(state.currentUser!.mustChangePassword, isTrue);
+    expect(state.errorMessage, 'كلمة المرور الحالية غير صحيحة');
   });
 }

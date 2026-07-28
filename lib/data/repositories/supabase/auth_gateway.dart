@@ -17,6 +17,31 @@ class AuthSessionInfo {
   final bool isExpired;
 }
 
+/// Status + decoded JSON returned by the password-change Edge Function.
+///
+/// The gateway catches only [FunctionException] so the repository can safely
+/// map known HTTP error contracts. Network/SDK exceptions still throw and are
+/// collapsed to a generic failure by the repository.
+class PasswordChangeFunctionResponse {
+  const PasswordChangeFunctionResponse({
+    required this.status,
+    required this.data,
+  });
+
+  final int status;
+  final dynamic data;
+}
+
+/// Exact request contract for `change-own-password`.
+///
+/// Identity is intentionally absent: the authenticated Supabase session is the
+/// only caller identity. The returned map is passed directly to `invoke` and is
+/// never stored or logged.
+Map<String, String> passwordChangeRequestBody({
+  required String currentPassword,
+  required String newPassword,
+}) => {'current_password': currentPassword, 'new_password': newPassword};
+
 /// Auth lifecycle events reduced to the outcomes restoration cares about.
 enum AuthSessionEventKind {
   /// A usable (refreshed / newly signed-in) session is available.
@@ -91,6 +116,12 @@ abstract interface class AuthGateway {
   /// Idempotent sign-out.
   Future<void> signOut();
 
+  /// Invoke the authenticated caller's own password-change Edge Function.
+  Future<PasswordChangeFunctionResponse> invokeChangeOwnPassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
   /// The caller's OWN profile row (selected columns), or `null` when absent.
   Future<Map<String, dynamic>?> fetchProfile(String userId);
 
@@ -156,6 +187,35 @@ class SupabaseAuthGateway implements AuthGateway {
 
   @override
   Future<void> signOut() => _client.auth.signOut();
+
+  @override
+  Future<PasswordChangeFunctionResponse> invokeChangeOwnPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      // SupabaseClient's authenticated HTTP client supplies the current
+      // session bearer token. Never add a service_role key or custom identity.
+      final response = await _client.functions.invoke(
+        'change-own-password',
+        body: passwordChangeRequestBody(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        ),
+      );
+      return PasswordChangeFunctionResponse(
+        status: response.status,
+        data: response.data,
+      );
+    } on FunctionException catch (error) {
+      // Preserve only the status + decoded contract for safe typed mapping.
+      // Never surface/log error.toString(), details, or the request values.
+      return PasswordChangeFunctionResponse(
+        status: error.status,
+        data: error.details,
+      );
+    }
+  }
 
   @override
   Future<Map<String, dynamic>?> fetchProfile(String userId) {

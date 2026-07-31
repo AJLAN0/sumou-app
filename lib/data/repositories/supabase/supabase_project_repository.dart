@@ -8,7 +8,8 @@ import '../../../core/models/project_team_role.dart';
 import '../project_repository.dart';
 import 'project_gateway.dart';
 
-/// Strict, read-only project repository over authenticated, RLS-scoped rows.
+/// Strict project repository over authenticated, RLS-scoped reads and the
+/// explicitly approved project write RPCs.
 class SupabaseProjectRepository implements ProjectRepository {
   SupabaseProjectRepository(SupabaseClient client)
     : _gateway = SupabaseProjectGateway(client);
@@ -515,6 +516,121 @@ class SupabaseProjectRepository implements ProjectRepository {
         ProjectRepositoryFailure.invalidData,
       );
 
+  static Never _invalidInput() =>
+      throw const ProjectRepositoryException(
+        ProjectRepositoryFailure.invalidInput,
+      );
+
+  static String _inputText(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) _invalidInput();
+    return normalized;
+  }
+
+  static String? _inputNotes(String? value) {
+    if (value == null) return null;
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static String _inputDate(DateTime value) {
+    if (value.hour != 0 ||
+        value.minute != 0 ||
+        value.second != 0 ||
+        value.millisecond != 0 ||
+        value.microsecond != 0) {
+      _invalidInput();
+    }
+    String twoDigits(int part) => part.toString().padLeft(2, '0');
+    return '${value.year.toString().padLeft(4, '0')}-'
+        '${twoDigits(value.month)}-${twoDigits(value.day)}';
+  }
+
+  static String _rpcUuid(Object? value) {
+    if (value is! String || value != value.trim() || !_uuid.hasMatch(value)) {
+      _invalidData();
+    }
+    return value.toLowerCase();
+  }
+
+  Future<ProjectModel> _requireProjectForWrite(String projectId) async {
+    final projects = await _loadProjects(projectId: projectId);
+    if (projects.isEmpty) {
+      throw const ProjectRepositoryException(ProjectRepositoryFailure.notFound);
+    }
+    return projects.single;
+  }
+
+  Future<ProjectModel> _requireProjectAfterWrite(String projectId) async {
+    final projects = await _loadProjects(projectId: projectId);
+    if (projects.isEmpty) _invalidData();
+    return projects.single;
+  }
+
+  Future<T> _performWrite<T>(
+    Future<T> Function() action, {
+    required bool missingEntityIsUnavailable,
+  }) async {
+    try {
+      return await action();
+    } on ProjectGatewayException catch (error) {
+      final reason = switch (error.reason) {
+        ProjectGatewayFailure.notAuthenticated =>
+          ProjectRepositoryFailure.notAuthenticated,
+        ProjectGatewayFailure.forbidden => ProjectRepositoryFailure.forbidden,
+        ProjectGatewayFailure.invalidInput =>
+          ProjectRepositoryFailure.invalidInput,
+        ProjectGatewayFailure.unavailable =>
+          ProjectRepositoryFailure.unavailable,
+        ProjectGatewayFailure.missingEntity =>
+          missingEntityIsUnavailable
+              ? ProjectRepositoryFailure.unavailable
+              : ProjectRepositoryFailure.notFound,
+        ProjectGatewayFailure.serverFailure =>
+          ProjectRepositoryFailure.saveFailed,
+      };
+      throw ProjectRepositoryException(reason);
+    } on ProjectRepositoryException catch (error) {
+      if (error.reason == ProjectRepositoryFailure.loadFailed) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.saveFailed,
+        );
+      }
+      rethrow;
+    } catch (_) {
+      throw const ProjectRepositoryException(
+        ProjectRepositoryFailure.saveFailed,
+      );
+    }
+  }
+
+  static bool _sameDate(DateTime left, DateTime right) =>
+      left.year == right.year &&
+      left.month == right.month &&
+      left.day == right.day;
+
+  static bool _sameTeam(
+    List<ProjectTeamRole> before,
+    List<ProjectTeamRole> after,
+  ) {
+    if (before.length != after.length) return false;
+    for (var index = 0; index < before.length; index++) {
+      final left = before[index];
+      final right = after[index];
+      if (left.id != right.id ||
+          left.projectId != right.projectId ||
+          left.type != right.type ||
+          left.personName != right.personName ||
+          left.userId != right.userId ||
+          left.value != right.value ||
+          (left.date == null) != (right.date == null) ||
+          (left.date != null && !_sameDate(left.date!, right.date!))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   static Future<T> _unsupported<T>() => Future<T>.error(
     const ProjectRepositoryException(
       ProjectRepositoryFailure.unsupportedOperation,
@@ -536,7 +652,47 @@ class SupabaseProjectRepository implements ProjectRepository {
     String? notes,
     String? serial,
     List<ProjectTeamRole> teamRoles = const [],
-  }) => _unsupported();
+  }) async {
+    if (serial != null) _invalidInput();
+    if (teamRoles.isNotEmpty) {
+      throw const ProjectRepositoryException(
+        ProjectRepositoryFailure.unsupportedOperation,
+      );
+    }
+    final normalizedName = _inputText(name);
+    final normalizedClientName = _inputText(clientName);
+    final normalizedManagerId = _inputUuid(managerId);
+    final normalizedStartDate = _inputDate(startDate);
+    final normalizedEndDate = _inputDate(endDate);
+    if (normalizedEndDate.compareTo(normalizedStartDate) < 0) _invalidInput();
+    final normalizedNotes = _inputNotes(notes);
+
+    return _performWrite(() async {
+      final result = await _gateway.createProject({
+        'p_name': normalizedName,
+        'p_client_name': normalizedClientName,
+        'p_type': type.key,
+        'p_start_date': normalizedStartDate,
+        'p_end_date': normalizedEndDate,
+        'p_notes': normalizedNotes,
+        'p_manager_id': normalizedManagerId,
+        'p_members': const <dynamic>[],
+      });
+      final createdId = _rpcUuid(result);
+      final created = await _requireProjectAfterWrite(createdId);
+      if (created.id != createdId ||
+          created.name != normalizedName ||
+          created.clientName != normalizedClientName ||
+          created.managerId != normalizedManagerId ||
+          created.type != type ||
+          !_sameDate(created.startDate, startDate) ||
+          !_sameDate(created.endDate, endDate) ||
+          created.notes != normalizedNotes) {
+        _invalidData();
+      }
+      return created;
+    }, missingEntityIsUnavailable: true);
+  }
 
   @override
   Future<ProjectModel?> updateProjectBasics(
@@ -548,7 +704,50 @@ class SupabaseProjectRepository implements ProjectRepository {
     required DateTime startDate,
     required DateTime endDate,
     String? notes,
-  }) => _unsupported();
+  }) async {
+    final normalizedProjectId = _inputUuid(projectId);
+    final normalizedName = _inputText(name);
+    final normalizedClientName = _inputText(clientName);
+    final normalizedStartDate = _inputDate(startDate);
+    final normalizedEndDate = _inputDate(endDate);
+    if (normalizedEndDate.compareTo(normalizedStartDate) < 0) _invalidInput();
+    final normalizedNotes = _inputNotes(notes);
+
+    return _performWrite(() async {
+      final before = await _requireProjectForWrite(normalizedProjectId);
+      if (!before.isActive) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.unavailable,
+        );
+      }
+      if (type != before.type || status != before.status) _invalidInput();
+
+      final result = await _gateway.updateProject({
+        'p_project_id': normalizedProjectId,
+        'p_name': normalizedName,
+        'p_client_name': normalizedClientName,
+        'p_type': before.type.key,
+        'p_start_date': normalizedStartDate,
+        'p_end_date': normalizedEndDate,
+        'p_notes': normalizedNotes,
+      });
+      if (_rpcUuid(result) != normalizedProjectId) _invalidData();
+
+      final updated = await _requireProjectAfterWrite(normalizedProjectId);
+      if (updated.name != normalizedName ||
+          updated.clientName != normalizedClientName ||
+          updated.type != before.type ||
+          updated.status != before.status ||
+          !_sameDate(updated.startDate, startDate) ||
+          !_sameDate(updated.endDate, endDate) ||
+          updated.notes != normalizedNotes ||
+          updated.serial != before.serial ||
+          updated.managerId != before.managerId) {
+        _invalidData();
+      }
+      return updated;
+    }, missingEntityIsUnavailable: false);
+  }
 
   @override
   Future<ProjectModel?> setProjectManager(
@@ -569,7 +768,74 @@ class SupabaseProjectRepository implements ProjectRepository {
     String stageId, {
     String? notes,
     String? updatedBy,
-  }) => _unsupported();
+  }) async {
+    final normalizedProjectId = _inputUuid(projectId);
+    final normalizedStageId = _inputUuid(stageId);
+    final normalizedNotes = _inputNotes(notes);
+
+    return _performWrite(() async {
+      final before = await _requireProjectForWrite(normalizedProjectId);
+      if (!before.isActive) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.unavailable,
+        );
+      }
+      final target =
+          before.stages
+              .where((stage) => stage.id == normalizedStageId)
+              .firstOrNull;
+      if (target == null) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.notFound,
+        );
+      }
+
+      final result = await _gateway.updateProjectStage({
+        'p_project_id': normalizedProjectId,
+        'p_stage_id': normalizedStageId,
+        'p_notes': normalizedNotes,
+      });
+      if (_rpcUuid(result) != normalizedProjectId) _invalidData();
+
+      final updated = await _requireProjectAfterWrite(normalizedProjectId);
+      if (updated.id != before.id ||
+          updated.serial != before.serial ||
+          updated.name != before.name ||
+          updated.clientName != before.clientName ||
+          updated.managerId != before.managerId ||
+          updated.type != before.type ||
+          updated.status != before.status ||
+          !_sameDate(updated.startDate, before.startDate) ||
+          !_sameDate(updated.endDate, before.endDate) ||
+          updated.notes != before.notes ||
+          !_sameTeam(before.teamRoles, updated.teamRoles) ||
+          updated.stages.length != before.stages.length) {
+        _invalidData();
+      }
+      final beforeById = {for (final stage in before.stages) stage.id: stage};
+      for (final stage in updated.stages) {
+        final prior = beforeById[stage.id];
+        if (prior == null ||
+            stage.projectId != prior.projectId ||
+            stage.title != prior.title ||
+            stage.order != prior.order) {
+          _invalidData();
+        }
+        final expectedStatus = switch (stage.order.compareTo(target.order)) {
+          < 0 => ProjectStageStatus.done,
+          0 => ProjectStageStatus.current,
+          _ => ProjectStageStatus.pending,
+        };
+        if (stage.status != expectedStatus ||
+            (stage.id == normalizedStageId
+                ? stage.notes != normalizedNotes
+                : stage.notes != prior.notes)) {
+          _invalidData();
+        }
+      }
+      return updated;
+    }, missingEntityIsUnavailable: false);
+  }
 
   @override
   Future<ClosureRequestModel?> submitClosureRequest({

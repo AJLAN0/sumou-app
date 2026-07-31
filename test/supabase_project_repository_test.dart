@@ -18,6 +18,8 @@ const photoTypeId = '10000000-0000-4000-8000-000000000001';
 const videoTypeId = '10000000-0000-4000-8000-000000000002';
 const firstTypeLinkId = '20000000-0000-4000-8000-000000000001';
 const secondTypeLinkId = '20000000-0000-4000-8000-000000000002';
+const firstStageId = '11111111-1000-4000-8000-000000000001';
+const secondStageId = '11111111-1000-4000-8000-000000000002';
 
 void main() {
   group('SupabaseProjectRepository visible reads', () {
@@ -394,32 +396,399 @@ void main() {
     });
   });
 
+  group('SupabaseProjectRepository create_project', () {
+    test(
+      'sends the exact RPC argument map and accepts server fields',
+      () async {
+        final gateway = validGateway(
+          project: validProject(
+            name: 'مشروع جديد',
+            clientName: 'عميل جديد',
+            type: 'social',
+            serial: 'SOC-A1B2-C3',
+            startDate: '2026-02-01',
+            endDate: '2026-02-05',
+          ),
+          type: ProjectType.social,
+        );
+        final repository = SupabaseProjectRepository.withGateway(gateway);
+
+        final created = await repository.createProject(
+          name: '  مشروع جديد  ',
+          clientName: ' عميل جديد ',
+          managerId: managerId.toUpperCase(),
+          managerName: 'اسم لا يرسل',
+          type: ProjectType.social,
+          startDate: DateTime(2026, 2, 1),
+          endDate: DateTime(2026, 2, 5),
+          notes: '   ',
+        );
+
+        expect(gateway.lastMutationName, 'create_project');
+        expect(gateway.lastMutationParameters, {
+          'p_name': 'مشروع جديد',
+          'p_client_name': 'عميل جديد',
+          'p_type': 'social',
+          'p_start_date': '2026-02-01',
+          'p_end_date': '2026-02-05',
+          'p_notes': null,
+          'p_manager_id': managerId,
+          'p_members': <dynamic>[],
+        });
+        expect(created.serial, 'SOC-A1B2-C3');
+        expect(created.status, ProjectStatus.active);
+        expect(created.stages, hasLength(7));
+      },
+    );
+
+    test('rejects client serial and team before any gateway call', () async {
+      final serialGateway = FakeProjectGateway();
+      final teamGateway = FakeProjectGateway();
+
+      await expectLater(
+        createWith(
+          SupabaseProjectRepository.withGateway(serialGateway),
+          serial: 'FLD-A1B2-C3',
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      await expectLater(
+        createWith(
+          SupabaseProjectRepository.withGateway(teamGateway),
+          teamRoles: [
+            ProjectTeamRole(
+              id: memberId,
+              projectId: projectId,
+              type: 'تصوير',
+              personName: 'مصور',
+            ),
+          ],
+        ),
+        throwsReason(ProjectRepositoryFailure.unsupportedOperation),
+      );
+      expect(serialGateway.totalCalls, 0);
+      expect(teamGateway.totalCalls, 0);
+    });
+
+    test('rejects invalid manager and calendar dates before RPC', () async {
+      final managerGateway = FakeProjectGateway();
+      final rangeGateway = FakeProjectGateway();
+      final timeGateway = FakeProjectGateway();
+
+      await expectLater(
+        createWith(
+          SupabaseProjectRepository.withGateway(managerGateway),
+          manager: 'bad-id',
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      await expectLater(
+        createWith(
+          SupabaseProjectRepository.withGateway(rangeGateway),
+          start: DateTime(2026, 2, 2),
+          end: DateTime(2026, 2, 1),
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      await expectLater(
+        createWith(
+          SupabaseProjectRepository.withGateway(timeGateway),
+          start: DateTime(2026, 2, 1, 1),
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      expect(managerGateway.mutationCalls, 0);
+      expect(rangeGateway.mutationCalls, 0);
+      expect(timeGateway.mutationCalls, 0);
+    });
+
+    test('rejects malformed result and contradictory re-read', () async {
+      final malformed = validGateway()..mutationResult = 'not-a-uuid';
+      final mismatch = validGateway();
+
+      await expectInvalidData(
+        createWith(SupabaseProjectRepository.withGateway(malformed)),
+      );
+      await expectInvalidData(
+        createWith(
+          SupabaseProjectRepository.withGateway(mismatch),
+          name: 'اسم مختلف',
+        ),
+      );
+      expect(malformed.mutationCalls, 1);
+      expect(mismatch.mutationCalls, 1);
+    });
+
+    test('maps safe backend failures and never retries', () async {
+      const cases = <(ProjectGatewayFailure, ProjectRepositoryFailure)>[
+        (
+          ProjectGatewayFailure.notAuthenticated,
+          ProjectRepositoryFailure.notAuthenticated,
+        ),
+        (ProjectGatewayFailure.forbidden, ProjectRepositoryFailure.forbidden),
+        (
+          ProjectGatewayFailure.invalidInput,
+          ProjectRepositoryFailure.invalidInput,
+        ),
+        (
+          ProjectGatewayFailure.unavailable,
+          ProjectRepositoryFailure.unavailable,
+        ),
+        (
+          ProjectGatewayFailure.missingEntity,
+          ProjectRepositoryFailure.unavailable,
+        ),
+        (
+          ProjectGatewayFailure.serverFailure,
+          ProjectRepositoryFailure.saveFailed,
+        ),
+      ];
+      for (final entry in cases) {
+        final gateway =
+            validGateway()..mutationError = ProjectGatewayException(entry.$1);
+        await expectLater(
+          createWith(SupabaseProjectRepository.withGateway(gateway)),
+          throwsReason(entry.$2),
+        );
+        expect(gateway.mutationCalls, 1);
+      }
+
+      final networkGateway =
+          validGateway()..mutationError = StateError('raw-network-token');
+      await expectLater(
+        createWith(SupabaseProjectRepository.withGateway(networkGateway)),
+        throwsA(
+          isA<ProjectRepositoryException>()
+              .having(
+                (error) => error.reason,
+                'reason',
+                ProjectRepositoryFailure.saveFailed,
+              )
+              .having(
+                (error) => error.toString(),
+                'safe text',
+                isNot(contains('raw-network-token')),
+              ),
+        ),
+      );
+      expect(networkGateway.mutationCalls, 1);
+    });
+  });
+
+  group('SupabaseProjectRepository update_project', () {
+    test(
+      'sends exact basics while omitting immutable unrelated fields',
+      () async {
+        final gateway = updateReadyGateway();
+        final repository = SupabaseProjectRepository.withGateway(gateway);
+
+        final updated = await repository.updateProjectBasics(
+          projectId,
+          name: '  مشروع محدث ',
+          clientName: ' عميل محدث ',
+          type: ProjectType.field,
+          status: ProjectStatus.active,
+          startDate: DateTime(2026, 3, 1),
+          endDate: DateTime(2026, 3, 3),
+          notes: ' ملاحظة ',
+        );
+
+        expect(gateway.lastMutationName, 'update_project');
+        expect(gateway.lastMutationParameters, {
+          'p_project_id': projectId,
+          'p_name': 'مشروع محدث',
+          'p_client_name': 'عميل محدث',
+          'p_type': 'field',
+          'p_start_date': '2026-03-01',
+          'p_end_date': '2026-03-03',
+          'p_notes': 'ملاحظة',
+        });
+        expect(updated!.serial, 'FLD-A1B2-C3');
+        expect(updated.managerId, managerId);
+        expect(updated.status, ProjectStatus.active);
+      },
+    );
+
+    test('rejects type and status change attempts before RPC', () async {
+      final typeGateway = validGateway();
+      final statusGateway = validGateway();
+
+      await expectLater(
+        updateWith(
+          SupabaseProjectRepository.withGateway(typeGateway),
+          type: ProjectType.social,
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      await expectLater(
+        updateWith(
+          SupabaseProjectRepository.withGateway(statusGateway),
+          status: ProjectStatus.inProgress,
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      expect(typeGateway.mutationCalls, 0);
+      expect(statusGateway.mutationCalls, 0);
+    });
+
+    test('rejects non-working projects and invalid date ranges', () async {
+      final stateGateway = validGateway(
+        project: validProject(status: 'completed'),
+      );
+      final dateGateway = FakeProjectGateway();
+
+      await expectLater(
+        updateWith(SupabaseProjectRepository.withGateway(stateGateway)),
+        throwsReason(ProjectRepositoryFailure.unavailable),
+      );
+      await expectLater(
+        updateWith(
+          SupabaseProjectRepository.withGateway(dateGateway),
+          start: DateTime(2026, 2, 2),
+          end: DateTime(2026, 2, 1),
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      expect(stateGateway.mutationCalls, 0);
+      expect(dateGateway.totalCalls, 0);
+    });
+
+    test('rejects returned UUID mismatch', () async {
+      final gateway = updateReadyGateway()..mutationResult = secondProjectId;
+
+      await expectInvalidData(
+        updateWith(SupabaseProjectRepository.withGateway(gateway)),
+      );
+      expect(gateway.mutationCalls, 1);
+    });
+
+    test(
+      'post-write read requires manager serial type and status unchanged',
+      () async {
+        for (final mutateUnexpectedly in <void Function(Map<String, dynamic>)>[
+          (row) => row['manager_id'] = secondManagerId,
+          (row) => row['serial'] = 'FLD-D4E5-F6',
+          (row) => row['type'] = 'wedding',
+          (row) => row['status'] = 'in_progress',
+        ]) {
+          final gateway = updateReadyGateway(afterUpdate: mutateUnexpectedly);
+          await expectInvalidData(
+            updateWith(SupabaseProjectRepository.withGateway(gateway)),
+          );
+        }
+      },
+    );
+
+    test('maps safe backend failures', () async {
+      await expectWriteMappings(
+        gatewayFactory: () => validGateway(),
+        invoke: (repository) => updateWith(repository),
+        missingReason: ProjectRepositoryFailure.notFound,
+      );
+    });
+  });
+
+  group('SupabaseProjectRepository update_project_stage', () {
+    test(
+      'sends exact arguments without updatedBy and verifies sequence',
+      () async {
+        final gateway = stageReadyGateway();
+        final repository = SupabaseProjectRepository.withGateway(gateway);
+
+        final updated = await repository.updateProjectStage(
+          projectId,
+          secondStageId,
+          notes: ' ملاحظة المرحلة ',
+          updatedBy: photographerId,
+        );
+
+        expect(gateway.lastMutationName, 'update_project_stage');
+        expect(gateway.lastMutationParameters, {
+          'p_project_id': projectId,
+          'p_stage_id': secondStageId,
+          'p_notes': 'ملاحظة المرحلة',
+        });
+        expect(updated!.stages.map((stage) => stage.status), [
+          ProjectStageStatus.done,
+          ProjectStageStatus.current,
+          ProjectStageStatus.pending,
+        ]);
+      },
+    );
+
+    test('requires the stage to belong to the project', () async {
+      final gateway = validGateway();
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).updateProjectStage(projectId, secondProjectId),
+        throwsReason(ProjectRepositoryFailure.notFound),
+      );
+      expect(gateway.mutationCalls, 0);
+    });
+
+    test('rejects non-working project before RPC', () async {
+      final gateway = validGateway(
+        project: validProject(status: 'pending_closure'),
+      );
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).updateProjectStage(projectId, firstStageId),
+        throwsReason(ProjectRepositoryFailure.unavailable),
+      );
+      expect(gateway.mutationCalls, 0);
+    });
+
+    test('rejects returned UUID mismatch and invalid stage sequence', () async {
+      final mismatch = stageReadyGateway()..mutationResult = secondProjectId;
+      final sequence = stageReadyGateway(validSequence: false);
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          mismatch,
+        ).updateProjectStage(projectId, secondStageId),
+      );
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          sequence,
+        ).updateProjectStage(projectId, secondStageId),
+      );
+    });
+
+    test('rejects unrelated project field changes after RPC', () async {
+      final gateway = stageReadyGateway(
+        afterUpdate: (row) => row['client_name'] = 'عميل آخر',
+      );
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).updateProjectStage(projectId, secondStageId),
+      );
+    });
+
+    test('maps safe backend failures', () async {
+      await expectWriteMappings(
+        gatewayFactory: () => validGateway(),
+        invoke:
+            (repository) =>
+                repository.updateProjectStage(projectId, firstStageId),
+        missingReason: ProjectRepositoryFailure.notFound,
+      );
+    });
+  });
+
   group('SupabaseProjectRepository write boundary', () {
     test('unsupported methods fail safely without any gateway call', () async {
       final gateway = FakeProjectGateway();
       final repository = SupabaseProjectRepository.withGateway(gateway);
       final operations = <Future<dynamic> Function()>[
         repository.getClosureRequests,
-        () => repository.createProject(
-          name: 'مشروع',
-          clientName: 'عميل',
-          managerId: managerId,
-          type: ProjectType.field,
-          startDate: DateTime(2026, 1, 1),
-          endDate: DateTime(2026, 1, 2),
-        ),
-        () => repository.updateProjectBasics(
-          projectId,
-          name: 'مشروع',
-          clientName: 'عميل',
-          type: ProjectType.field,
-          status: ProjectStatus.active,
-          startDate: DateTime(2026, 1, 1),
-          endDate: DateTime(2026, 1, 2),
-        ),
         () => repository.setProjectManager(projectId, managerId: managerId),
         () => repository.assignTeamRoles(projectId, const []),
-        () => repository.updateProjectStage(projectId, projectId),
         () => repository.submitClosureRequest(
           projectId: projectId,
           submittedBy: photographerId,
@@ -438,7 +807,7 @@ void main() {
       expect(gateway.totalCalls, 0);
     });
 
-    test('gateway source contains SELECT-only operations', () {
+    test('gateway source contains only approved RPC mutations', () {
       final source =
           File(
             'lib/data/repositories/supabase/project_gateway.dart',
@@ -454,6 +823,24 @@ void main() {
         expect(source, isNot(contains(mutation)));
         expect(repositorySource, isNot(contains(mutation)));
       }
+      for (final rpc in [
+        "_rpc('create_project'",
+        "_rpc('update_project'",
+        "_rpc('update_project_stage'",
+      ]) {
+        expect(source, contains(rpc));
+      }
+      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(3));
+    });
+
+    test('normal app provider remains MockProjectRepository', () {
+      final source =
+          File(
+            'lib/core/providers/repository_providers.dart',
+          ).readAsStringSync();
+
+      expect(source, contains('MockProjectRepository'));
+      expect(source, isNot(contains('SupabaseProjectRepository(client)')));
     });
   });
 }
@@ -468,6 +855,70 @@ Matcher throwsReason(ProjectRepositoryFailure reason) => throwsA(
 
 Future<void> expectInvalidData(Future<dynamic> future) =>
     expectLater(future, throwsReason(ProjectRepositoryFailure.invalidData));
+
+Future<ProjectModel> createWith(
+  SupabaseProjectRepository repository, {
+  String name = 'مشروع اختبار',
+  String manager = managerId,
+  DateTime? start,
+  DateTime? end,
+  String? serial,
+  List<ProjectTeamRole> teamRoles = const [],
+}) => repository.createProject(
+  name: name,
+  clientName: 'عميل اختبار',
+  managerId: manager,
+  type: ProjectType.field,
+  startDate: start ?? DateTime(2026, 1, 1),
+  endDate: end ?? DateTime(2026, 1, 2),
+  serial: serial,
+  teamRoles: teamRoles,
+);
+
+Future<ProjectModel?> updateWith(
+  SupabaseProjectRepository repository, {
+  ProjectType type = ProjectType.field,
+  ProjectStatus status = ProjectStatus.active,
+  DateTime? start,
+  DateTime? end,
+}) => repository.updateProjectBasics(
+  projectId,
+  name: 'مشروع محدث',
+  clientName: 'عميل محدث',
+  type: type,
+  status: status,
+  startDate: start ?? DateTime(2026, 3, 1),
+  endDate: end ?? DateTime(2026, 3, 3),
+  notes: 'ملاحظة',
+);
+
+Future<void> expectWriteMappings({
+  required FakeProjectGateway Function() gatewayFactory,
+  required Future<dynamic> Function(SupabaseProjectRepository repository)
+  invoke,
+  required ProjectRepositoryFailure missingReason,
+}) async {
+  final cases = <(ProjectGatewayFailure, ProjectRepositoryFailure)>[
+    (
+      ProjectGatewayFailure.notAuthenticated,
+      ProjectRepositoryFailure.notAuthenticated,
+    ),
+    (ProjectGatewayFailure.forbidden, ProjectRepositoryFailure.forbidden),
+    (ProjectGatewayFailure.invalidInput, ProjectRepositoryFailure.invalidInput),
+    (ProjectGatewayFailure.unavailable, ProjectRepositoryFailure.unavailable),
+    (ProjectGatewayFailure.missingEntity, missingReason),
+    (ProjectGatewayFailure.serverFailure, ProjectRepositoryFailure.saveFailed),
+  ];
+  for (final entry in cases) {
+    final gateway =
+        gatewayFactory()..mutationError = ProjectGatewayException(entry.$1);
+    await expectLater(
+      invoke(SupabaseProjectRepository.withGateway(gateway)),
+      throwsReason(entry.$2),
+    );
+    expect(gateway.mutationCalls, 1);
+  }
+}
 
 FakeProjectGateway validGateway({
   Map<String, dynamic>? project,
@@ -512,24 +963,59 @@ Map<String, dynamic> validProject({
   String type = 'field',
   String status = 'active',
   String name = 'مشروع اختبار',
+  String clientName = 'عميل اختبار',
   String startDate = '2026-01-01',
   String endDate = '2026-01-02',
+  String? notes,
 }) => {
   'id': id,
   'serial': serial,
   'name': name,
-  'client_name': 'عميل اختبار',
+  'client_name': clientName,
   'manager_id': manager,
   'type': type,
   'status': status,
   'start_date': startDate,
   'end_date': endDate,
-  'notes': null,
+  'notes': notes,
   'is_active': true,
   'created_at': '2026-07-14T09:00:00+03:00',
   'updated_at': '2026-07-14T10:00:00+03:00',
   'deleted_at': null,
 };
+
+FakeProjectGateway updateReadyGateway({
+  void Function(Map<String, dynamic> row)? afterUpdate,
+}) {
+  final gateway = validGateway();
+  gateway.onMutation = (name, parameters) {
+    final row = gateway.projects.single;
+    row['name'] = parameters['p_name'];
+    row['client_name'] = parameters['p_client_name'];
+    row['start_date'] = parameters['p_start_date'];
+    row['end_date'] = parameters['p_end_date'];
+    row['notes'] = parameters['p_notes'];
+    afterUpdate?.call(row);
+  };
+  return gateway;
+}
+
+FakeProjectGateway stageReadyGateway({
+  bool validSequence = true,
+  void Function(Map<String, dynamic> row)? afterUpdate,
+}) {
+  final gateway = validGateway();
+  gateway.onMutation = (name, parameters) {
+    if (validSequence) {
+      gateway.stages[0]['status'] = 'done';
+      gateway.stages[1]['status'] = 'current';
+      gateway.stages[1]['notes'] = parameters['p_notes'];
+      gateway.stages[2]['status'] = 'pending';
+    }
+    afterUpdate?.call(gateway.projects.single);
+  };
+  return gateway;
+}
 
 List<Map<String, dynamic>> validStages({
   String project = projectId,
@@ -596,12 +1082,18 @@ class FakeProjectGateway implements ProjectGateway {
   List<Map<String, dynamic>> teamTypes = [];
   List<Map<String, dynamic>> profiles = [];
   bool throwOnProjects = false;
+  Object? mutationResult = projectId;
+  Object? mutationError;
+  void Function(String name, Map<String, dynamic> parameters)? onMutation;
 
   int projectCalls = 0;
   int stagesCalls = 0;
   int teamMemberCalls = 0;
   int teamTypeCalls = 0;
   int profileCalls = 0;
+  int mutationCalls = 0;
+  String? lastMutationName;
+  Map<String, dynamic>? lastMutationParameters;
   String? lastProjectId;
 
   int get totalCalls =>
@@ -609,7 +1101,8 @@ class FakeProjectGateway implements ProjectGateway {
       stagesCalls +
       teamMemberCalls +
       teamTypeCalls +
-      profileCalls;
+      profileCalls +
+      mutationCalls;
 
   @override
   Future<List<Map<String, dynamic>>> fetchProjects({String? projectId}) async {
@@ -664,5 +1157,27 @@ class FakeProjectGateway implements ProjectGateway {
         .where((row) => profileIds.contains(row['id']))
         .map(Map<String, dynamic>.from)
         .toList();
+  }
+
+  @override
+  Future<Object?> createProject(Map<String, dynamic> parameters) =>
+      _mutate('create_project', parameters);
+
+  @override
+  Future<Object?> updateProject(Map<String, dynamic> parameters) =>
+      _mutate('update_project', parameters);
+
+  @override
+  Future<Object?> updateProjectStage(Map<String, dynamic> parameters) =>
+      _mutate('update_project_stage', parameters);
+
+  Future<Object?> _mutate(String name, Map<String, dynamic> parameters) async {
+    mutationCalls++;
+    lastMutationName = name;
+    lastMutationParameters = Map<String, dynamic>.from(parameters);
+    final error = mutationError;
+    if (error != null) throw error;
+    onMutation?.call(name, parameters);
+    return mutationResult;
   }
 }

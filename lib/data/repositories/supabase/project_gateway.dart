@@ -1,6 +1,24 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Narrow, fakeable boundary for authenticated, RLS-scoped project reads.
+enum ProjectGatewayFailure {
+  notAuthenticated,
+  forbidden,
+  invalidInput,
+  unavailable,
+  missingEntity,
+  serverFailure,
+}
+
+class ProjectGatewayException implements Exception {
+  const ProjectGatewayException(this.reason);
+
+  final ProjectGatewayFailure reason;
+
+  @override
+  String toString() => 'ProjectGatewayException(${reason.name})';
+}
+
+/// Narrow, fakeable boundary for authenticated, RLS-scoped project access.
 abstract interface class ProjectGateway {
   Future<List<Map<String, dynamic>>> fetchProjects({String? projectId});
 
@@ -13,6 +31,12 @@ abstract interface class ProjectGateway {
   Future<List<Map<String, dynamic>>> fetchVisibleProfiles(
     List<String> profileIds,
   );
+
+  Future<Object?> createProject(Map<String, dynamic> parameters);
+
+  Future<Object?> updateProject(Map<String, dynamic> parameters);
+
+  Future<Object?> updateProjectStage(Map<String, dynamic> parameters);
 }
 
 class SupabaseProjectGateway implements ProjectGateway {
@@ -107,6 +131,38 @@ class SupabaseProjectGateway implements ProjectGateway {
         .inFilter('id', profileIds);
     return _maps(rows);
   }
+
+  @override
+  Future<Object?> createProject(Map<String, dynamic> parameters) =>
+      _rpc('create_project', parameters);
+
+  @override
+  Future<Object?> updateProject(Map<String, dynamic> parameters) =>
+      _rpc('update_project', parameters);
+
+  @override
+  Future<Object?> updateProjectStage(Map<String, dynamic> parameters) =>
+      _rpc('update_project_stage', parameters);
+
+  Future<Object?> _rpc(
+    String functionName,
+    Map<String, dynamic> parameters,
+  ) async {
+    try {
+      return await _client.rpc(functionName, params: parameters);
+    } on PostgrestException catch (error) {
+      throw ProjectGatewayException(_safeFailure(error.code));
+    }
+  }
+
+  static ProjectGatewayFailure _safeFailure(String? code) => switch (code) {
+    '28000' || 'PGRST301' => ProjectGatewayFailure.notAuthenticated,
+    '42501' => ProjectGatewayFailure.forbidden,
+    '22023' => ProjectGatewayFailure.invalidInput,
+    'P0001' => ProjectGatewayFailure.unavailable,
+    'P0002' => ProjectGatewayFailure.missingEntity,
+    _ => ProjectGatewayFailure.serverFailure,
+  };
 
   static List<Map<String, dynamic>> _maps(List<dynamic> rows) => [
     for (final row in rows) Map<String, dynamic>.from(row as Map),

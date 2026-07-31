@@ -3,6 +3,45 @@ import '../../core/models/project_enums.dart';
 import '../../core/models/project_model.dart';
 import '../../core/models/project_team_role.dart';
 
+/// Safe failure categories shared by real project repositories and Arabic UI
+/// mapping. Backend diagnostics are intentionally not retained.
+enum ProjectRepositoryFailure {
+  notAuthenticated,
+  forbidden,
+  notFound,
+  invalidInput,
+  invalidData,
+  loadFailed,
+  unavailable,
+  unsupportedOperation,
+  saveFailed,
+}
+
+class ProjectRepositoryException implements Exception {
+  const ProjectRepositoryException(this.reason);
+
+  final ProjectRepositoryFailure reason;
+
+  String get messageAr => switch (reason) {
+    ProjectRepositoryFailure.notAuthenticated =>
+      'انتهت الجلسة، سجّل الدخول مرة أخرى',
+    ProjectRepositoryFailure.forbidden => 'ليست لديك صلاحية لتنفيذ هذا الإجراء',
+    ProjectRepositoryFailure.notFound => 'المشروع غير موجود',
+    ProjectRepositoryFailure.invalidInput =>
+      'تحقق من بيانات المشروع وحاول مرة أخرى',
+    ProjectRepositoryFailure.invalidData ||
+    ProjectRepositoryFailure.loadFailed => 'تعذّر تحميل بيانات المشاريع بأمان',
+    ProjectRepositoryFailure.unavailable =>
+      'الإجراء غير متاح حاليًا، حاول لاحقًا',
+    ProjectRepositoryFailure.unsupportedOperation =>
+      'هذا الإجراء غير متاح حتى يجهز مسار الخادم الآمن',
+    ProjectRepositoryFailure.saveFailed => 'تعذّر حفظ المشروع، حاول مرة أخرى',
+  };
+
+  @override
+  String toString() => 'ProjectRepositoryException(${reason.name})';
+}
+
 /// Read access to projects and closure requests.
 ///
 /// Mock-backed in Sprint 2; a Supabase implementation can replace it later

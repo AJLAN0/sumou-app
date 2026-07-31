@@ -1,7 +1,8 @@
 /// A team assignment on a project: a photo-type role filled by a person.
 ///
 /// [userId] links to a [UserModel] when the person has an account; [personName]
-/// covers external people without one. [value] is the agreed amount (SAR).
+/// covers external people without one. [value] is opaque assignment metadata;
+/// it must not be interpreted, labelled, or aggregated as finance.
 class ProjectTeamRole {
   const ProjectTeamRole({
     required this.id,

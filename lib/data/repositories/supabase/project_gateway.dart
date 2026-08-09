@@ -32,6 +32,11 @@ abstract interface class ProjectGateway {
     List<String> profileIds,
   );
 
+  Future<Object?> listAssignableProjectStaff({
+    required String onDate,
+    String? excludeProjectId,
+  });
+
   Future<Object?> createProject(Map<String, dynamic> parameters);
 
   Future<Object?> updateProject(Map<String, dynamic> parameters);
@@ -131,6 +136,15 @@ class SupabaseProjectGateway implements ProjectGateway {
         .inFilter('id', profileIds);
     return _maps(rows);
   }
+
+  @override
+  Future<Object?> listAssignableProjectStaff({
+    required String onDate,
+    String? excludeProjectId,
+  }) => _rpc('list_assignable_project_staff', {
+    'p_on_date': onDate,
+    'p_exclude_project_id': excludeProjectId,
+  });
 
   @override
   Future<Object?> createProject(Map<String, dynamic> parameters) =>

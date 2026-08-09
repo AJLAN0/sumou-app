@@ -1,3 +1,4 @@
+import '../../../core/models/assignable_project_staff.dart';
 import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_enums.dart';
 import '../../../core/models/project_model.dart';
@@ -43,6 +44,30 @@ class MockProjectRepository implements ProjectRepository {
   @override
   Future<List<ProjectModel>> getCompletedProjects() async =>
       _projects.where((p) => p.isCompleted).toList();
+
+  @override
+  Future<List<AssignableProjectStaff>> getAssignableProjectStaff({
+    required DateTime onDate,
+    String? excludeProjectId,
+  }) async => [
+    AssignableProjectStaff(
+      userId: 'u-photographer',
+      fullName: 'سارة المصورة',
+      photographerTypes: const [
+        ProjectPhotographerType(
+          id: '10000000-0000-4000-8000-000000000001',
+          code: 'photo',
+          nameAr: 'تصوير فوتوغرافي',
+        ),
+        ProjectPhotographerType(
+          id: '10000000-0000-4000-8000-000000000002',
+          code: 'video',
+          nameAr: 'تصوير فيديو',
+        ),
+      ],
+      isAvailable: true,
+    ),
+  ];
 
   @override
   Future<List<ProjectModel>> searchProjects(String query) async {

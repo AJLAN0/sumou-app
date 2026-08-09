@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
 
+import '../../../core/models/assignable_project_staff.dart';
 import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_enums.dart';
 import '../../../core/models/project_model.dart';
@@ -30,6 +31,19 @@ class SupabaseProjectRepository implements ProjectRepository {
     r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$',
   );
   static final RegExp _photographerTypeCode = RegExp(r'^[a-z][a-z0-9_]{0,49}$');
+  static const Set<String> _assignableCandidateKeys = {
+    'user_id',
+    'full_name',
+    'photographer_types',
+    'is_available',
+  };
+  static const Set<String> _assignableTypeKeys = {'id', 'code', 'name_ar'};
+  static const Set<String> _assignableTypeCodes = {
+    'photo',
+    'video',
+    'instagram',
+    'design',
+  };
 
   @override
   Future<List<ProjectModel>> getProjects() => _loadProjects();
@@ -63,6 +77,86 @@ class SupabaseProjectRepository implements ProjectRepository {
   Future<List<ProjectModel>> getCompletedProjects() async {
     final projects = await getProjects();
     return List.unmodifiable(projects.where((project) => project.isCompleted));
+  }
+
+  @override
+  Future<List<AssignableProjectStaff>> getAssignableProjectStaff({
+    required DateTime onDate,
+    String? excludeProjectId,
+  }) async {
+    final normalizedDate = _inputDate(onDate);
+    final normalizedExcludeProjectId =
+        excludeProjectId == null ? null : _inputStrictUuid(excludeProjectId);
+
+    try {
+      final response = await _gateway.listAssignableProjectStaff(
+        onDate: normalizedDate,
+        excludeProjectId: normalizedExcludeProjectId,
+      );
+      if (response is! List) _invalidData();
+
+      final candidates = <AssignableProjectStaff>[];
+      final seenUserIds = <String>{};
+      for (final rawCandidate in response) {
+        final candidate = _strictMap(rawCandidate, _assignableCandidateKeys);
+        final userId = _requiredUuid(candidate, 'user_id');
+        if (!seenUserIds.add(userId)) _invalidData();
+
+        final rawTypes = candidate['photographer_types'];
+        if (rawTypes is! List || rawTypes.isEmpty) _invalidData();
+        final photographerTypes = <ProjectPhotographerType>[];
+        final seenTypeIds = <String>{};
+        final seenTypeCodes = <String>{};
+        for (final rawType in rawTypes) {
+          final type = _strictMap(rawType, _assignableTypeKeys);
+          final id = _requiredUuid(type, 'id');
+          final code = _requiredToken(type, 'code');
+          if (!_assignableTypeCodes.contains(code) ||
+              !seenTypeIds.add(id) ||
+              !seenTypeCodes.add(code)) {
+            _invalidData();
+          }
+          photographerTypes.add(
+            ProjectPhotographerType(
+              id: id,
+              code: code,
+              nameAr: _requiredText(type, 'name_ar'),
+            ),
+          );
+        }
+
+        candidates.add(
+          AssignableProjectStaff(
+            userId: userId,
+            fullName: _requiredText(candidate, 'full_name'),
+            photographerTypes: photographerTypes,
+            isAvailable: _requiredBool(candidate, 'is_available'),
+          ),
+        );
+      }
+      return List.unmodifiable(candidates);
+    } on ProjectGatewayException catch (error) {
+      final reason = switch (error.reason) {
+        ProjectGatewayFailure.notAuthenticated =>
+          ProjectRepositoryFailure.notAuthenticated,
+        ProjectGatewayFailure.forbidden => ProjectRepositoryFailure.forbidden,
+        ProjectGatewayFailure.invalidInput =>
+          ProjectRepositoryFailure.invalidInput,
+        ProjectGatewayFailure.unavailable =>
+          ProjectRepositoryFailure.unavailable,
+        ProjectGatewayFailure.missingEntity =>
+          ProjectRepositoryFailure.notFound,
+        ProjectGatewayFailure.serverFailure =>
+          ProjectRepositoryFailure.loadFailed,
+      };
+      throw ProjectRepositoryException(reason);
+    } on ProjectRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const ProjectRepositoryException(
+        ProjectRepositoryFailure.loadFailed,
+      );
+    }
   }
 
   @override
@@ -423,6 +517,28 @@ class SupabaseProjectRepository implements ProjectRepository {
       );
     }
     return normalized;
+  }
+
+  static String _inputStrictUuid(String value) {
+    if (value != value.trim() || !_uuid.hasMatch(value)) _invalidInput();
+    return value.toLowerCase();
+  }
+
+  static Map<String, dynamic> _strictMap(
+    Object? value,
+    Set<String> expectedKeys,
+  ) {
+    if (value is! Map) _invalidData();
+    final result = <String, dynamic>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String) _invalidData();
+      result[entry.key as String] = entry.value;
+    }
+    if (result.length != expectedKeys.length ||
+        !result.keys.toSet().containsAll(expectedKeys)) {
+      _invalidData();
+    }
+    return result;
   }
 
   static String _requiredUuid(Map<String, dynamic> row, String key) {

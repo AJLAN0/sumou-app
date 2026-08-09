@@ -164,9 +164,9 @@ Gate:
 
 Status:
 
-- **11.4A:** backend assignable-staff contract prepared locally; migration not
-  applied to DEV.
-- **11.4B:** not started.
+- **11.4A:** backend assignable-staff contract prepared and applied to DEV by
+  the owner.
+- **11.4B:** Flutter assignable-staff data contract complete.
 - **11.4C:** not started.
 
 Prerequisite backend contract:

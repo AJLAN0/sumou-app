@@ -1,3 +1,4 @@
+import '../../core/models/assignable_project_staff.dart';
 import '../../core/models/closure_request_model.dart';
 import '../../core/models/project_enums.dart';
 import '../../core/models/project_model.dart';
@@ -53,6 +54,13 @@ abstract interface class ProjectRepository {
   Future<List<ProjectModel>> getProjectsForManager(String managerId);
   Future<List<ProjectModel>> getProjectsForPhotographer(String userId);
   Future<List<ProjectModel>> getCompletedProjects();
+
+  /// Return the server-authoritative staff candidates and availability for one
+  /// assignment calendar date.
+  Future<List<AssignableProjectStaff>> getAssignableProjectStaff({
+    required DateTime onDate,
+    String? excludeProjectId,
+  });
 
   /// Search by project name, client name, serial, or team member name.
   Future<List<ProjectModel>> searchProjects(String query);

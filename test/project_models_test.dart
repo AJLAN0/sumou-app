@@ -83,6 +83,22 @@ void main() {
       expect(weddings.single.id, 'p-4');
     });
 
+    test('assignable staff mock remains deterministic and immutable', () async {
+      final candidates = await repo.getAssignableProjectStaff(
+        onDate: DateTime(2026, 8, 9),
+      );
+
+      expect(candidates.single.userId, 'u-photographer');
+      expect(candidates.single.photographerTypes.map((type) => type.code), [
+        'photo',
+        'video',
+      ]);
+      expect(
+        () => candidates.single.photographerTypes.clear(),
+        throwsUnsupportedError,
+      );
+    });
+
     test('closure requests', () async {
       final requests = await repo.getClosureRequests();
       expect(requests.length, 1);

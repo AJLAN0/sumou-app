@@ -16,6 +16,8 @@ const externalMemberId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const photographerId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const photoTypeId = '10000000-0000-4000-8000-000000000001';
 const videoTypeId = '10000000-0000-4000-8000-000000000002';
+const instagramTypeId = '10000000-0000-4000-8000-000000000003';
+const designTypeId = '10000000-0000-4000-8000-000000000004';
 const firstTypeLinkId = '20000000-0000-4000-8000-000000000001';
 const secondTypeLinkId = '20000000-0000-4000-8000-000000000002';
 const firstStageId = '11111111-1000-4000-8000-000000000001';
@@ -781,6 +783,325 @@ void main() {
     });
   });
 
+  group('SupabaseProjectRepository assignable staff reads', () {
+    test(
+      'sends the date and null exclusion and parses one candidate',
+      () async {
+        final gateway =
+            FakeProjectGateway()
+              ..assignableStaffResult = [validAssignableCandidate()];
+        final repository = SupabaseProjectRepository.withGateway(gateway);
+
+        final result = await repository.getAssignableProjectStaff(
+          onDate: DateTime(2026, 8, 9),
+        );
+
+        expect(gateway.assignableStaffCalls, 1);
+        expect(gateway.lastAssignableOnDate, '2026-08-09');
+        expect(gateway.lastExcludeProjectId, isNull);
+        expect(result, hasLength(1));
+        expect(result.single.userId, photographerId);
+        expect(result.single.fullName, 'مصور اختبار');
+        expect(result.single.photographerTypes.single.code, 'photo');
+        expect(result.single.isAvailable, isTrue);
+      },
+    );
+
+    test('sends a valid exclusion project UUID exactly once', () async {
+      final gateway = FakeProjectGateway();
+
+      await SupabaseProjectRepository.withGateway(
+        gateway,
+      ).getAssignableProjectStaff(
+        onDate: DateTime(2026, 12, 31),
+        excludeProjectId: projectId,
+      );
+
+      expect(gateway.assignableStaffCalls, 1);
+      expect(gateway.lastAssignableOnDate, '2026-12-31');
+      expect(gateway.lastExcludeProjectId, projectId);
+    });
+
+    test('rejects a time-bearing date before the gateway call', () async {
+      final gateway = FakeProjectGateway();
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9, 1)),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      expect(gateway.assignableStaffCalls, 0);
+    });
+
+    test('rejects an invalid exclusion UUID before the gateway call', () async {
+      final gateway = FakeProjectGateway();
+      for (final value in ['not-a-uuid', ' $projectId']) {
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(
+            onDate: DateTime(2026, 8, 9),
+            excludeProjectId: value,
+          ),
+          throwsReason(ProjectRepositoryFailure.invalidInput),
+        );
+      }
+      expect(gateway.assignableStaffCalls, 0);
+    });
+
+    test('returns an immutable empty list for an empty response', () async {
+      final result = await SupabaseProjectRepository.withGateway(
+        FakeProjectGateway(),
+      ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9));
+
+      expect(result, isEmpty);
+      expect(
+        () => result.add(
+          AssignableProjectStaff(
+            userId: photographerId,
+            fullName: 'مصور',
+            photographerTypes: const [],
+            isAvailable: true,
+          ),
+        ),
+        throwsUnsupportedError,
+      );
+    });
+
+    test(
+      'parses multiple candidates and all four allowed type codes',
+      () async {
+        final gateway =
+            FakeProjectGateway()
+              ..assignableStaffResult = [
+                validAssignableCandidate(
+                  types: [
+                    validAssignableType(),
+                    validAssignableType(
+                      id: videoTypeId,
+                      code: 'video',
+                      nameAr: 'فيديو',
+                    ),
+                    validAssignableType(
+                      id: instagramTypeId,
+                      code: 'instagram',
+                      nameAr: 'إنستغرام',
+                    ),
+                    validAssignableType(
+                      id: designTypeId,
+                      code: 'design',
+                      nameAr: 'تصميم',
+                    ),
+                  ],
+                ),
+                validAssignableCandidate(
+                  userId: secondManagerId,
+                  fullName: 'مرشح ثانٍ',
+                ),
+              ];
+
+        final result = await SupabaseProjectRepository.withGateway(
+          gateway,
+        ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9));
+
+        expect(result, hasLength(2));
+        expect(result.first.photographerTypes.map((type) => type.code), [
+          'photo',
+          'video',
+          'instagram',
+          'design',
+        ]);
+      },
+    );
+
+    test('rejects unknown type codes and blank candidate names', () async {
+      final malformed = <Object?>[
+        [
+          validAssignableCandidate(
+            types: [validAssignableType(code: 'unknown')],
+          ),
+        ],
+        [validAssignableCandidate(fullName: '   ')],
+      ];
+
+      for (final response in malformed) {
+        final gateway = FakeProjectGateway()..assignableStaffResult = response;
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+        );
+      }
+    });
+
+    test('rejects malformed outer and candidate shapes', () async {
+      final extra = validAssignableCandidate()..['email'] = 'hidden@example';
+      final malformed = <Object?>[
+        null,
+        <String, dynamic>{},
+        [null],
+        [extra],
+        [validAssignableCandidate(userId: 'invalid')],
+      ];
+
+      for (final response in malformed) {
+        final gateway = FakeProjectGateway()..assignableStaffResult = response;
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+        );
+      }
+    });
+
+    test('rejects malformed and empty photographer type arrays', () async {
+      final extraType = validAssignableType()..['active'] = true;
+      final malformed = <Object?>[
+        [validAssignableCandidate(types: const [])],
+        [
+          validAssignableCandidate(types: [null]),
+        ],
+        [
+          validAssignableCandidate(types: [extraType]),
+        ],
+        [
+          validAssignableCandidate(types: [validAssignableType(nameAr: '')]),
+        ],
+      ];
+
+      for (final response in malformed) {
+        final gateway = FakeProjectGateway()..assignableStaffResult = response;
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+        );
+      }
+    });
+
+    test('rejects duplicate candidate UUIDs', () async {
+      final gateway =
+          FakeProjectGateway()
+            ..assignableStaffResult = [
+              validAssignableCandidate(),
+              validAssignableCandidate(fullName: 'اسم مختلف'),
+            ];
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+      );
+    });
+
+    test('rejects duplicate type IDs and duplicate type codes', () async {
+      final malformedTypes = <List<Object?>>[
+        [
+          validAssignableType(),
+          validAssignableType(id: photoTypeId, code: 'video'),
+        ],
+        [
+          validAssignableType(),
+          validAssignableType(id: videoTypeId, code: 'photo'),
+        ],
+      ];
+
+      for (final types in malformedTypes) {
+        final gateway =
+            FakeProjectGateway()
+              ..assignableStaffResult = [
+                validAssignableCandidate(types: types),
+              ];
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+        );
+      }
+    });
+
+    test('rejects malformed is_available values', () async {
+      final gateway =
+          FakeProjectGateway()
+            ..assignableStaffResult = [
+              validAssignableCandidate(isAvailable: 'false'),
+            ];
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+      );
+    });
+
+    test('keeps backend unavailability false without an explanation', () async {
+      final gateway =
+          FakeProjectGateway()
+            ..assignableStaffResult = [
+              validAssignableCandidate(isAvailable: false),
+            ];
+
+      final candidate =
+          (await SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9))).single;
+
+      expect(candidate.isAvailable, isFalse);
+      expect(candidate.toString(), isNot(contains('conflict')));
+    });
+
+    test('maps gateway failures safely without retrying', () async {
+      const cases = <(ProjectGatewayFailure, ProjectRepositoryFailure)>[
+        (
+          ProjectGatewayFailure.notAuthenticated,
+          ProjectRepositoryFailure.notAuthenticated,
+        ),
+        (ProjectGatewayFailure.forbidden, ProjectRepositoryFailure.forbidden),
+        (
+          ProjectGatewayFailure.invalidInput,
+          ProjectRepositoryFailure.invalidInput,
+        ),
+        (
+          ProjectGatewayFailure.unavailable,
+          ProjectRepositoryFailure.unavailable,
+        ),
+        (
+          ProjectGatewayFailure.missingEntity,
+          ProjectRepositoryFailure.notFound,
+        ),
+        (
+          ProjectGatewayFailure.serverFailure,
+          ProjectRepositoryFailure.loadFailed,
+        ),
+      ];
+
+      for (final entry in cases) {
+        final gateway =
+            FakeProjectGateway()
+              ..assignableStaffError = ProjectGatewayException(entry.$1);
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+          throwsReason(entry.$2),
+        );
+        expect(gateway.assignableStaffCalls, 1);
+      }
+
+      final network =
+          FakeProjectGateway()
+            ..assignableStaffError = StateError('raw-network-secret');
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          network,
+        ).getAssignableProjectStaff(onDate: DateTime(2026, 8, 9)),
+        throwsReason(ProjectRepositoryFailure.loadFailed),
+      );
+      expect(network.assignableStaffCalls, 1);
+    });
+  });
+
   group('SupabaseProjectRepository write boundary', () {
     test('unsupported methods fail safely without any gateway call', () async {
       final gateway = FakeProjectGateway();
@@ -807,7 +1128,7 @@ void main() {
       expect(gateway.totalCalls, 0);
     });
 
-    test('gateway source contains only approved RPC mutations', () {
+    test('gateway source contains only approved RPC contracts', () {
       final source =
           File(
             'lib/data/repositories/supabase/project_gateway.dart',
@@ -824,13 +1145,36 @@ void main() {
         expect(repositorySource, isNot(contains(mutation)));
       }
       for (final rpc in [
+        "_rpc('list_assignable_project_staff'",
         "_rpc('create_project'",
         "_rpc('update_project'",
         "_rpc('update_project_stage'",
       ]) {
         expect(source, contains(rpc));
       }
-      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(3));
+      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(4));
+      expect(source, contains("'p_on_date': onDate"));
+      expect(source, contains("'p_exclude_project_id': excludeProjectId"));
+      expect(source, isNot(contains("_rpc('assign_team_roles'")));
+      final discoveryStart = source.lastIndexOf(
+        'Future<Object?> listAssignableProjectStaff',
+      );
+      final discoveryEnd = source.indexOf(
+        'Future<Object?> createProject',
+        discoveryStart,
+      );
+      final discoverySource = source.substring(discoveryStart, discoveryEnd);
+      for (final prohibited in [
+        '.from(',
+        'profiles',
+        'user_unavailability',
+        'user_roles',
+        'permissions',
+        'is_available',
+        'assign_team_roles',
+      ]) {
+        expect(discoverySource, isNot(contains(prohibited)));
+      }
     });
 
     test('normal app provider remains MockProjectRepository', () {
@@ -1075,6 +1419,24 @@ Map<String, dynamic> validProfile({String id = managerId}) => {
   'deleted_at': null,
 };
 
+Map<String, dynamic> validAssignableCandidate({
+  String userId = photographerId,
+  String fullName = 'مصور اختبار',
+  List<Object?>? types,
+  Object? isAvailable = true,
+}) => {
+  'user_id': userId,
+  'full_name': fullName,
+  'photographer_types': types ?? [validAssignableType()],
+  'is_available': isAvailable,
+};
+
+Map<String, dynamic> validAssignableType({
+  String id = photoTypeId,
+  String code = 'photo',
+  String nameAr = 'تصوير فوتوغرافي',
+}) => {'id': id, 'code': code, 'name_ar': nameAr};
+
 class FakeProjectGateway implements ProjectGateway {
   List<Map<String, dynamic>> projects = [];
   List<Map<String, dynamic>> stages = [];
@@ -1084,6 +1446,8 @@ class FakeProjectGateway implements ProjectGateway {
   bool throwOnProjects = false;
   Object? mutationResult = projectId;
   Object? mutationError;
+  Object? assignableStaffResult = <dynamic>[];
+  Object? assignableStaffError;
   void Function(String name, Map<String, dynamic> parameters)? onMutation;
 
   int projectCalls = 0;
@@ -1092,9 +1456,12 @@ class FakeProjectGateway implements ProjectGateway {
   int teamTypeCalls = 0;
   int profileCalls = 0;
   int mutationCalls = 0;
+  int assignableStaffCalls = 0;
   String? lastMutationName;
   Map<String, dynamic>? lastMutationParameters;
   String? lastProjectId;
+  String? lastAssignableOnDate;
+  String? lastExcludeProjectId;
 
   int get totalCalls =>
       projectCalls +
@@ -1102,7 +1469,8 @@ class FakeProjectGateway implements ProjectGateway {
       teamMemberCalls +
       teamTypeCalls +
       profileCalls +
-      mutationCalls;
+      mutationCalls +
+      assignableStaffCalls;
 
   @override
   Future<List<Map<String, dynamic>>> fetchProjects({String? projectId}) async {
@@ -1157,6 +1525,19 @@ class FakeProjectGateway implements ProjectGateway {
         .where((row) => profileIds.contains(row['id']))
         .map(Map<String, dynamic>.from)
         .toList();
+  }
+
+  @override
+  Future<Object?> listAssignableProjectStaff({
+    required String onDate,
+    String? excludeProjectId,
+  }) async {
+    assignableStaffCalls++;
+    lastAssignableOnDate = onDate;
+    lastExcludeProjectId = excludeProjectId;
+    final error = assignableStaffError;
+    if (error != null) throw error;
+    return assignableStaffResult;
   }
 
   @override

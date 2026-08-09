@@ -162,6 +162,13 @@ Gate:
 
 ### Step 11.4 — Team catalog, availability, and assignment
 
+Status:
+
+- **11.4A:** backend assignable-staff contract prepared locally; migration not
+  applied to DEV.
+- **11.4B:** not started.
+- **11.4C:** not started.
+
 Prerequisite backend contract:
 
 - a manager-safe, least-privilege assignable-staff lookup is required. It should

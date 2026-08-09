@@ -39,6 +39,8 @@ abstract interface class ProjectGateway {
 
   Future<Object?> createProject(Map<String, dynamic> parameters);
 
+  Future<Object?> assignTeamRoles(Map<String, dynamic> parameters);
+
   Future<Object?> updateProject(Map<String, dynamic> parameters);
 
   Future<Object?> updateProjectStage(Map<String, dynamic> parameters);
@@ -149,6 +151,10 @@ class SupabaseProjectGateway implements ProjectGateway {
   @override
   Future<Object?> createProject(Map<String, dynamic> parameters) =>
       _rpc('create_project', parameters);
+
+  @override
+  Future<Object?> assignTeamRoles(Map<String, dynamic> parameters) =>
+      _rpc('assign_team_roles', parameters);
 
   @override
   Future<Object?> updateProject(Map<String, dynamic> parameters) =>

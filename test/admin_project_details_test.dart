@@ -46,6 +46,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('تعديل بيانات المشروع'), findsOneWidget);
+    expect(find.text('تغيير المدير'), findsNothing);
   });
 
   testWidgets('team action opens team management', (tester) async {

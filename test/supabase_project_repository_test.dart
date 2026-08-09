@@ -84,6 +84,15 @@ void main() {
           'مصور فوتوغرافي',
           'مصور فيديو',
         ]);
+        expect(roles.map((role) => role.teamMemberId), [memberId, memberId]);
+        expect(roles.map((role) => role.photographerTypeId), [
+          photoTypeId,
+          videoTypeId,
+        ]);
+        expect(roles.map((role) => role.photographerTypeCode), [
+          'photo',
+          'video',
+        ]);
         expect(roles.map((role) => role.value), [250, 0]);
       },
     );
@@ -443,7 +452,7 @@ void main() {
       },
     );
 
-    test('rejects client serial and team before any gateway call', () async {
+    test('rejects client serial and malformed team before RPC', () async {
       final serialGateway = FakeProjectGateway();
       final teamGateway = FakeProjectGateway();
 
@@ -466,10 +475,33 @@ void main() {
             ),
           ],
         ),
-        throwsReason(ProjectRepositoryFailure.unsupportedOperation),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
       );
       expect(serialGateway.totalCalls, 0);
       expect(teamGateway.totalCalls, 0);
+    });
+
+    test('creates a validated initial team atomically', () async {
+      final gateway = teamMutationReadyGateway();
+      final repository = SupabaseProjectRepository.withGateway(gateway);
+
+      final created = await createWith(
+        repository,
+        teamRoles: [validAssignmentRole()],
+      );
+
+      expect(gateway.lastMutationName, 'create_project');
+      expect(gateway.lastMutationParameters!['p_members'], [
+        {
+          'user_id': photographerId,
+          'person_name': null,
+          'value': 250,
+          'date': '2026-01-01',
+          'photographer_type_ids': [photoTypeId],
+        },
+      ]);
+      expect(gateway.lastExcludeProjectId, isNull);
+      expect(created.teamRoles.single.photographerTypeCode, 'photo');
     });
 
     test('rejects invalid manager and calendar dates before RPC', () async {
@@ -779,6 +811,320 @@ void main() {
             (repository) =>
                 repository.updateProjectStage(projectId, firstStageId),
         missingReason: ProjectRepositoryFailure.notFound,
+      );
+    });
+  });
+
+  group('SupabaseProjectRepository assign_team_roles', () {
+    test(
+      'groups one internal person with multiple types in exact payload',
+      () async {
+        final gateway = teamMutationReadyGateway();
+        final repository = SupabaseProjectRepository.withGateway(gateway);
+
+        final updated = await repository.assignTeamRoles(projectId, [
+          validAssignmentRole(),
+          validAssignmentRole(
+            id: 'draft-video',
+            typeId: videoTypeId,
+            typeCode: 'video',
+            typeName: 'مصور فيديو',
+            value: 0,
+          ),
+        ]);
+
+        expect(gateway.lastMutationName, 'assign_team_roles');
+        expect(gateway.lastMutationParameters, {
+          'p_project_id': projectId,
+          'p_members': [
+            {
+              'user_id': photographerId,
+              'person_name': null,
+              'value': 250,
+              'date': '2026-01-01',
+              'photographer_type_ids': [photoTypeId, videoTypeId],
+            },
+          ],
+        });
+        expect(gateway.mutationCalls, 1);
+        expect(gateway.assignableStaffCalls, 1);
+        expect(gateway.lastExcludeProjectId, projectId);
+        expect(updated!.teamRoles, hasLength(2));
+        expect(updated.teamRoles.map((role) => role.photographerTypeCode), [
+          'photo',
+          'video',
+        ]);
+      },
+    );
+
+    test('requires internal date and finite assignment metadata', () async {
+      final cases = <ProjectTeamRole>[
+        ProjectTeamRole(
+          id: 'draft',
+          projectId: projectId,
+          photographerTypeId: photoTypeId,
+          photographerTypeCode: 'photo',
+          type: 'مصور فوتوغرافي',
+          personName: 'مصور',
+          userId: photographerId,
+        ),
+        validAssignmentRole(value: double.infinity),
+      ];
+
+      for (final role in cases) {
+        final gateway = teamMutationReadyGateway();
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).assignTeamRoles(projectId, [role]),
+          throwsReason(ProjectRepositoryFailure.invalidInput),
+        );
+        expect(gateway.mutationCalls, 0);
+      }
+    });
+
+    test('rejects duplicate internal member and duplicate type ID', () async {
+      final duplicateMember = teamMutationReadyGateway();
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          duplicateMember,
+        ).assignTeamRoles(projectId, [
+          validAssignmentRole(),
+          validAssignmentRole(
+            id: 'other-member',
+            typeId: videoTypeId,
+            typeCode: 'video',
+            date: DateTime(2026, 1, 2),
+          ),
+        ]),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+
+      final duplicateType = teamMutationReadyGateway();
+      await expectLater(
+        SupabaseProjectRepository.withGateway(duplicateType).assignTeamRoles(
+          projectId,
+          [
+            validAssignmentRole(),
+            validAssignmentRole(id: 'duplicate-type', value: 0),
+          ],
+        ),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      expect(duplicateMember.mutationCalls, 0);
+      expect(duplicateType.mutationCalls, 0);
+    });
+
+    test(
+      'rejects unavailable candidate and unreturned selected type',
+      () async {
+        final unavailable =
+            teamMutationReadyGateway()
+              ..assignableStaffResult = [
+                validAssignableCandidate(isAvailable: false),
+              ];
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            unavailable,
+          ).assignTeamRoles(projectId, [validAssignmentRole()]),
+          throwsReason(ProjectRepositoryFailure.unavailable),
+        );
+
+        final missingType =
+            teamMutationReadyGateway()
+              ..assignableStaffResult = [validAssignableCandidate()];
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            missingType,
+          ).assignTeamRoles(projectId, [
+            validAssignmentRole(
+              typeId: videoTypeId,
+              typeCode: 'video',
+              typeName: 'مصور فيديو',
+            ),
+          ]),
+          throwsReason(ProjectRepositoryFailure.unavailable),
+        );
+        expect(unavailable.mutationCalls, 0);
+        expect(missingType.mutationCalls, 0);
+      },
+    );
+
+    test('groups candidate preflight by shared assignment date', () async {
+      final gateway = teamMutationReadyGateway();
+
+      await SupabaseProjectRepository.withGateway(
+        gateway,
+      ).assignTeamRoles(projectId, [
+        validAssignmentRole(),
+        validAssignmentRole(
+          id: 'second-user',
+          userId: secondManagerId,
+          personName: 'مرشح ثانٍ',
+          typeId: videoTypeId,
+          typeCode: 'video',
+          typeName: 'مصور فيديو',
+        ),
+      ]);
+
+      expect(gateway.assignableStaffCalls, 1);
+      expect(gateway.mutationCalls, 1);
+    });
+
+    test('rejects a non-strict project UUID before any gateway call', () async {
+      final gateway = teamMutationReadyGateway();
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).assignTeamRoles(' $projectId', const []),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+
+      expect(gateway.totalCalls, 0);
+    });
+
+    test('supports an explicitly empty replace-all payload', () async {
+      final gateway = teamMutationReadyGateway();
+
+      final updated = await SupabaseProjectRepository.withGateway(
+        gateway,
+      ).assignTeamRoles(projectId, const []);
+
+      expect(gateway.lastMutationParameters, {
+        'p_project_id': projectId,
+        'p_members': <dynamic>[],
+      });
+      expect(gateway.assignableStaffCalls, 0);
+      expect(gateway.mutationCalls, 1);
+      expect(updated!.teamRoles, isEmpty);
+    });
+
+    test('preserves existing external member with nullable date', () async {
+      final external = validTeamMember(
+        id: externalMemberId,
+        userId: null,
+        name: 'مصور خارجي',
+      )..['date'] = null;
+      final gateway = teamMutationReadyGateway(
+        existingMembers: [external],
+        existingTypes: [validTeamType(member: externalMemberId)],
+      );
+
+      final updated = await SupabaseProjectRepository.withGateway(
+        gateway,
+      ).assignTeamRoles(projectId, [validAssignmentRole()]);
+
+      final payload = gateway.lastMutationParameters!['p_members'] as List;
+      expect(payload, hasLength(2));
+      final externalPayload = Map<String, dynamic>.from(
+        payload.singleWhere((member) => (member as Map)['user_id'] == null)
+            as Map,
+      );
+      expect(externalPayload['person_name'], 'مصور خارجي');
+      expect(externalPayload['value'], 250);
+      expect(externalPayload['date'], isNull);
+      expect(externalPayload['photographer_type_ids'], [photoTypeId]);
+      expect(
+        updated!.teamRoles.any(
+          (role) => role.userId == null && role.personName == 'مصور خارجي',
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'rejects a malformed existing external name before mutation',
+      () async {
+        final gateway = teamMutationReadyGateway(
+          existingMembers: [
+            validTeamMember(id: externalMemberId, userId: null, name: '   '),
+          ],
+          existingTypes: [validTeamType(member: externalMemberId)],
+        );
+
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).assignTeamRoles(projectId, [validAssignmentRole()]),
+        );
+        expect(gateway.mutationCalls, 0);
+      },
+    );
+
+    test('rejects new or edited external members before mutation', () async {
+      final gateway = teamMutationReadyGateway();
+      final proposedExternal = validAssignmentRole(
+        userId: null,
+        teamMember: externalMemberId,
+        personName: 'عضو خارجي جديد',
+      );
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).assignTeamRoles(projectId, [proposedExternal]),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      expect(gateway.mutationCalls, 0);
+    });
+
+    test('maps all safe mutation failures and never retries', () async {
+      await expectWriteMappings(
+        gatewayFactory: teamMutationReadyGateway,
+        invoke: (repository) => repository.assignTeamRoles(projectId, const []),
+        missingReason: ProjectRepositoryFailure.unavailable,
+      );
+      final gateway =
+          teamMutationReadyGateway()
+            ..mutationError = StateError('raw-network-payload');
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).assignTeamRoles(projectId, const []),
+        throwsReason(ProjectRepositoryFailure.saveFailed),
+      );
+      expect(gateway.mutationCalls, 1);
+    });
+
+    test(
+      'rejects returned UUID mismatch and post-write team mismatch',
+      () async {
+        final returnedMismatch =
+            teamMutationReadyGateway()..mutationResult = secondProjectId;
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            returnedMismatch,
+          ).assignTeamRoles(projectId, const []),
+        );
+
+        final teamMismatch = teamMutationReadyGateway();
+        final normalMutation = teamMismatch.onMutation!;
+        teamMismatch.onMutation = (name, parameters) {
+          normalMutation(name, parameters);
+          teamMismatch.teamMembers = [];
+          teamMismatch.teamTypes = [];
+        };
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            teamMismatch,
+          ).assignTeamRoles(projectId, [validAssignmentRole()]),
+        );
+      },
+    );
+
+    test('rejects any unrelated project or stage change after write', () async {
+      final gateway = teamMutationReadyGateway();
+      final normalMutation = gateway.onMutation!;
+      gateway.onMutation = (name, parameters) {
+        normalMutation(name, parameters);
+        gateway.projects.single['name'] = 'اسم متناقض';
+      };
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          gateway,
+        ).assignTeamRoles(projectId, const []),
       );
     });
   });
@@ -1109,7 +1455,6 @@ void main() {
       final operations = <Future<dynamic> Function()>[
         repository.getClosureRequests,
         () => repository.setProjectManager(projectId, managerId: managerId),
-        () => repository.assignTeamRoles(projectId, const []),
         () => repository.submitClosureRequest(
           projectId: projectId,
           submittedBy: photographerId,
@@ -1147,15 +1492,15 @@ void main() {
       for (final rpc in [
         "_rpc('list_assignable_project_staff'",
         "_rpc('create_project'",
+        "_rpc('assign_team_roles'",
         "_rpc('update_project'",
         "_rpc('update_project_stage'",
       ]) {
         expect(source, contains(rpc));
       }
-      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(4));
+      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(5));
       expect(source, contains("'p_on_date': onDate"));
       expect(source, contains("'p_exclude_project_id': excludeProjectId"));
-      expect(source, isNot(contains("_rpc('assign_team_roles'")));
       final discoveryStart = source.lastIndexOf(
         'Future<Object?> listAssignableProjectStaff',
       );
@@ -1272,6 +1617,106 @@ FakeProjectGateway validGateway({
       ..projects = [project ?? validProject()]
       ..stages = validStages(type: type)
       ..profiles = [validProfile()];
+
+ProjectTeamRole validAssignmentRole({
+  String id = 'draft',
+  String? teamMember = memberId,
+  String? userId = photographerId,
+  String personName = 'اسم العرض',
+  String typeId = photoTypeId,
+  String typeCode = 'photo',
+  String typeName = 'مصور فوتوغرافي',
+  num value = 250,
+  DateTime? date,
+}) => ProjectTeamRole(
+  id: id,
+  projectId: projectId,
+  teamMemberId: teamMember,
+  photographerTypeId: typeId,
+  photographerTypeCode: typeCode,
+  type: typeName,
+  personName: personName,
+  userId: userId,
+  value: value,
+  date: date ?? DateTime(2026, 1, 1),
+);
+
+FakeProjectGateway teamMutationReadyGateway({
+  List<Map<String, dynamic>>? existingMembers,
+  List<Map<String, dynamic>>? existingTypes,
+}) {
+  final gateway = validGateway();
+  gateway.teamMembers = existingMembers ?? [];
+  gateway.teamTypes = existingTypes ?? [];
+  gateway.assignableStaffResult = [
+    validAssignableCandidate(
+      types: [
+        validAssignableType(),
+        validAssignableType(
+          id: videoTypeId,
+          code: 'video',
+          nameAr: 'مصور فيديو',
+        ),
+      ],
+    ),
+    validAssignableCandidate(
+      userId: secondManagerId,
+      fullName: 'مرشح ثانٍ',
+      types: [
+        validAssignableType(
+          id: videoTypeId,
+          code: 'video',
+          nameAr: 'مصور فيديو',
+        ),
+      ],
+    ),
+  ];
+  gateway.onMutation = (name, parameters) {
+    if (name != 'assign_team_roles' && name != 'create_project') return;
+    final payload = parameters['p_members']! as List<dynamic>;
+    gateway.teamMembers = [];
+    gateway.teamTypes = [];
+    var associationIndex = 0;
+    for (var memberIndex = 0; memberIndex < payload.length; memberIndex++) {
+      final member = Map<String, dynamic>.from(payload[memberIndex] as Map);
+      final generatedMemberId = _testUuid(30, memberIndex + 1);
+      final userId = member['user_id'] as String?;
+      gateway.teamMembers.add({
+        'id': generatedMemberId,
+        'project_id': projectId,
+        'user_id': userId,
+        'person_name': userId == null ? member['person_name'] : 'اسم من الخادم',
+        'value': member['value'],
+        'date': member['date'],
+      });
+      for (final rawType in member['photographer_type_ids'] as List<dynamic>) {
+        associationIndex++;
+        final typeId = rawType as String;
+        final (code, nameAr) = switch (typeId) {
+          photoTypeId => ('photo', 'مصور فوتوغرافي'),
+          videoTypeId => ('video', 'مصور فيديو'),
+          instagramTypeId => ('instagram', 'انستقرام'),
+          designTypeId => ('design', 'تصميم'),
+          _ => ('unknown', 'غير معروف'),
+        };
+        gateway.teamTypes.add(
+          validTeamType(
+            id: _testUuid(40, associationIndex),
+            member: generatedMemberId,
+            typeId: typeId,
+            code: code,
+            nameAr: nameAr,
+          ),
+        );
+      }
+    }
+  };
+  return gateway;
+}
+
+String _testUuid(int prefix, int suffix) =>
+    '${prefix.toString().padLeft(8, '0')}-0000-4000-8000-'
+    '${suffix.toString().padLeft(12, '0')}';
 
 FakeProjectGateway validGatewayWithTeam() =>
     validGateway()
@@ -1543,6 +1988,10 @@ class FakeProjectGateway implements ProjectGateway {
   @override
   Future<Object?> createProject(Map<String, dynamic> parameters) =>
       _mutate('create_project', parameters);
+
+  @override
+  Future<Object?> assignTeamRoles(Map<String, dynamic> parameters) =>
+      _mutate('assign_team_roles', parameters);
 
   @override
   Future<Object?> updateProject(Map<String, dynamic> parameters) =>

@@ -38,14 +38,14 @@ void main() {
   testWidgets('admin opens the team management screen', (tester) async {
     await openTeam(tester, 'تصوير ميداني — مهرجان الرياض');
     expect(find.text('إدارة الفريق'), findsOneWidget); // app bar
-    expect(find.text('مدير المشروع'), findsWidgets); // section
-    expect(find.text('الفريق الحالي (1)'), findsOneWidget);
-    expect(find.text('حفظ التغييرات'), findsOneWidget);
+    expect(find.text('مدير المشروع'), findsNothing);
+    expect(find.text('الفريق المختار (1)'), findsOneWidget);
+    expect(find.text('حفظ الإسناد (1)'), findsOneWidget);
   });
 
   testWidgets('saving the team shows a success snackbar', (tester) async {
     await openTeam(tester, 'تصوير ميداني — مهرجان الرياض');
-    await tester.tap(find.text('حفظ التغييرات'));
+    await tester.tap(find.text('حفظ الإسناد (1)'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('تم تحديث فريق المشروع'), findsOneWidget);

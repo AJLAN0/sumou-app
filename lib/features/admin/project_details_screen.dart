@@ -174,12 +174,6 @@ class _Body extends ConsumerWidget {
         ),
         const SizedBox(height: 10),
         _ActionCard(
-          icon: Icons.swap_horiz,
-          label: 'تغيير المدير',
-          onTap: () => context.push(AppRoutes.adminProjectTeamPath(project.id)),
-        ),
-        const SizedBox(height: 10),
-        _ActionCard(
           icon: Icons.group_outlined,
           label: 'تعديل الفريق',
           onTap: () => context.push(AppRoutes.adminProjectTeamPath(project.id)),

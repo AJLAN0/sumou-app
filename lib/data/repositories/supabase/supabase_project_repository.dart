@@ -30,7 +30,6 @@ class SupabaseProjectRepository implements ProjectRepository {
   static final RegExp _timestamp = RegExp(
     r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$',
   );
-  static final RegExp _photographerTypeCode = RegExp(r'^[a-z][a-z0-9_]{0,49}$');
   static const Set<String> _assignableCandidateKeys = {
     'user_id',
     'full_name',
@@ -349,13 +348,15 @@ class SupabaseProjectRepository implements ProjectRepository {
       if (value is! num || (value is double && !value.isFinite)) {
         _invalidData();
       }
+      final date = _optionalDate(row['date']);
+      if (userId != null && date == null) _invalidData();
       result[id] = _TeamMember(
         id: id,
         projectId: projectId,
         userId: userId,
         personName: _requiredText(row, 'person_name'),
         value: value,
-        date: _optionalDate(row['date']),
+        date: date,
       );
     }
     return result;
@@ -389,7 +390,7 @@ class SupabaseProjectRepository implements ProjectRepository {
       }
       final code = _requiredToken(typeRow, 'code');
       final nameAr = _requiredText(typeRow, 'name_ar');
-      if (!_photographerTypeCode.hasMatch(code)) _invalidData();
+      if (!_assignableTypeCodes.contains(code)) _invalidData();
 
       final catalog = _PhotographerType(id: typeId, code: code, nameAr: nameAr);
       final priorCatalog = catalogById[typeId];
@@ -428,6 +429,9 @@ class SupabaseProjectRepository implements ProjectRepository {
               ProjectTeamRole(
                 id: memberType.associationId,
                 projectId: member.projectId,
+                teamMemberId: member.id,
+                photographerTypeId: memberType.type.id,
+                photographerTypeCode: memberType.type.code,
                 type: memberType.type.nameAr,
                 personName: member.personName,
                 userId: member.userId,
@@ -737,10 +741,243 @@ class SupabaseProjectRepository implements ProjectRepository {
           left.projectId != right.projectId ||
           left.type != right.type ||
           left.personName != right.personName ||
+          left.teamMemberId != right.teamMemberId ||
+          left.photographerTypeId != right.photographerTypeId ||
+          left.photographerTypeCode != right.photographerTypeCode ||
           left.userId != right.userId ||
           left.value != right.value ||
           (left.date == null) != (right.date == null) ||
           (left.date != null && !_sameDate(left.date!, right.date!))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<List<_NormalizedTeamMember>> _normalizeTeamRoles(
+    List<ProjectTeamRole> roles, {
+    required String? excludeProjectId,
+    required bool allowExistingExternal,
+    required bool preflightInternal,
+  }) async {
+    final groups = <String, _MutableTeamMember>{};
+    final typeIdsByCode = <String, String>{};
+    final typeCodesById = <String, String>{};
+
+    for (final role in roles) {
+      final typeIdValue = role.photographerTypeId;
+      final typeCode = role.photographerTypeCode;
+      if (typeIdValue == null ||
+          typeCode == null ||
+          !_assignableTypeCodes.contains(typeCode)) {
+        _invalidInput();
+      }
+      final typeId = _inputStrictUuid(typeIdValue);
+      final knownId = typeIdsByCode[typeCode];
+      final knownCode = typeCodesById[typeId];
+      if ((knownId != null && knownId != typeId) ||
+          (knownCode != null && knownCode != typeCode)) {
+        _invalidInput();
+      }
+      typeIdsByCode[typeCode] = typeId;
+      typeCodesById[typeId] = typeCode;
+
+      final value = role.value;
+      if (!value.isFinite) _invalidInput();
+
+      final String key;
+      final String? userId;
+      final String? externalName;
+      final DateTime? date;
+      if (role.userId != null) {
+        userId = _inputStrictUuid(role.userId!);
+        externalName = null;
+        if (role.date == null) _invalidInput();
+        _inputDate(role.date!);
+        date = role.date;
+        key = 'user:$userId';
+      } else {
+        if (!allowExistingExternal || role.teamMemberId == null) {
+          _invalidInput();
+        }
+        final memberId = _inputStrictUuid(role.teamMemberId!);
+        userId = null;
+        externalName = _inputText(role.personName);
+        if (role.date != null) _inputDate(role.date!);
+        date = role.date;
+        key = 'external:$memberId';
+      }
+
+      final group = groups.putIfAbsent(
+        key,
+        () => _MutableTeamMember(
+          key: key,
+          userId: userId,
+          externalName: externalName,
+          value: value,
+          date: date,
+        ),
+      );
+      if (group.userId != userId ||
+          group.externalName != externalName ||
+          !_sameNullableDate(group.date, date)) {
+        _invalidInput();
+      }
+      if (group.types.isNotEmpty && value != 0) {
+        if (group.value != 0) _invalidInput();
+        group.value = value;
+      }
+      if (!group.typeIds.add(typeId) || !group.typeCodes.add(typeCode)) {
+        _invalidInput();
+      }
+      group.types.add(_NormalizedTeamType(id: typeId, code: typeCode));
+    }
+
+    final normalized = [
+      for (final group in groups.values)
+        _NormalizedTeamMember(
+          key: group.key,
+          userId: group.userId,
+          externalName: group.externalName,
+          value: group.value,
+          date: group.date,
+          types: List.unmodifiable(
+            group.types..sort((a, b) => a.code.compareTo(b.code)),
+          ),
+        ),
+    ]..sort(
+      (a, b) => _normalizedMemberComparisonKey(
+        a,
+      ).compareTo(_normalizedMemberComparisonKey(b)),
+    );
+
+    if (preflightInternal) {
+      final candidatesByDate = <String, List<AssignableProjectStaff>>{};
+      for (final member in normalized.where(
+        (member) => member.userId != null,
+      )) {
+        final date = member.date!;
+        final dateKey = _inputDate(date);
+        List<AssignableProjectStaff> candidates;
+        try {
+          candidates =
+              candidatesByDate[dateKey] ??= await getAssignableProjectStaff(
+                onDate: date,
+                excludeProjectId: excludeProjectId,
+              );
+        } on ProjectRepositoryException catch (error) {
+          if (error.reason == ProjectRepositoryFailure.notFound) {
+            throw const ProjectRepositoryException(
+              ProjectRepositoryFailure.unavailable,
+            );
+          }
+          rethrow;
+        }
+        final candidate =
+            candidates
+                .where((item) => item.userId == member.userId)
+                .firstOrNull;
+        if (candidate == null || !candidate.isAvailable) {
+          throw const ProjectRepositoryException(
+            ProjectRepositoryFailure.unavailable,
+          );
+        }
+        final allowedTypes = {
+          for (final type in candidate.photographerTypes) type.id: type.code,
+        };
+        for (final type in member.types) {
+          if (allowedTypes[type.id] != type.code) {
+            throw const ProjectRepositoryException(
+              ProjectRepositoryFailure.unavailable,
+            );
+          }
+        }
+      }
+    }
+
+    return List.unmodifiable(normalized);
+  }
+
+  static List<Map<String, dynamic>> _teamPayload(
+    List<_NormalizedTeamMember> members,
+  ) => [
+    for (final member in members)
+      {
+        'user_id': member.userId,
+        'person_name': member.userId == null ? member.externalName : null,
+        'value': member.value,
+        'date': member.date == null ? null : _inputDate(member.date!),
+        'photographer_type_ids': [for (final type in member.types) type.id],
+      },
+  ];
+
+  static bool _sameNullableDate(DateTime? left, DateTime? right) =>
+      left == null ? right == null : right != null && _sameDate(left, right);
+
+  static bool _sameNormalizedTeam(
+    List<_NormalizedTeamMember> expected,
+    List<_NormalizedTeamMember> actual,
+  ) {
+    if (expected.length != actual.length) return false;
+    for (var index = 0; index < expected.length; index++) {
+      final left = expected[index];
+      final right = actual[index];
+      if (left.userId != right.userId ||
+          left.externalName != right.externalName ||
+          left.value != right.value ||
+          !_sameNullableDate(left.date, right.date) ||
+          left.types.length != right.types.length) {
+        return false;
+      }
+      for (var typeIndex = 0; typeIndex < left.types.length; typeIndex++) {
+        if (left.types[typeIndex] != right.types[typeIndex]) return false;
+      }
+    }
+    return true;
+  }
+
+  static String _normalizedMemberComparisonKey(_NormalizedTeamMember member) {
+    final identity = member.userId ?? 'external:${member.externalName}';
+    final date = member.date == null ? '' : _inputDate(member.date!);
+    final types = member.types
+        .map((type) => '${type.id}:${type.code}')
+        .join(',');
+    return '$identity|$date|${member.value}|$types';
+  }
+
+  static bool _sameProjectOutsideTeam(
+    ProjectModel before,
+    ProjectModel after,
+  ) =>
+      before.id == after.id &&
+      before.serial == after.serial &&
+      before.name == after.name &&
+      before.clientName == after.clientName &&
+      before.managerId == after.managerId &&
+      before.type == after.type &&
+      before.status == after.status &&
+      _sameDate(before.startDate, after.startDate) &&
+      _sameDate(before.endDate, after.endDate) &&
+      before.notes == after.notes &&
+      _sameStages(before.stages, after.stages);
+
+  static bool _sameStages(
+    List<ProjectStageModel> before,
+    List<ProjectStageModel> after,
+  ) {
+    if (before.length != after.length) return false;
+    final afterById = {for (final stage in after) stage.id: stage};
+    if (afterById.length != after.length) return false;
+    for (final left in before) {
+      final right = afterById[left.id];
+      if (right == null ||
+          left.projectId != right.projectId ||
+          left.title != right.title ||
+          left.order != right.order ||
+          left.status != right.status ||
+          left.notes != right.notes ||
+          left.updatedBy != right.updatedBy ||
+          left.updatedAt != right.updatedAt) {
         return false;
       }
     }
@@ -770,11 +1007,6 @@ class SupabaseProjectRepository implements ProjectRepository {
     List<ProjectTeamRole> teamRoles = const [],
   }) async {
     if (serial != null) _invalidInput();
-    if (teamRoles.isNotEmpty) {
-      throw const ProjectRepositoryException(
-        ProjectRepositoryFailure.unsupportedOperation,
-      );
-    }
     final normalizedName = _inputText(name);
     final normalizedClientName = _inputText(clientName);
     final normalizedManagerId = _inputUuid(managerId);
@@ -784,6 +1016,12 @@ class SupabaseProjectRepository implements ProjectRepository {
     final normalizedNotes = _inputNotes(notes);
 
     return _performWrite(() async {
+      final normalizedTeam = await _normalizeTeamRoles(
+        teamRoles,
+        excludeProjectId: null,
+        allowExistingExternal: false,
+        preflightInternal: true,
+      );
       final result = await _gateway.createProject({
         'p_name': normalizedName,
         'p_client_name': normalizedClientName,
@@ -792,7 +1030,7 @@ class SupabaseProjectRepository implements ProjectRepository {
         'p_end_date': normalizedEndDate,
         'p_notes': normalizedNotes,
         'p_manager_id': normalizedManagerId,
-        'p_members': const <dynamic>[],
+        'p_members': _teamPayload(normalizedTeam),
       });
       final createdId = _rpcUuid(result);
       final created = await _requireProjectAfterWrite(createdId);
@@ -806,6 +1044,13 @@ class SupabaseProjectRepository implements ProjectRepository {
           created.notes != normalizedNotes) {
         _invalidData();
       }
+      final createdTeam = await _normalizeTeamRoles(
+        created.teamRoles,
+        excludeProjectId: null,
+        allowExistingExternal: true,
+        preflightInternal: false,
+      );
+      if (!_sameNormalizedTeam(normalizedTeam, createdTeam)) _invalidData();
       return created;
     }, missingEntityIsUnavailable: true);
   }
@@ -876,7 +1121,68 @@ class SupabaseProjectRepository implements ProjectRepository {
   Future<ProjectModel?> assignTeamRoles(
     String projectId,
     List<ProjectTeamRole> teamRoles,
-  ) => _unsupported();
+  ) async {
+    final normalizedProjectId = _inputStrictUuid(projectId);
+
+    return _performWrite(() async {
+      final before = await _requireProjectForWrite(normalizedProjectId);
+      if (!before.isActive) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.unavailable,
+        );
+      }
+
+      final preservedExternalRoles = before.teamRoles
+          .where((role) => role.userId == null)
+          .toList(growable: false);
+      final proposedInternalRoles = teamRoles.where(
+        (role) => role.userId != null,
+      );
+      final proposedExternalRoles = teamRoles
+          .where((role) => role.userId == null)
+          .toList(growable: false);
+      if (proposedExternalRoles.isNotEmpty) {
+        final proposedExternal = await _normalizeTeamRoles(
+          proposedExternalRoles,
+          excludeProjectId: normalizedProjectId,
+          allowExistingExternal: true,
+          preflightInternal: false,
+        );
+        final persistedExternal = await _normalizeTeamRoles(
+          preservedExternalRoles,
+          excludeProjectId: normalizedProjectId,
+          allowExistingExternal: true,
+          preflightInternal: false,
+        );
+        if (!_sameNormalizedTeam(proposedExternal, persistedExternal)) {
+          _invalidInput();
+        }
+      }
+      final normalizedTeam = await _normalizeTeamRoles(
+        [...proposedInternalRoles, ...preservedExternalRoles],
+        excludeProjectId: normalizedProjectId,
+        allowExistingExternal: true,
+        preflightInternal: true,
+      );
+
+      final result = await _gateway.assignTeamRoles({
+        'p_project_id': normalizedProjectId,
+        'p_members': _teamPayload(normalizedTeam),
+      });
+      if (_rpcUuid(result) != normalizedProjectId) _invalidData();
+
+      final updated = await _requireProjectAfterWrite(normalizedProjectId);
+      if (!_sameProjectOutsideTeam(before, updated)) _invalidData();
+      final updatedTeam = await _normalizeTeamRoles(
+        updated.teamRoles,
+        excludeProjectId: normalizedProjectId,
+        allowExistingExternal: true,
+        preflightInternal: false,
+      );
+      if (!_sameNormalizedTeam(normalizedTeam, updatedTeam)) _invalidData();
+      return updated;
+    }, missingEntityIsUnavailable: true);
+  }
 
   @override
   Future<ProjectModel?> updateProjectStage(
@@ -1039,4 +1345,55 @@ class _MemberType {
 
   final String associationId;
   final _PhotographerType type;
+}
+
+class _MutableTeamMember {
+  _MutableTeamMember({
+    required this.key,
+    required this.userId,
+    required this.externalName,
+    required this.value,
+    required this.date,
+  });
+
+  final String key;
+  final String? userId;
+  final String? externalName;
+  num value;
+  final DateTime? date;
+  final List<_NormalizedTeamType> types = [];
+  final Set<String> typeIds = {};
+  final Set<String> typeCodes = {};
+}
+
+class _NormalizedTeamMember {
+  const _NormalizedTeamMember({
+    required this.key,
+    required this.userId,
+    required this.externalName,
+    required this.value,
+    required this.date,
+    required this.types,
+  });
+
+  final String key;
+  final String? userId;
+  final String? externalName;
+  final num value;
+  final DateTime? date;
+  final List<_NormalizedTeamType> types;
+}
+
+class _NormalizedTeamType {
+  const _NormalizedTeamType({required this.id, required this.code});
+
+  final String id;
+  final String code;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _NormalizedTeamType && other.id == id && other.code == code;
+
+  @override
+  int get hashCode => Object.hash(id, code);
 }

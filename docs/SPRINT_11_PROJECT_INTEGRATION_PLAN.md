@@ -167,7 +167,11 @@ Status:
 - **11.4A:** backend assignable-staff contract prepared and applied to DEV by
   the owner.
 - **11.4B:** Flutter assignable-staff data contract complete.
-- **11.4C:** not started.
+- **11.4C:** trusted team mutation, assignment-date/catalog UX, and existing
+  create-team compatibility complete after automated gates.
+- **Before 11.6:** `_apply_project_team` still accepts empty type arrays and
+  does not enforce internal-user type membership server-side; explicit backend
+  hardening or owner acceptance remains required before provider cutover.
 
 Prerequisite backend contract:
 

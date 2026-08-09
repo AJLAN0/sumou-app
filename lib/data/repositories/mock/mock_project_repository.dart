@@ -49,25 +49,46 @@ class MockProjectRepository implements ProjectRepository {
   Future<List<AssignableProjectStaff>> getAssignableProjectStaff({
     required DateTime onDate,
     String? excludeProjectId,
-  }) async => [
-    AssignableProjectStaff(
-      userId: 'u-photographer',
-      fullName: 'سارة المصورة',
-      photographerTypes: const [
-        ProjectPhotographerType(
-          id: '10000000-0000-4000-8000-000000000001',
-          code: 'photo',
-          nameAr: 'تصوير فوتوغرافي',
-        ),
-        ProjectPhotographerType(
-          id: '10000000-0000-4000-8000-000000000002',
-          code: 'video',
-          nameAr: 'تصوير فيديو',
-        ),
-      ],
-      isAvailable: true,
-    ),
-  ];
+  }) async {
+    final photographerAvailable =
+        !(onDate.year == 2026 && onDate.month == 8 && onDate.day == 10);
+    return [
+      AssignableProjectStaff(
+        userId: 'u-photographer',
+        fullName: 'نورة الحنايا',
+        photographerTypes: const [
+          ProjectPhotographerType(
+            id: '10000000-0000-4000-8000-000000000001',
+            code: 'photo',
+            nameAr: 'مصور فوتوغرافي',
+          ),
+          ProjectPhotographerType(
+            id: '10000000-0000-4000-8000-000000000003',
+            code: 'instagram',
+            nameAr: 'انستقرام',
+          ),
+        ],
+        isAvailable: photographerAvailable,
+      ),
+      AssignableProjectStaff(
+        userId: 'u-multi',
+        fullName: 'خالد الزهراني',
+        photographerTypes: const [
+          ProjectPhotographerType(
+            id: '10000000-0000-4000-8000-000000000002',
+            code: 'video',
+            nameAr: 'مصور فيديو',
+          ),
+          ProjectPhotographerType(
+            id: '10000000-0000-4000-8000-000000000004',
+            code: 'design',
+            nameAr: 'تصميم',
+          ),
+        ],
+        isAvailable: true,
+      ),
+    ];
+  }
 
   @override
   Future<List<ProjectModel>> searchProjects(String query) async {
@@ -345,6 +366,9 @@ class MockProjectRepository implements ProjectRepository {
       ProjectTeamRole(
         id: '$projectId-r${i + 1}',
         projectId: projectId,
+        teamMemberId: roles[i].teamMemberId,
+        photographerTypeId: roles[i].photographerTypeId,
+        photographerTypeCode: roles[i].photographerTypeCode,
         type: roles[i].type,
         personName: roles[i].personName,
         userId: roles[i].userId,

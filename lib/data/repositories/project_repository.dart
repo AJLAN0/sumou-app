@@ -89,9 +89,9 @@ abstract interface class ProjectRepository {
     List<ProjectTeamRole> teamRoles = const [],
   });
 
-  /// Replace the full team on an existing project and return the updated model.
-  /// Roles are re-keyed to the project. Returns null when [projectId] is
-  /// unknown. Mock-backed in Sprint 2.
+  /// Replace a project's team and return the updated model. The production
+  /// implementation uses trusted `assign_team_roles` and preserves persisted
+  /// external members; the mock retains its legacy in-memory replacement.
   Future<ProjectModel?> assignTeamRoles(
     String projectId,
     List<ProjectTeamRole> teamRoles,

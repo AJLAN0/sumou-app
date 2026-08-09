@@ -88,13 +88,15 @@ void main() {
         onDate: DateTime(2026, 8, 9),
       );
 
-      expect(candidates.single.userId, 'u-photographer');
-      expect(candidates.single.photographerTypes.map((type) => type.code), [
+      final photographer = candidates.firstWhere(
+        (candidate) => candidate.userId == 'u-photographer',
+      );
+      expect(photographer.photographerTypes.map((type) => type.code), [
         'photo',
-        'video',
+        'instagram',
       ]);
       expect(
-        () => candidates.single.photographerTypes.clear(),
+        () => photographer.photographerTypes.clear(),
         throwsUnsupportedError,
       );
     });

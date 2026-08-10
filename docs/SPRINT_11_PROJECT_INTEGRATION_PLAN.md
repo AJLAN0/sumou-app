@@ -169,9 +169,9 @@ Status:
 - **11.4B:** Flutter assignable-staff data contract complete.
 - **11.4C:** trusted team mutation, assignment-date/catalog UX, and existing
   create-team compatibility complete after automated gates.
-- **Before 11.6:** `_apply_project_team` still accepts empty type arrays and
-  does not enforce internal-user type membership server-side; explicit backend
-  hardening or owner acceptance remains required before provider cutover.
+- **11.6A dependency:** server-side `_apply_project_team` hardening is required;
+  owner acceptance is not a substitute. The migration is prepared locally, and
+  provider cutover remains blocked until the owner applies it to DEV.
 
 Prerequisite backend contract:
 
@@ -206,11 +206,11 @@ Gate:
 
 Status:
 
+- **Step 11.5:** complete.
 - **11.5A:** safe closure-request read backend contract prepared and applied to
   DEV by the owner.
 - **11.5B:** Flutter closure workflow and read-only project-link integration
   complete.
-- **Next:** Step 11.6 has not started; the real provider remains isolated.
 
 Scope:
 
@@ -232,6 +232,14 @@ Gate:
 - closure URLs/notes never enter audit metadata.
 
 ### Step 11.6 — Public tracking, cutover, and security QA
+
+Status:
+
+- **11.6A:** project-team type-integrity backend hardening prepared locally;
+  migration not applied to DEV.
+- **11.6B:** provider cutover and tracking integration not started.
+- Provider cutover remains blocked until the owner applies the Step 11.6A
+  migration to DEV.
 
 Scope:
 

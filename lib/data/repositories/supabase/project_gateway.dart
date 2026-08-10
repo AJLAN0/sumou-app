@@ -32,10 +32,14 @@ abstract interface class ProjectGateway {
     List<String> profileIds,
   );
 
+  Future<List<Map<String, dynamic>>> fetchProjectLinks(String projectId);
+
   Future<Object?> listAssignableProjectStaff({
     required String onDate,
     String? excludeProjectId,
   });
+
+  Future<Object?> listVisibleClosureRequests();
 
   Future<Object?> createProject(Map<String, dynamic> parameters);
 
@@ -44,6 +48,12 @@ abstract interface class ProjectGateway {
   Future<Object?> updateProject(Map<String, dynamic> parameters);
 
   Future<Object?> updateProjectStage(Map<String, dynamic> parameters);
+
+  Future<Object?> submitClosureRequest(Map<String, dynamic> parameters);
+
+  Future<Object?> approveClosureRequest(Map<String, dynamic> parameters);
+
+  Future<Object?> rejectClosureRequest(Map<String, dynamic> parameters);
 }
 
 class SupabaseProjectGateway implements ProjectGateway {
@@ -140,6 +150,24 @@ class SupabaseProjectGateway implements ProjectGateway {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchProjectLinks(String projectId) async {
+    try {
+      final rows = await _client
+          .from('project_links')
+          .select(
+            'id, project_id, label, url, is_approved, is_client_visible, '
+            'is_active, created_at, deleted_at',
+          )
+          .eq('project_id', projectId)
+          .order('created_at')
+          .order('id');
+      return _maps(rows);
+    } on PostgrestException catch (error) {
+      throw ProjectGatewayException(_safeFailure(error.code));
+    }
+  }
+
+  @override
   Future<Object?> listAssignableProjectStaff({
     required String onDate,
     String? excludeProjectId,
@@ -147,6 +175,10 @@ class SupabaseProjectGateway implements ProjectGateway {
     'p_on_date': onDate,
     'p_exclude_project_id': excludeProjectId,
   });
+
+  @override
+  Future<Object?> listVisibleClosureRequests() =>
+      _rpcWithoutParameters('list_visible_closure_requests');
 
   @override
   Future<Object?> createProject(Map<String, dynamic> parameters) =>
@@ -163,6 +195,26 @@ class SupabaseProjectGateway implements ProjectGateway {
   @override
   Future<Object?> updateProjectStage(Map<String, dynamic> parameters) =>
       _rpc('update_project_stage', parameters);
+
+  @override
+  Future<Object?> submitClosureRequest(Map<String, dynamic> parameters) =>
+      _rpc('submit_closure_request', parameters);
+
+  @override
+  Future<Object?> approveClosureRequest(Map<String, dynamic> parameters) =>
+      _rpc('approve_closure_request', parameters);
+
+  @override
+  Future<Object?> rejectClosureRequest(Map<String, dynamic> parameters) =>
+      _rpc('reject_closure_request', parameters);
+
+  Future<Object?> _rpcWithoutParameters(String functionName) async {
+    try {
+      return await _client.rpc(functionName);
+    } on PostgrestException catch (error) {
+      throw ProjectGatewayException(_safeFailure(error.code));
+    }
+  }
 
   Future<Object?> _rpc(
     String functionName,

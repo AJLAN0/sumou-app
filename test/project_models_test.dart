@@ -106,5 +106,12 @@ void main() {
       expect(requests.length, 1);
       expect(requests.single.isPending, isTrue);
     });
+
+    test('delivery-link retained state is read-only metadata', () async {
+      final link = (await repo.getProjectLinks('p-4')).single;
+
+      expect(link.isRemoved, isFalse);
+      expect(link.url, startsWith('https://'));
+    });
   });
 }

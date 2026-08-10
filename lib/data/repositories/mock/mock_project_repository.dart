@@ -1,6 +1,7 @@
 import '../../../core/models/assignable_project_staff.dart';
 import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_enums.dart';
+import '../../../core/models/project_delivery_link.dart';
 import '../../../core/models/project_model.dart';
 import '../../../core/models/project_serial.dart';
 import '../../../core/models/project_stage_model.dart';
@@ -13,13 +14,16 @@ class MockProjectRepository implements ProjectRepository {
   MockProjectRepository({
     List<ProjectModel>? projects,
     List<ClosureRequestModel>? closureRequests,
+    List<ProjectDeliveryLink>? projectLinks,
   }) : _projects = List.of(projects ?? MockProjects.projects),
        _closureRequests = List.of(
          closureRequests ?? MockProjects.closureRequests,
-       );
+       ),
+       _projectLinks = List.of(projectLinks ?? MockProjects.projectLinks);
 
   final List<ProjectModel> _projects;
   final List<ClosureRequestModel> _closureRequests;
+  final List<ProjectDeliveryLink> _projectLinks;
 
   @override
   Future<List<ProjectModel>> getProjects() async =>
@@ -120,6 +124,12 @@ class MockProjectRepository implements ProjectRepository {
   @override
   Future<List<ClosureRequestModel>> getClosureRequests() async =>
       List.unmodifiable(_closureRequests);
+
+  @override
+  Future<List<ProjectDeliveryLink>> getProjectLinks(String projectId) async =>
+      List.unmodifiable(
+        _projectLinks.where((link) => link.projectId == projectId),
+      );
 
   @override
   Future<ProjectModel> createProject({

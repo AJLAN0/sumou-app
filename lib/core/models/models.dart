@@ -8,6 +8,7 @@ export 'feature_permissions.dart';
 export 'permission_model.dart';
 export 'photo_request_model.dart';
 export 'project_enums.dart';
+export 'project_delivery_link.dart';
 export 'project_model.dart';
 export 'project_serial.dart';
 export 'project_stage_model.dart';

@@ -206,9 +206,11 @@ Gate:
 
 Status:
 
-- **11.5A:** safe closure-request read backend contract prepared locally;
-  migration not applied to DEV.
-- **11.5B:** Flutter closure workflow not started.
+- **11.5A:** safe closure-request read backend contract prepared and applied to
+  DEV by the owner.
+- **11.5B:** Flutter closure workflow and read-only project-link integration
+  complete.
+- **Next:** Step 11.6 has not started; the real provider remains isolated.
 
 Scope:
 

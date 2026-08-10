@@ -1,6 +1,7 @@
 import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_enums.dart';
 import '../../../core/models/project_model.dart';
+import '../../../core/models/project_delivery_link.dart';
 import '../../../core/models/project_stage_model.dart';
 import '../../../core/models/project_team_role.dart';
 
@@ -181,6 +182,19 @@ class MockProjects {
       createdAt: DateTime(2026, 6, 17),
       reportFileUrl: 'mock://reports/p-4.pdf',
       deliveryLink: 'https://example.test/delivery/p-4',
+    ),
+  ];
+
+  static final List<ProjectDeliveryLink> projectLinks = [
+    ProjectDeliveryLink(
+      id: 'link-1',
+      projectId: 'p-4',
+      label: 'ملفات التسليم',
+      url: 'https://example.test/delivery/p-4',
+      isApproved: true,
+      isClientVisible: true,
+      isActive: true,
+      createdAt: DateTime(2026, 6, 17),
     ),
   ];
 }

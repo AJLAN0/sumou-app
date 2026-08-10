@@ -8,8 +8,9 @@ import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../projects/closure_actions.dart';
 import '../projects/providers/projects_providers.dart';
-import '../projects/widgets/closure_request_card.dart';
+import '../projects/widgets/project_delivery_links.dart';
 import '../projects/widgets/project_card.dart';
 import '../projects/widgets/stage_timeline.dart';
 import 'providers/admin_providers.dart';
@@ -17,8 +18,8 @@ import 'providers/admin_providers.dart';
 String _fmtDate(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
-/// Admin project oversight (read-only). Opens any project regardless of
-/// manager/photographer. No editing here — actions are placeholders.
+/// Admin project oversight. Closure review uses the trusted workflow RPCs;
+/// delivery-link management state remains read-only.
 class AdminProjectDetailsScreen extends ConsumerWidget {
   const AdminProjectDetailsScreen({super.key, required this.projectId});
 
@@ -65,8 +66,8 @@ class _Body extends ConsumerWidget {
           in ref.watch(usersListProvider).valueOrNull ?? const <UserModel>[])
         u.id: u,
     };
-    final closureAsync = ref.watch(
-      closureRequestForProjectProvider(project.id),
+    final closuresAsync = ref.watch(
+      closureRequestsForProjectProvider(project.id),
     );
     final photographers = project.teamRoles;
 
@@ -114,7 +115,7 @@ class _Body extends ConsumerWidget {
         // ---- closure request ----
         const SumouSectionHeader(title: 'طلب الإغلاق'),
         const SizedBox(height: 12),
-        closureAsync.when(
+        closuresAsync.when(
           loading:
               () => const SumouCard(
                 child: Center(child: CircularProgressIndicator()),
@@ -127,18 +128,30 @@ class _Body extends ConsumerWidget {
                 ),
               ),
           data:
-              (request) =>
-                  request == null
+              (requests) =>
+                  requests.isEmpty
                       ? const SumouCard(
                         child: Text(
                           'لا يوجد طلب إغلاق لهذا المشروع',
                           style: AppTextStyles.bodyMuted,
                         ),
                       )
-                      // Read-only: no approve/reject callbacks for the admin here.
-                      : ClosureRequestCard(
-                        request: request,
-                        clientName: project.clientName,
+                      : Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < requests.length;
+                            index++
+                          ) ...[
+                            ClosureRequestReviewCard(
+                              request: requests[index],
+                              project: project,
+                              clientName: project.clientName,
+                            ),
+                            if (index != requests.length - 1)
+                              const SizedBox(height: 10),
+                          ],
+                        ],
                       ),
         ),
         const SizedBox(height: 24),
@@ -146,11 +159,7 @@ class _Body extends ConsumerWidget {
         // ---- client delivery links ----
         const SumouSectionHeader(title: 'روابط التسليم للعميل'),
         const SizedBox(height: 12),
-        closureAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
-          data: (request) => _ClientLinks(request: request),
-        ),
+        ProjectDeliveryLinksPanel(projectId: project.id),
         const SizedBox(height: 24),
 
         // ---- notes ----
@@ -413,56 +422,6 @@ class _StatusPill extends StatelessWidget {
           color: color,
           fontWeight: FontWeight.w600,
         ),
-      ),
-    );
-  }
-}
-
-// ---- client links -----------------------------------------------------------
-
-class _ClientLinks extends StatelessWidget {
-  const _ClientLinks({required this.request});
-
-  final ClosureRequestModel? request;
-
-  @override
-  Widget build(BuildContext context) {
-    final link = request?.deliveryLink;
-    final approved = request?.isApproved ?? false;
-    final hasApprovedLink = approved && link != null && link.trim().isNotEmpty;
-
-    if (!hasApprovedLink) {
-      return const SumouCard(
-        child: Text(
-          'لا توجد روابط معتمدة بعد — يظهر للعميل «جاري الإبداع ⏳»',
-          style: AppTextStyles.bodyMuted,
-        ),
-      );
-    }
-    return SumouCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.link, size: 16, color: AppColors.accentGreen),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  link,
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.accentGreen,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'رابط معتمد ومرئي للعميل عبر صفحة التتبع.',
-            style: AppTextStyles.label.copyWith(color: AppColors.textMuted),
-          ),
-        ],
       ),
     );
   }

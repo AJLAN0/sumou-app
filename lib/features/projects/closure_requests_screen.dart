@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
-import '../auth/providers/auth_controller.dart';
 import 'closure_actions.dart';
 import 'providers/projects_providers.dart';
-import 'widgets/closure_request_card.dart';
 
 /// Full-page wrapper (own scaffold) so the closure inbox can be pushed as a
 /// route from the manager requests hub. The manager shell tab embeds the
@@ -30,20 +27,14 @@ class ClosureRequestsPage extends StatelessWidget {
   }
 }
 
-/// Manager "الطلبات" tab: pending closure requests to review (approve/reject).
-/// Cards, not tables. Mock-backed; actions gated by canApproveClosure.
+/// Manager closure history. Pending requests expose guarded review actions;
+/// processed requests remain visible without mutation controls.
 class ClosureRequestsScreen extends ConsumerWidget {
   const ClosureRequestsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canApprove =
-        ref
-            .watch(authControllerProvider)
-            .currentUser
-            ?.hasPermission(AppFeature.canApproveClosure) ??
-        false;
-    final requestsAsync = ref.watch(managerClosureRequestsProvider);
+    final requestsAsync = ref.watch(managerAllClosureRequestsProvider);
 
     return requestsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -52,7 +43,7 @@ class ClosureRequestsScreen extends ConsumerWidget {
         if (views.isEmpty) {
           return const SumouEmptyState(
             title: 'لا توجد طلبات إغلاق',
-            message: 'ستظهر هنا طلبات إغلاق المشاريع بانتظار مراجعتك',
+            message: 'ستظهر هنا طلبات إغلاق المشاريع وسجل قراراتها',
             icon: Icons.inbox_outlined,
           );
         }
@@ -61,17 +52,10 @@ class ClosureRequestsScreen extends ConsumerWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (_, i) {
             final view = views[i];
-            return ClosureRequestCard(
+            return ClosureRequestReviewCard(
               request: view.request,
+              project: view.project,
               clientName: view.project.clientName,
-              onApprove:
-                  canApprove
-                      ? () => approveClosureFlow(context, ref, view.request)
-                      : null,
-              onReject:
-                  canApprove
-                      ? () => rejectClosureFlow(context, ref, view.request)
-                      : null,
             );
           },
         );

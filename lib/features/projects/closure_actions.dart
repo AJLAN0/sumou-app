@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../auth/providers/auth_controller.dart';
 import 'providers/projects_providers.dart';
+import 'widgets/closure_request_card.dart';
 
 /// Refresh everything that reflects a closure decision.
 void _invalidateClosure(WidgetRef ref, String projectId) {
@@ -14,18 +17,25 @@ void _invalidateClosure(WidgetRef ref, String projectId) {
   ref.invalidate(managerAllClosureRequestsProvider);
   ref.invalidate(photographerClosureRequestsProvider);
   ref.invalidate(pendingClosureForProjectProvider(projectId));
+  ref.invalidate(closureRequestsForProjectProvider(projectId));
   ref.invalidate(managerProjectsProvider);
   ref.invalidate(photographerProjectsProvider);
   ref.invalidate(projectByIdProvider(projectId));
 }
 
-/// Confirm + approve a closure request (manager). Shows a success/error
-/// snackbar. Mock-only.
+String _safeFailureMessage(Object error) =>
+    error is ProjectRepositoryException
+        ? error.messageAr
+        : 'تعذّر تنفيذ العملية بأمان، حاول مرة أخرى';
+
+/// Confirm + approve a closure request. The repository and backend remain
+/// authoritative; failures are reduced to safe Arabic messages.
 Future<void> approveClosureFlow(
   BuildContext context,
   WidgetRef ref,
-  ClosureRequestModel request,
-) async {
+  ClosureRequestModel request, {
+  ValueChanged<bool>? onSaving,
+}) async {
   final ok = await showSumouConfirmSheet(
     context,
     title: 'قبول طلب الإغلاق',
@@ -33,39 +43,133 @@ Future<void> approveClosureFlow(
     confirmLabel: 'قبول وإنهاء',
   );
   if (!ok) return;
+  onSaving?.call(true);
   final repo = ref.read(projectRepositoryProvider);
-  final updated = await repo.approveClosureRequest(request.id);
-  _invalidateClosure(ref, request.projectId);
+  String message;
+  try {
+    final updated = await repo.approveClosureRequest(request.id);
+    if (updated == null) {
+      message = 'تعذّر تنفيذ العملية';
+    } else {
+      _invalidateClosure(ref, request.projectId);
+      message = 'تم قبول الطلب وإنهاء المشروع';
+    }
+  } catch (error) {
+    message = _safeFailureMessage(error);
+  } finally {
+    onSaving?.call(false);
+  }
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        updated == null
-            ? 'تعذّر تنفيذ العملية'
-            : 'تم قبول الطلب وإنهاء المشروع',
-      ),
-    ),
-  );
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
-/// Capture a reason + reject a closure request (manager). Shows a success/error
-/// snackbar. Mock-only.
+/// Capture a reason + reject a closure request with safe failure handling.
 Future<void> rejectClosureFlow(
   BuildContext context,
   WidgetRef ref,
-  ClosureRequestModel request,
-) async {
+  ClosureRequestModel request, {
+  ValueChanged<bool>? onSaving,
+}) async {
   final reason = await _showRejectReasonSheet(context);
   if (reason == null) return; // cancelled
+  onSaving?.call(true);
   final repo = ref.read(projectRepositoryProvider);
-  final updated = await repo.rejectClosureRequest(request.id, reason);
-  _invalidateClosure(ref, request.projectId);
+  String message;
+  try {
+    final updated = await repo.rejectClosureRequest(request.id, reason);
+    if (updated == null) {
+      message = 'تعذّر تنفيذ العملية';
+    } else {
+      _invalidateClosure(ref, request.projectId);
+      message = 'تم رفض الطلب';
+    }
+  } catch (error) {
+    message = _safeFailureMessage(error);
+  } finally {
+    onSaving?.call(false);
+  }
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(updated == null ? 'تعذّر تنفيذ العملية' : 'تم رفض الطلب'),
-    ),
-  );
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Closure card that exposes review actions only for the exact local
+/// authorization/state preconditions and blocks concurrent submissions.
+class ClosureRequestReviewCard extends ConsumerStatefulWidget {
+  const ClosureRequestReviewCard({
+    super.key,
+    required this.request,
+    required this.project,
+    this.clientName,
+  });
+
+  final ClosureRequestModel request;
+  final ProjectModel project;
+  final String? clientName;
+
+  @override
+  ConsumerState<ClosureRequestReviewCard> createState() =>
+      _ClosureRequestReviewCardState();
+}
+
+class _ClosureRequestReviewCardState
+    extends ConsumerState<ClosureRequestReviewCard> {
+  var _busy = false;
+  var _flowOpen = false;
+
+  bool get _canReview {
+    final user = ref.watch(authControllerProvider).currentUser;
+    if (user == null ||
+        !widget.request.isPending ||
+        widget.project.status != ProjectStatus.pendingClosure) {
+      return false;
+    }
+    if (user.hasRole(RoleType.admin)) return true;
+    return widget.project.managerId == user.id &&
+        user.hasPermission(AppFeature.canApproveClosure);
+  }
+
+  Future<void> _approve() async {
+    if (_flowOpen) return;
+    _flowOpen = true;
+    try {
+      await approveClosureFlow(
+        context,
+        ref,
+        widget.request,
+        onSaving: _setBusy,
+      );
+    } finally {
+      _flowOpen = false;
+      _setBusy(false);
+    }
+  }
+
+  Future<void> _reject() async {
+    if (_flowOpen) return;
+    _flowOpen = true;
+    try {
+      await rejectClosureFlow(context, ref, widget.request, onSaving: _setBusy);
+    } finally {
+      _flowOpen = false;
+      _setBusy(false);
+    }
+  }
+
+  void _setBusy(bool value) {
+    if (mounted && _busy != value) setState(() => _busy = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canReview = _canReview;
+    return ClosureRequestCard(
+      request: widget.request,
+      clientName: widget.clientName,
+      busy: _busy,
+      onApprove: canReview ? _approve : null,
+      onReject: canReview ? _reject : null,
+    );
+  }
 }
 
 /// Bottom sheet collecting a required rejection reason. Returns the reason, or

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
@@ -13,8 +14,8 @@ import 'widgets/project_card.dart';
 
 /// Full-screen, mobile-first flow for submitting a project closure request.
 ///
-/// Mock-only: loads the project by id, collects a delivery link (+ optional
-/// report URL and notes), writes a pending request via
+/// Loads the project by id, collects a delivery link (+ optional report URL and
+/// notes), writes a pending request via
 /// [ProjectRepository.submitClosureRequest], and returns to the details screen.
 /// No real file upload / storage.
 class SubmitClosureRequestScreen extends ConsumerWidget {
@@ -100,6 +101,7 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
   }
 
   Future<void> _submit() async {
+    if (_saving || !widget.project.isActive) return;
     if (_linkError != null) {
       setState(() => _showErrors = true);
       return;
@@ -110,29 +112,38 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
     final user = ref.read(authControllerProvider).currentUser;
     final report = _reportController.text.trim();
     final notes = _notesController.text.trim();
-    final request = await repo.submitClosureRequest(
-      projectId: widget.project.id,
-      submittedBy: user?.id ?? '',
-      submittedByName: user?.fullName ?? '',
-      deliveryLink: _linkController.text.trim(),
-      reportFileUrl: report.isEmpty ? null : report,
-      notes: notes.isEmpty ? null : notes,
-    );
-    ref.invalidate(projectByIdProvider(widget.project.id));
-    ref.invalidate(managerProjectsProvider);
-    ref.invalidate(photographerProjectsProvider);
-    ref.invalidate(pendingClosureForProjectProvider(widget.project.id));
-    ref.invalidate(managerClosureRequestsProvider);
-    ref.invalidate(managerAllClosureRequestsProvider);
-    ref.invalidate(photographerClosureRequestsProvider);
+    ClosureRequestModel? request;
+    String? failureMessage;
+    try {
+      request = await repo.submitClosureRequest(
+        projectId: widget.project.id,
+        submittedBy: user?.id ?? '',
+        submittedByName: user?.fullName ?? '',
+        deliveryLink: _linkController.text.trim(),
+        reportFileUrl: report.isEmpty ? null : report,
+        notes: notes.isEmpty ? null : notes,
+      );
+    } on ProjectRepositoryException catch (error) {
+      failureMessage = error.messageAr;
+    } catch (_) {
+      failureMessage = 'تعذّر إرسال الطلب بأمان، حاول مرة أخرى';
+    }
     if (!mounted) return;
     if (request == null) {
       setState(() => _saving = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('تعذّر إرسال الطلب')),
+        SnackBar(content: Text(failureMessage ?? 'تعذّر إرسال الطلب')),
       );
       return;
     }
+    ref.invalidate(projectByIdProvider(widget.project.id));
+    ref.invalidate(managerProjectsProvider);
+    ref.invalidate(photographerProjectsProvider);
+    ref.invalidate(pendingClosureForProjectProvider(widget.project.id));
+    ref.invalidate(closureRequestsForProjectProvider(widget.project.id));
+    ref.invalidate(managerClosureRequestsProvider);
+    ref.invalidate(managerAllClosureRequestsProvider);
+    ref.invalidate(photographerClosureRequestsProvider);
     await ref.read(projectByIdProvider(widget.project.id).future);
     if (!mounted) return;
     context.pop();
@@ -144,6 +155,7 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
   @override
   Widget build(BuildContext context) {
     final alreadyPending = widget.project.hasPendingClosure;
+    final canSubmit = widget.project.isActive;
 
     return Column(
       children: [
@@ -155,12 +167,17 @@ class _ClosureBodyState extends ConsumerState<_ClosureBody> {
               children: [
                 _ProjectSummary(project: widget.project, role: _myRole),
                 const SizedBox(height: 20),
-                if (alreadyPending) const _PendingNotice() else _buildForm(),
+                if (alreadyPending)
+                  const _PendingNotice()
+                else if (!canSubmit)
+                  const _UnavailableNotice()
+                else
+                  _buildForm(),
               ],
             ),
           ),
         ),
-        if (!alreadyPending)
+        if (!alreadyPending && canSubmit)
           SafeArea(
             top: false,
             child: Padding(
@@ -336,6 +353,28 @@ class _PendingNotice extends StatelessWidget {
                   style: AppTextStyles.bodyMuted,
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnavailableNotice extends StatelessWidget {
+  const _UnavailableNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SumouCard(
+      child: Row(
+        children: [
+          Icon(Icons.lock_clock_outlined, color: AppColors.textMuted),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'طلب الإغلاق متاح فقط للمشاريع النشطة أو قيد التنفيذ.',
+              style: AppTextStyles.bodyMuted,
             ),
           ),
         ],

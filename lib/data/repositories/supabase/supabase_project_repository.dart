@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
 
 import '../../../core/models/assignable_project_staff.dart';
 import '../../../core/models/closure_request_model.dart';
+import '../../../core/models/project_delivery_link.dart';
 import '../../../core/models/project_enums.dart';
 import '../../../core/models/project_model.dart';
 import '../../../core/models/project_stage_model.dart';
@@ -28,7 +29,8 @@ class SupabaseProjectRepository implements ProjectRepository {
   );
   static final RegExp _dateOnly = RegExp(r'^\d{4}-\d{2}-\d{2}$');
   static final RegExp _timestamp = RegExp(
-    r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$',
+    r'^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d'
+    r'(?:\.\d+)?(?:Z|[+-](?:0\d|1[0-5]):[0-5]\d)$',
   );
   static const Set<String> _assignableCandidateKeys = {
     'user_id',
@@ -42,6 +44,31 @@ class SupabaseProjectRepository implements ProjectRepository {
     'video',
     'instagram',
     'design',
+  };
+  static const Set<String> _closureRequestKeys = {
+    'id',
+    'project_id',
+    'project_name',
+    'submitted_by',
+    'submitted_by_name',
+    'created_at',
+    'report_file_url',
+    'delivery_link',
+    'notes',
+    'status',
+    'reject_reason',
+    'reviewed_at',
+  };
+  static const Set<String> _projectLinkKeys = {
+    'id',
+    'project_id',
+    'label',
+    'url',
+    'is_approved',
+    'is_client_visible',
+    'is_active',
+    'created_at',
+    'deleted_at',
   };
 
   @override
@@ -984,6 +1011,128 @@ class SupabaseProjectRepository implements ProjectRepository {
     return true;
   }
 
+  List<ClosureRequestModel> _parseClosureRequests(Object? response) {
+    if (response is! List) _invalidData();
+    final requests = <ClosureRequestModel>[];
+    final ids = <String>{};
+    for (final raw in response) {
+      final row = _strictMap(raw, _closureRequestKeys);
+      final id = _requiredUuid(row, 'id');
+      if (!ids.add(id)) _invalidData();
+
+      final status = switch (_requiredToken(row, 'status')) {
+        'pending' => ClosureRequestStatus.pending,
+        'approved' => ClosureRequestStatus.approved,
+        'rejected' => ClosureRequestStatus.rejected,
+        _ => _invalidData(),
+      };
+      final reviewedAt = _optionalTimestamp(row['reviewed_at']);
+      final rejectReason = _optionalString(row, 'reject_reason');
+      switch (status) {
+        case ClosureRequestStatus.pending:
+          if (reviewedAt != null || rejectReason != null) _invalidData();
+        case ClosureRequestStatus.approved:
+          if (reviewedAt == null || rejectReason != null) _invalidData();
+        case ClosureRequestStatus.rejected:
+          if (reviewedAt == null ||
+              rejectReason == null ||
+              rejectReason.trim().isEmpty) {
+            _invalidData();
+          }
+      }
+
+      final deliveryLink = _optionalString(row, 'delivery_link');
+      if (deliveryLink != null) _validateHttpUrlData(deliveryLink);
+      requests.add(
+        ClosureRequestModel(
+          id: id,
+          projectId: _requiredUuid(row, 'project_id'),
+          projectName: _requiredNonBlankString(row, 'project_name'),
+          submittedBy: _requiredUuid(row, 'submitted_by'),
+          submittedByName: _requiredNonBlankString(row, 'submitted_by_name'),
+          createdAt: _requiredTimestamp(row, 'created_at'),
+          reportFileUrl: _optionalString(row, 'report_file_url'),
+          deliveryLink: deliveryLink,
+          notes: _optionalString(row, 'notes'),
+          status: status,
+          rejectReason: rejectReason,
+          reviewedAt: reviewedAt,
+        ),
+      );
+    }
+    return List.unmodifiable(requests);
+  }
+
+  List<ProjectDeliveryLink> _parseProjectLinks(
+    List<Map<String, dynamic>> rows,
+    String projectId,
+  ) {
+    final links = <ProjectDeliveryLink>[];
+    final ids = <String>{};
+    for (final raw in rows) {
+      final row = _strictMap(raw, _projectLinkKeys);
+      final id = _requiredUuid(row, 'id');
+      if (!ids.add(id) || _requiredUuid(row, 'project_id') != projectId) {
+        _invalidData();
+      }
+      final url = _requiredToken(row, 'url');
+      _validateHttpUrlData(url);
+      links.add(
+        ProjectDeliveryLink(
+          id: id,
+          projectId: projectId,
+          label: _requiredText(row, 'label'),
+          url: url,
+          isApproved: _requiredBool(row, 'is_approved'),
+          isClientVisible: _requiredBool(row, 'is_client_visible'),
+          isActive: _requiredBool(row, 'is_active'),
+          createdAt: _requiredTimestamp(row, 'created_at'),
+          deletedAt: _optionalTimestamp(row['deleted_at']),
+        ),
+      );
+    }
+    return List.unmodifiable(links);
+  }
+
+  static void _validateHttpUrlData(String value) {
+    if (value != value.trim()) _invalidData();
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      _invalidData();
+    }
+  }
+
+  static String? _inputHttpUrl(String? value) {
+    final normalized = _inputNotes(value);
+    if (normalized == null) return null;
+    final uri = Uri.tryParse(normalized);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      _invalidInput();
+    }
+    return normalized;
+  }
+
+  static ClosureRequestModel? _closureById(
+    List<ClosureRequestModel> requests,
+    String requestId,
+  ) => requests.where((request) => request.id == requestId).firstOrNull;
+
+  static ProjectRepositoryFailure _readFailure(
+    ProjectGatewayFailure reason,
+  ) => switch (reason) {
+    ProjectGatewayFailure.notAuthenticated =>
+      ProjectRepositoryFailure.notAuthenticated,
+    ProjectGatewayFailure.forbidden => ProjectRepositoryFailure.forbidden,
+    ProjectGatewayFailure.invalidInput ||
+    ProjectGatewayFailure.unavailable ||
+    ProjectGatewayFailure.missingEntity ||
+    ProjectGatewayFailure.serverFailure => ProjectRepositoryFailure.loadFailed,
+  };
+
   static Future<T> _unsupported<T>() => Future<T>.error(
     const ProjectRepositoryException(
       ProjectRepositoryFailure.unsupportedOperation,
@@ -991,7 +1140,38 @@ class SupabaseProjectRepository implements ProjectRepository {
   );
 
   @override
-  Future<List<ClosureRequestModel>> getClosureRequests() => _unsupported();
+  Future<List<ClosureRequestModel>> getClosureRequests() async {
+    try {
+      return _parseClosureRequests(await _gateway.listVisibleClosureRequests());
+    } on ProjectGatewayException catch (error) {
+      throw ProjectRepositoryException(_readFailure(error.reason));
+    } on ProjectRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const ProjectRepositoryException(
+        ProjectRepositoryFailure.loadFailed,
+      );
+    }
+  }
+
+  @override
+  Future<List<ProjectDeliveryLink>> getProjectLinks(String projectId) async {
+    final normalizedProjectId = _inputStrictUuid(projectId);
+    try {
+      return _parseProjectLinks(
+        await _gateway.fetchProjectLinks(normalizedProjectId),
+        normalizedProjectId,
+      );
+    } on ProjectGatewayException catch (error) {
+      throw ProjectRepositoryException(_readFailure(error.reason));
+    } on ProjectRepositoryException {
+      rethrow;
+    } catch (_) {
+      throw const ProjectRepositoryException(
+        ProjectRepositoryFailure.loadFailed,
+      );
+    }
+  }
 
   @override
   Future<ProjectModel> createProject({
@@ -1267,17 +1447,124 @@ class SupabaseProjectRepository implements ProjectRepository {
     String? deliveryLink,
     String? reportFileUrl,
     String? notes,
-  }) => _unsupported();
+  }) async {
+    final normalizedProjectId = _inputStrictUuid(projectId);
+    final normalizedDeliveryLink = _inputHttpUrl(deliveryLink);
+    final normalizedReportFileUrl = _inputNotes(reportFileUrl);
+    final normalizedNotes = _inputNotes(notes);
+
+    return _performWrite(() async {
+      final result = await _gateway.submitClosureRequest({
+        'p_project_id': normalizedProjectId,
+        'p_delivery_link': normalizedDeliveryLink,
+        'p_report_file_url': normalizedReportFileUrl,
+        'p_notes': normalizedNotes,
+      });
+      final requestId = _rpcUuid(result);
+      final request = _closureById(await getClosureRequests(), requestId);
+      if (request == null ||
+          request.projectId != normalizedProjectId ||
+          request.status != ClosureRequestStatus.pending ||
+          request.deliveryLink != normalizedDeliveryLink ||
+          request.reportFileUrl != normalizedReportFileUrl ||
+          request.notes != normalizedNotes) {
+        _invalidData();
+      }
+      final project = await _requireProjectAfterWrite(normalizedProjectId);
+      if (project.status != ProjectStatus.pendingClosure) _invalidData();
+      return request;
+    }, missingEntityIsUnavailable: true);
+  }
 
   @override
-  Future<ClosureRequestModel?> approveClosureRequest(String requestId) =>
-      _unsupported();
+  Future<ClosureRequestModel?> approveClosureRequest(String requestId) async {
+    final normalizedRequestId = _inputStrictUuid(requestId);
+    return _performWrite(() async {
+      final before = _closureById(
+        await getClosureRequests(),
+        normalizedRequestId,
+      );
+      if (before == null) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.notFound,
+        );
+      }
+      if (!before.isPending) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.unavailable,
+        );
+      }
+
+      final result = await _gateway.approveClosureRequest({
+        'p_request_id': normalizedRequestId,
+      });
+      if (_rpcUuid(result) != normalizedRequestId) _invalidData();
+
+      final request = _closureById(
+        await getClosureRequests(),
+        normalizedRequestId,
+      );
+      if (request == null ||
+          request.projectId != before.projectId ||
+          !request.isApproved ||
+          request.reviewedAt == null ||
+          request.rejectReason != null) {
+        _invalidData();
+      }
+      final project = await _requireProjectAfterWrite(before.projectId);
+      if (project.status != ProjectStatus.completed ||
+          project.stages.any((stage) => !stage.isDone)) {
+        _invalidData();
+      }
+      return request;
+    }, missingEntityIsUnavailable: true);
+  }
 
   @override
   Future<ClosureRequestModel?> rejectClosureRequest(
     String requestId,
     String reason,
-  ) => _unsupported();
+  ) async {
+    final normalizedRequestId = _inputStrictUuid(requestId);
+    final normalizedReason = _inputText(reason);
+    return _performWrite(() async {
+      final before = _closureById(
+        await getClosureRequests(),
+        normalizedRequestId,
+      );
+      if (before == null) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.notFound,
+        );
+      }
+      if (!before.isPending) {
+        throw const ProjectRepositoryException(
+          ProjectRepositoryFailure.unavailable,
+        );
+      }
+
+      final result = await _gateway.rejectClosureRequest({
+        'p_request_id': normalizedRequestId,
+        'p_reason': normalizedReason,
+      });
+      if (_rpcUuid(result) != normalizedRequestId) _invalidData();
+
+      final request = _closureById(
+        await getClosureRequests(),
+        normalizedRequestId,
+      );
+      if (request == null ||
+          request.projectId != before.projectId ||
+          !request.isRejected ||
+          request.rejectReason != normalizedReason ||
+          request.reviewedAt == null) {
+        _invalidData();
+      }
+      final project = await _requireProjectAfterWrite(before.projectId);
+      if (project.status != ProjectStatus.active) _invalidData();
+      return request;
+    }, missingEntityIsUnavailable: true);
+  }
 }
 
 class _ProjectRow {

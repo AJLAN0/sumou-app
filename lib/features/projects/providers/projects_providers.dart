@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/closure_request_model.dart';
+import '../../../core/models/project_delivery_link.dart';
 import '../../../core/models/project_model.dart';
 import '../../../core/models/role_type.dart';
 import '../../../core/models/user_model.dart';
@@ -119,6 +120,20 @@ final pendingClosureForProjectProvider =
       return null;
     });
 
+/// Every retained closure request for one project in authoritative backend
+/// order. No historical status is discarded.
+final closureRequestsForProjectProvider =
+    FutureProvider.family<List<ClosureRequestModel>, String>((
+      ref,
+      projectId,
+    ) async {
+      final requests =
+          await ref.read(projectRepositoryProvider).getClosureRequests();
+      return List.unmodifiable(
+        requests.where((request) => request.projectId == projectId),
+      );
+    });
+
 /// All closure requests (any status) for the signed-in manager's projects,
 /// joined with the project — used by the manager requests hub for counts.
 final managerAllClosureRequestsProvider =
@@ -147,13 +162,19 @@ final allProjectsProvider = FutureProvider<List<ProjectModel>>(
 /// Used by the admin read-only project details.
 final closureRequestForProjectProvider =
     FutureProvider.family<ClosureRequestModel?, String>((ref, projectId) async {
-      final requests =
-          await ref.read(projectRepositoryProvider).getClosureRequests();
-      final matching =
-          requests.where((r) => r.projectId == projectId).toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final matching = await ref.watch(
+        closureRequestsForProjectProvider(projectId).future,
+      );
       return matching.isEmpty ? null : matching.first;
     });
+
+/// Management-visible project links. The repository preserves approved,
+/// hidden, inactive, and retained rows returned by RLS.
+final projectLinksProvider =
+    FutureProvider.family<List<ProjectDeliveryLink>, String>(
+      (ref, projectId) =>
+          ref.read(projectRepositoryProvider).getProjectLinks(projectId),
+    );
 
 /// All closure requests in the system (any status). Used by the admin overview.
 final allClosureRequestsProvider = FutureProvider<List<ClosureRequestModel>>(

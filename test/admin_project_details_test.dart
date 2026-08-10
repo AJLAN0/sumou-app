@@ -55,6 +55,41 @@ void main() {
     expect(find.text('إدارة الفريق'), findsOneWidget);
   });
 
+  testWidgets('admin can review a pending closure request', (tester) async {
+    await openAdminDetails(tester, 'تصوير زواج — العليا');
+    await tester.scrollUntilVisible(
+      find.text('قبول'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('قبول'), findsOneWidget);
+    expect(find.text('رفض'), findsOneWidget);
+  });
+
+  testWidgets('delivery-link management state is read-only', (tester) async {
+    await openAdminDetails(tester, 'تصوير زواج — العليا');
+    await tester.scrollUntilVisible(
+      find.text('ملفات التسليم'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('معتمد'), findsOneWidget);
+    expect(find.text('مرئي للعميل'), findsOneWidget);
+    expect(find.text('نشط'), findsOneWidget);
+    for (final action in [
+      'إضافة رابط',
+      'تعديل الرابط',
+      'اعتماد الرابط',
+      'تغيير الظهور',
+      'حذف الرابط',
+      'استعادة الرابط',
+    ]) {
+      expect(find.text(action), findsNothing);
+    }
+  });
+
   test(
     'closureRequestForProjectProvider returns the project request',
     () async {

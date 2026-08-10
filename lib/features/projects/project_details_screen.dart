@@ -10,6 +10,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
 import 'providers/projects_providers.dart';
+import 'widgets/project_delivery_links.dart';
 import 'widgets/project_card.dart';
 import 'widgets/stage_timeline.dart';
 
@@ -57,12 +58,6 @@ class _Details extends ConsumerWidget {
 
   final ProjectModel project;
 
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('هذه الميزة قريباً')));
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).currentUser;
@@ -76,7 +71,8 @@ class _Details extends ConsumerWidget {
     // Closure requests: needs the permission and being assigned to the project.
     final canRequestClosure =
         (user?.hasPermission(AppFeature.canRequestClosure) ?? false) &&
-        isAssigned;
+        isAssigned &&
+        project.isActive;
 
     return ListView(
       children: [
@@ -110,6 +106,12 @@ class _Details extends ConsumerWidget {
             child: Text('لا توجد ملاحظات', style: AppTextStyles.bodyMuted),
           ),
         const SizedBox(height: 24),
+        if (isManager) ...[
+          const SumouSectionHeader(title: 'روابط التسليم'),
+          const SizedBox(height: 12),
+          ProjectDeliveryLinksPanel(projectId: project.id),
+          const SizedBox(height: 24),
+        ],
         const SumouSectionHeader(title: 'الإجراءات'),
         const SizedBox(height: 12),
         // Manager: exactly two actions. "تعديل المشروع" is a hub that merges the
@@ -155,13 +157,6 @@ class _Details extends ConsumerWidget {
             const SizedBox(height: 10),
           ],
         ],
-        if (project.isCompleted)
-          SumouButton(
-            label: 'رابط التسليم',
-            variant: SumouButtonVariant.secondary,
-            icon: Icons.link,
-            onPressed: () => _comingSoon(context),
-          ),
         const SizedBox(height: 24),
       ],
     );

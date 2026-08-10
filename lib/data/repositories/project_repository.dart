@@ -1,6 +1,7 @@
 import '../../core/models/assignable_project_staff.dart';
 import '../../core/models/closure_request_model.dart';
 import '../../core/models/project_enums.dart';
+import '../../core/models/project_delivery_link.dart';
 import '../../core/models/project_model.dart';
 import '../../core/models/project_team_role.dart';
 
@@ -72,6 +73,10 @@ abstract interface class ProjectRepository {
   });
 
   Future<List<ClosureRequestModel>> getClosureRequests();
+
+  /// Return every management-visible delivery-link row for [projectId],
+  /// including retained or non-public states. This contract is read-only.
+  Future<List<ProjectDeliveryLink>> getProjectLinks(String projectId);
 
   /// Create a new project and return the persisted model (with its id, serial,
   /// and initial stages). When [serial] is null one is generated. Mock-backed

@@ -22,6 +22,9 @@ const firstTypeLinkId = '20000000-0000-4000-8000-000000000001';
 const secondTypeLinkId = '20000000-0000-4000-8000-000000000002';
 const firstStageId = '11111111-1000-4000-8000-000000000001';
 const secondStageId = '11111111-1000-4000-8000-000000000002';
+const closureId = '50000000-0000-4000-8000-000000000001';
+const secondClosureId = '50000000-0000-4000-8000-000000000002';
+const projectLinkId = '60000000-0000-4000-8000-000000000001';
 
 void main() {
   group('SupabaseProjectRepository visible reads', () {
@@ -1448,30 +1451,563 @@ void main() {
     });
   });
 
-  group('SupabaseProjectRepository write boundary', () {
-    test('unsupported methods fail safely without any gateway call', () async {
-      final gateway = FakeProjectGateway();
-      final repository = SupabaseProjectRepository.withGateway(gateway);
-      final operations = <Future<dynamic> Function()>[
-        repository.getClosureRequests,
-        () => repository.setProjectManager(projectId, managerId: managerId),
-        () => repository.submitClosureRequest(
-          projectId: projectId,
-          submittedBy: photographerId,
-          submittedByName: 'مصور',
-        ),
-        () => repository.approveClosureRequest(projectId),
-        () => repository.rejectClosureRequest(projectId, 'السبب'),
-      ];
+  group('SupabaseProjectRepository closure reads', () {
+    test('reads the exact server order and all retained statuses', () async {
+      final gateway =
+          FakeProjectGateway()
+            ..closureResult = [
+              validClosure(status: 'rejected'),
+              validClosure(id: secondClosureId),
+              validClosure(
+                id: '50000000-0000-4000-8000-000000000003',
+                status: 'approved',
+              ),
+            ];
 
-      for (final operation in operations) {
-        await expectLater(
-          operation(),
-          throwsReason(ProjectRepositoryFailure.unsupportedOperation),
+      final requests =
+          await SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getClosureRequests();
+
+      expect(requests.map((request) => request.status), [
+        ClosureRequestStatus.rejected,
+        ClosureRequestStatus.pending,
+        ClosureRequestStatus.approved,
+      ]);
+      expect(requests.first.createdAt.isUtc, isTrue);
+      expect(gateway.closureCalls, 1);
+      expect(() => requests.add(requests.first), throwsUnsupportedError);
+    });
+
+    test('accepts an empty JSON array', () async {
+      final gateway = FakeProjectGateway();
+
+      expect(
+        await SupabaseProjectRepository.withGateway(
+          gateway,
+        ).getClosureRequests(),
+        isEmpty,
+      );
+      expect(gateway.closureCalls, 1);
+    });
+
+    test('rejects a non-array RPC response', () async {
+      final gateway = FakeProjectGateway()..closureResult = <String, dynamic>{};
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(gateway).getClosureRequests(),
+      );
+    });
+
+    test('requires the exact closure key allowlist', () async {
+      final missing = validClosure()..remove('project_name');
+      final additional = validClosure()..['internal_email'] = 'hidden@test';
+
+      for (final row in [missing, additional]) {
+        final gateway = FakeProjectGateway()..closureResult = [row];
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(gateway).getClosureRequests(),
         );
       }
-      expect(gateway.totalCalls, 0);
     });
+
+    test(
+      'rejects malformed identities, names, timestamps, and status',
+      () async {
+        final rows = [
+          validClosure()..['id'] = 'bad-id',
+          validClosure()..['project_id'] = 'bad-id',
+          validClosure()..['submitted_by'] = 'bad-id',
+          validClosure()..['project_name'] = '   ',
+          validClosure()..['submitted_by_name'] = '',
+          validClosure()..['created_at'] = '2026-08-10T10:00:00',
+          validClosure()..['created_at'] = '2026-08-10T25:00:00+03:00',
+          validClosure()..['reviewed_at'] = 42,
+          validClosure()..['status'] = 'unknown',
+          validClosure()..['report_file_url'] = 42,
+          validClosure()..['notes'] = false,
+        ];
+
+        for (final row in rows) {
+          final gateway = FakeProjectGateway()..closureResult = [row];
+          await expectInvalidData(
+            SupabaseProjectRepository.withGateway(gateway).getClosureRequests(),
+          );
+        }
+      },
+    );
+
+    test('rejects duplicate closure IDs and unsafe delivery URLs', () async {
+      final duplicate =
+          FakeProjectGateway()
+            ..closureResult = [validClosure(), validClosure()];
+      final unsafe =
+          FakeProjectGateway()
+            ..closureResult = [
+              validClosure()..['delivery_link'] = 'javascript:alert(1)',
+            ];
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(duplicate).getClosureRequests(),
+      );
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(unsafe).getClosureRequests(),
+      );
+    });
+
+    test(
+      'enforces pending approved and rejected retained-state invariants',
+      () async {
+        final rows = [
+          validClosure()..['reviewed_at'] = '2026-08-10T11:00:00+03:00',
+          validClosure()..['reject_reason'] = 'سبب',
+          validClosure(status: 'approved')..['reviewed_at'] = null,
+          validClosure(status: 'approved')..['reject_reason'] = 'سبب',
+          validClosure(status: 'rejected')..['reviewed_at'] = null,
+          validClosure(status: 'rejected')..['reject_reason'] = '   ',
+        ];
+
+        for (final row in rows) {
+          final gateway = FakeProjectGateway()..closureResult = [row];
+          await expectInvalidData(
+            SupabaseProjectRepository.withGateway(gateway).getClosureRequests(),
+          );
+        }
+      },
+    );
+
+    test('maps read failures safely and never retries', () async {
+      const cases = <(ProjectGatewayFailure, ProjectRepositoryFailure)>[
+        (
+          ProjectGatewayFailure.notAuthenticated,
+          ProjectRepositoryFailure.notAuthenticated,
+        ),
+        (ProjectGatewayFailure.forbidden, ProjectRepositoryFailure.forbidden),
+        (
+          ProjectGatewayFailure.serverFailure,
+          ProjectRepositoryFailure.loadFailed,
+        ),
+      ];
+      for (final entry in cases) {
+        final gateway =
+            FakeProjectGateway()
+              ..closureError = ProjectGatewayException(entry.$1);
+        await expectLater(
+          SupabaseProjectRepository.withGateway(gateway).getClosureRequests(),
+          throwsReason(entry.$2),
+        );
+        expect(gateway.closureCalls, 1);
+      }
+
+      final network =
+          FakeProjectGateway()..closureError = StateError('raw-closure-token');
+      await expectLater(
+        SupabaseProjectRepository.withGateway(network).getClosureRequests(),
+        throwsReason(ProjectRepositoryFailure.loadFailed),
+      );
+      expect(network.closureCalls, 1);
+    });
+  });
+
+  group('SupabaseProjectRepository submit_closure_request', () {
+    test('sends exact normalized fields without caller identity', () async {
+      final gateway = submitClosureReadyGateway();
+      final repository = SupabaseProjectRepository.withGateway(gateway);
+
+      final request = await repository.submitClosureRequest(
+        projectId: projectId,
+        submittedBy: 'caller-controlled-id',
+        submittedByName: 'caller-controlled-name',
+        deliveryLink: '  https://delivery.test/final  ',
+        reportFileUrl: '   ',
+        notes: '  تم التسليم  ',
+      );
+
+      expect(gateway.lastMutationName, 'submit_closure_request');
+      expect(gateway.lastMutationParameters, {
+        'p_project_id': projectId,
+        'p_delivery_link': 'https://delivery.test/final',
+        'p_report_file_url': null,
+        'p_notes': 'تم التسليم',
+      });
+      expect(gateway.lastMutationParameters, isNot(contains('submittedBy')));
+      expect(gateway.lastMutationParameters, isNot(contains('submitted_by')));
+      expect(request!.status, ClosureRequestStatus.pending);
+      expect(request.deliveryLink, 'https://delivery.test/final');
+      expect(gateway.mutationCalls, 1);
+      expect(gateway.closureCalls, 1);
+      expect(gateway.projectCalls, 1);
+    });
+
+    test('normalizes every blank optional value to null', () async {
+      final gateway = submitClosureReadyGateway();
+
+      await SupabaseProjectRepository.withGateway(gateway).submitClosureRequest(
+        projectId: projectId,
+        submittedBy: 'ignored',
+        submittedByName: 'ignored',
+        deliveryLink: ' ',
+        reportFileUrl: '\n',
+        notes: '\t',
+      );
+
+      expect(gateway.lastMutationParameters, {
+        'p_project_id': projectId,
+        'p_delivery_link': null,
+        'p_report_file_url': null,
+        'p_notes': null,
+      });
+    });
+
+    test('rejects invalid project or delivery URL before the RPC', () async {
+      for (final entry in [
+        ('bad-id', 'https://delivery.test'),
+        (projectId, 'javascript:alert(1)'),
+        (projectId, 'https:///missing-host'),
+      ]) {
+        final gateway = FakeProjectGateway();
+        await expectLater(
+          SupabaseProjectRepository.withGateway(gateway).submitClosureRequest(
+            projectId: entry.$1,
+            submittedBy: 'ignored',
+            submittedByName: 'ignored',
+            deliveryLink: entry.$2,
+          ),
+          throwsReason(ProjectRepositoryFailure.invalidInput),
+        );
+        expect(gateway.totalCalls, 0);
+      }
+    });
+
+    test(
+      'requires an exact scalar UUID and matching post-write state',
+      () async {
+        final malformed =
+            submitClosureReadyGateway()..mutationResult = {'id': closureId};
+        final missing = validGateway()..mutationResult = closureId;
+
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(malformed).submitClosureRequest(
+            projectId: projectId,
+            submittedBy: 'ignored',
+            submittedByName: 'ignored',
+          ),
+        );
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(missing).submitClosureRequest(
+            projectId: projectId,
+            submittedBy: 'ignored',
+            submittedByName: 'ignored',
+          ),
+        );
+        expect(malformed.mutationCalls, 1);
+        expect(missing.mutationCalls, 1);
+      },
+    );
+
+    test('requires the project to become pending closure', () async {
+      final gateway = submitClosureReadyGateway();
+      final originalMutation = gateway.onMutation!;
+      gateway.onMutation = (name, parameters) {
+        originalMutation(name, parameters);
+        gateway.projects.single['status'] = 'active';
+      };
+
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(gateway).submitClosureRequest(
+          projectId: projectId,
+          submittedBy: 'ignored',
+          submittedByName: 'ignored',
+        ),
+      );
+    });
+
+    test('maps safe mutation failures without retrying', () async {
+      await expectWriteMappings(
+        gatewayFactory: validGateway,
+        invoke:
+            (repository) => repository.submitClosureRequest(
+              projectId: projectId,
+              submittedBy: 'ignored',
+              submittedByName: 'ignored',
+            ),
+        missingReason: ProjectRepositoryFailure.unavailable,
+      );
+
+      final network =
+          validGateway()..mutationError = StateError('raw-closure-token');
+      await expectLater(
+        SupabaseProjectRepository.withGateway(network).submitClosureRequest(
+          projectId: projectId,
+          submittedBy: 'ignored',
+          submittedByName: 'ignored',
+        ),
+        throwsReason(ProjectRepositoryFailure.saveFailed),
+      );
+      expect(network.mutationCalls, 1);
+    });
+  });
+
+  group('SupabaseProjectRepository approve_closure_request', () {
+    test(
+      'calls once and verifies approved request and completed project',
+      () async {
+        final gateway = approveClosureReadyGateway();
+
+        final request = await SupabaseProjectRepository.withGateway(
+          gateway,
+        ).approveClosureRequest(closureId);
+
+        expect(gateway.lastMutationName, 'approve_closure_request');
+        expect(gateway.lastMutationParameters, {'p_request_id': closureId});
+        expect(gateway.mutationCalls, 1);
+        expect(gateway.closureCalls, 2);
+        expect(request!.isApproved, isTrue);
+        expect(request.reviewedAt, isNotNull);
+        expect(request.rejectReason, isNull);
+      },
+    );
+
+    test('rejects missing or processed requests before the RPC', () async {
+      final missing = FakeProjectGateway();
+      final processed =
+          FakeProjectGateway()
+            ..closureResult = [validClosure(status: 'approved')];
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          missing,
+        ).approveClosureRequest(closureId),
+        throwsReason(ProjectRepositoryFailure.notFound),
+      );
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          processed,
+        ).approveClosureRequest(closureId),
+        throwsReason(ProjectRepositoryFailure.unavailable),
+      );
+      expect(missing.mutationCalls, 0);
+      expect(processed.mutationCalls, 0);
+    });
+
+    test(
+      'rejects result mismatch and contradictory completion state',
+      () async {
+        final mismatch =
+            approveClosureReadyGateway()..mutationResult = secondClosureId;
+        final stagesNotDone = approveClosureReadyGateway();
+        final originalMutation = stagesNotDone.onMutation!;
+        stagesNotDone.onMutation = (name, parameters) {
+          originalMutation(name, parameters);
+          stagesNotDone.stages.last['status'] = 'pending';
+        };
+
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            mismatch,
+          ).approveClosureRequest(closureId),
+        );
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            stagesNotDone,
+          ).approveClosureRequest(closureId),
+        );
+        expect(mismatch.mutationCalls, 1);
+        expect(stagesNotDone.mutationCalls, 1);
+      },
+    );
+
+    test('maps safe backend failures with no mutation retry', () async {
+      await expectWriteMappings(
+        gatewayFactory: closurePendingGateway,
+        invoke: (repository) => repository.approveClosureRequest(closureId),
+        missingReason: ProjectRepositoryFailure.unavailable,
+      );
+    });
+  });
+
+  group('SupabaseProjectRepository reject_closure_request', () {
+    test(
+      'sends the trimmed reason and verifies rejected active state',
+      () async {
+        final gateway = rejectClosureReadyGateway();
+
+        final request = await SupabaseProjectRepository.withGateway(
+          gateway,
+        ).rejectClosureRequest(closureId, '  تحتاج تعديلات  ');
+
+        expect(gateway.lastMutationName, 'reject_closure_request');
+        expect(gateway.lastMutationParameters, {
+          'p_request_id': closureId,
+          'p_reason': 'تحتاج تعديلات',
+        });
+        expect(gateway.mutationCalls, 1);
+        expect(gateway.closureCalls, 2);
+        expect(request!.isRejected, isTrue);
+        expect(request.rejectReason, 'تحتاج تعديلات');
+        expect(request.reviewedAt, isNotNull);
+      },
+    );
+
+    test('rejects blank reason or processed request before the RPC', () async {
+      final blank = closurePendingGateway();
+      final processed =
+          FakeProjectGateway()
+            ..closureResult = [validClosure(status: 'rejected')];
+
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          blank,
+        ).rejectClosureRequest(closureId, '   '),
+        throwsReason(ProjectRepositoryFailure.invalidInput),
+      );
+      await expectLater(
+        SupabaseProjectRepository.withGateway(
+          processed,
+        ).rejectClosureRequest(closureId, 'سبب'),
+        throwsReason(ProjectRepositoryFailure.unavailable),
+      );
+      expect(blank.totalCalls, 0);
+      expect(processed.mutationCalls, 0);
+    });
+
+    test(
+      'rejects result mismatch and contradictory active project state',
+      () async {
+        final mismatch =
+            rejectClosureReadyGateway()..mutationResult = secondClosureId;
+        final wrongProject = rejectClosureReadyGateway();
+        final originalMutation = wrongProject.onMutation!;
+        wrongProject.onMutation = (name, parameters) {
+          originalMutation(name, parameters);
+          wrongProject.projects.single['status'] = 'pending_closure';
+        };
+
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            mismatch,
+          ).rejectClosureRequest(closureId, 'سبب'),
+        );
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            wrongProject,
+          ).rejectClosureRequest(closureId, 'سبب'),
+        );
+        expect(mismatch.mutationCalls, 1);
+        expect(wrongProject.mutationCalls, 1);
+      },
+    );
+
+    test('maps safe backend failures with no mutation retry', () async {
+      await expectWriteMappings(
+        gatewayFactory: closurePendingGateway,
+        invoke:
+            (repository) => repository.rejectClosureRequest(closureId, 'سبب'),
+        missingReason: ProjectRepositoryFailure.unavailable,
+      );
+    });
+  });
+
+  group('SupabaseProjectRepository project link reads', () {
+    test('retains every management-visible state in server order', () async {
+      final gateway =
+          FakeProjectGateway()
+            ..projectLinks = [
+              validProjectLink(),
+              validProjectLink(
+                id: '60000000-0000-4000-8000-000000000002',
+                approved: false,
+                clientVisible: false,
+              ),
+              validProjectLink(
+                id: '60000000-0000-4000-8000-000000000003',
+                active: false,
+                deletedAt: '2026-08-10T12:00:00+03:00',
+              ),
+            ];
+
+      final links = await SupabaseProjectRepository.withGateway(
+        gateway,
+      ).getProjectLinks(projectId);
+
+      expect(links, hasLength(3));
+      expect(links[1].isApproved, isFalse);
+      expect(links[1].isClientVisible, isFalse);
+      expect(links[2].isRemoved, isTrue);
+      expect(links[2].deletedAt!.isUtc, isTrue);
+      expect(gateway.lastProjectLinksProjectId, projectId);
+      expect(gateway.projectLinkCalls, 1);
+    });
+
+    test('strictly rejects malformed rows and duplicate IDs', () async {
+      final malformedRows = [
+        validProjectLink()..['url'] = 'javascript:alert(1)',
+        validProjectLink()..['label'] = '   ',
+        validProjectLink()..['is_approved'] = 'true',
+        validProjectLink()..['created_at'] = 'not-a-time',
+        validProjectLink()..['extra'] = true,
+      ];
+      for (final row in malformedRows) {
+        final gateway = FakeProjectGateway()..projectLinks = [row];
+        await expectInvalidData(
+          SupabaseProjectRepository.withGateway(
+            gateway,
+          ).getProjectLinks(projectId),
+        );
+      }
+
+      final duplicate =
+          FakeProjectGateway()
+            ..projectLinks = [validProjectLink(), validProjectLink()];
+      await expectInvalidData(
+        SupabaseProjectRepository.withGateway(
+          duplicate,
+        ).getProjectLinks(projectId),
+      );
+    });
+
+    test(
+      'rejects invalid input before SELECT and maps read failures',
+      () async {
+        final invalid = FakeProjectGateway();
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            invalid,
+          ).getProjectLinks('bad-id'),
+          throwsReason(ProjectRepositoryFailure.invalidInput),
+        );
+        expect(invalid.totalCalls, 0);
+
+        final forbidden =
+            FakeProjectGateway()
+              ..projectLinksError = const ProjectGatewayException(
+                ProjectGatewayFailure.forbidden,
+              );
+        await expectLater(
+          SupabaseProjectRepository.withGateway(
+            forbidden,
+          ).getProjectLinks(projectId),
+          throwsReason(ProjectRepositoryFailure.forbidden),
+        );
+        expect(forbidden.projectLinkCalls, 1);
+      },
+    );
+  });
+
+  group('SupabaseProjectRepository write boundary', () {
+    test(
+      'manager reassignment remains unsupported without a gateway call',
+      () async {
+        final gateway = FakeProjectGateway();
+        final repository = SupabaseProjectRepository.withGateway(gateway);
+
+        await expectLater(
+          repository.setProjectManager(projectId, managerId: managerId),
+          throwsReason(ProjectRepositoryFailure.unsupportedOperation),
+        );
+        expect(gateway.totalCalls, 0);
+      },
+    );
 
     test('gateway source contains only approved RPC contracts', () {
       final source =
@@ -1495,12 +2031,39 @@ void main() {
         "_rpc('assign_team_roles'",
         "_rpc('update_project'",
         "_rpc('update_project_stage'",
+        "_rpc('submit_closure_request'",
+        "_rpc('approve_closure_request'",
+        "_rpc('reject_closure_request'",
       ]) {
         expect(source, contains(rpc));
       }
-      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(5));
+      expect(RegExp(r"_rpc\('[a-z_]+',").allMatches(source), hasLength(8));
+      expect(
+        source,
+        contains("_rpcWithoutParameters('list_visible_closure_requests')"),
+      );
+      final closureReadStart = source.lastIndexOf(
+        'Future<Object?> listVisibleClosureRequests',
+      );
+      final closureReadEnd = source.indexOf(
+        'Future<Object?> createProject',
+        closureReadStart,
+      );
+      final closureReadSource = source.substring(
+        closureReadStart,
+        closureReadEnd,
+      );
+      expect(closureReadSource, isNot(contains('params:')));
+      expect(closureReadSource, isNot(contains('.from(')));
       expect(source, contains("'p_on_date': onDate"));
       expect(source, contains("'p_exclude_project_id': excludeProjectId"));
+      expect(
+        source,
+        contains(
+          "'id, project_id, label, url, is_approved, is_client_visible, '",
+        ),
+      );
+      expect(source, contains(".from('project_links')"));
       final discoveryStart = source.lastIndexOf(
         'Future<Object?> listAssignableProjectStaff',
       );
@@ -1882,17 +2445,108 @@ Map<String, dynamic> validAssignableType({
   String nameAr = 'تصوير فوتوغرافي',
 }) => {'id': id, 'code': code, 'name_ar': nameAr};
 
+Map<String, dynamic> validClosure({
+  String id = closureId,
+  String project = projectId,
+  String status = 'pending',
+  String? deliveryLink = 'https://delivery.test/final',
+  String? reportFileUrl,
+  String? notes,
+}) => {
+  'id': id,
+  'project_id': project,
+  'project_name': 'مشروع اختبار',
+  'submitted_by': photographerId,
+  'submitted_by_name': 'مصور اختبار',
+  'created_at': '2026-08-10T10:00:00+03:00',
+  'report_file_url': reportFileUrl,
+  'delivery_link': deliveryLink,
+  'notes': notes,
+  'status': status,
+  'reject_reason': status == 'rejected' ? 'سبب الرفض' : null,
+  'reviewed_at': status == 'pending' ? null : '2026-08-10T11:00:00+03:00',
+};
+
+Map<String, dynamic> validProjectLink({
+  String id = projectLinkId,
+  bool approved = true,
+  bool clientVisible = true,
+  bool active = true,
+  String? deletedAt,
+}) => {
+  'id': id,
+  'project_id': projectId,
+  'label': 'ملفات التسليم',
+  'url': 'https://delivery.test/final',
+  'is_approved': approved,
+  'is_client_visible': clientVisible,
+  'is_active': active,
+  'created_at': '2026-08-10T10:00:00+03:00',
+  'deleted_at': deletedAt,
+};
+
+FakeProjectGateway closurePendingGateway() =>
+    validGateway(project: validProject(status: 'pending_closure'))
+      ..closureResult = [validClosure()]
+      ..mutationResult = closureId;
+
+FakeProjectGateway submitClosureReadyGateway() {
+  final gateway = validGateway()..mutationResult = closureId;
+  gateway.onMutation = (name, parameters) {
+    if (name != 'submit_closure_request') return;
+    gateway.closureResult = [
+      validClosure(
+        deliveryLink: parameters['p_delivery_link'] as String?,
+        reportFileUrl: parameters['p_report_file_url'] as String?,
+        notes: parameters['p_notes'] as String?,
+      ),
+    ];
+    gateway.projects.single['status'] = 'pending_closure';
+  };
+  return gateway;
+}
+
+FakeProjectGateway approveClosureReadyGateway() {
+  final gateway = closurePendingGateway();
+  gateway.onMutation = (name, parameters) {
+    if (name != 'approve_closure_request') return;
+    gateway.closureResult = [validClosure(status: 'approved')];
+    gateway.projects.single['status'] = 'completed';
+    for (final stage in gateway.stages) {
+      stage['status'] = 'done';
+    }
+  };
+  return gateway;
+}
+
+FakeProjectGateway rejectClosureReadyGateway() {
+  final gateway = closurePendingGateway();
+  gateway.onMutation = (name, parameters) {
+    if (name != 'reject_closure_request') return;
+    gateway.closureResult = [
+      validClosure(status: 'rejected')
+        ..['reject_reason'] = parameters['p_reason'],
+    ];
+    gateway.projects.single['status'] = 'active';
+  };
+  return gateway;
+}
+
 class FakeProjectGateway implements ProjectGateway {
   List<Map<String, dynamic>> projects = [];
   List<Map<String, dynamic>> stages = [];
   List<Map<String, dynamic>> teamMembers = [];
   List<Map<String, dynamic>> teamTypes = [];
   List<Map<String, dynamic>> profiles = [];
+  List<Map<String, dynamic>> projectLinks = [];
   bool throwOnProjects = false;
   Object? mutationResult = projectId;
   Object? mutationError;
   Object? assignableStaffResult = <dynamic>[];
   Object? assignableStaffError;
+  Object? closureResult = <dynamic>[];
+  Object? closureError;
+  Object? projectLinksError;
   void Function(String name, Map<String, dynamic> parameters)? onMutation;
 
   int projectCalls = 0;
@@ -1902,11 +2556,14 @@ class FakeProjectGateway implements ProjectGateway {
   int profileCalls = 0;
   int mutationCalls = 0;
   int assignableStaffCalls = 0;
+  int closureCalls = 0;
+  int projectLinkCalls = 0;
   String? lastMutationName;
   Map<String, dynamic>? lastMutationParameters;
   String? lastProjectId;
   String? lastAssignableOnDate;
   String? lastExcludeProjectId;
+  String? lastProjectLinksProjectId;
 
   int get totalCalls =>
       projectCalls +
@@ -1915,7 +2572,9 @@ class FakeProjectGateway implements ProjectGateway {
       teamTypeCalls +
       profileCalls +
       mutationCalls +
-      assignableStaffCalls;
+      assignableStaffCalls +
+      closureCalls +
+      projectLinkCalls;
 
   @override
   Future<List<Map<String, dynamic>>> fetchProjects({String? projectId}) async {
@@ -1973,6 +2632,18 @@ class FakeProjectGateway implements ProjectGateway {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchProjectLinks(String projectId) async {
+    projectLinkCalls++;
+    lastProjectLinksProjectId = projectId;
+    final error = projectLinksError;
+    if (error != null) throw error;
+    return projectLinks
+        .where((row) => row['project_id'] == projectId)
+        .map(Map<String, dynamic>.from)
+        .toList();
+  }
+
+  @override
   Future<Object?> listAssignableProjectStaff({
     required String onDate,
     String? excludeProjectId,
@@ -1983,6 +2654,21 @@ class FakeProjectGateway implements ProjectGateway {
     final error = assignableStaffError;
     if (error != null) throw error;
     return assignableStaffResult;
+  }
+
+  @override
+  Future<Object?> listVisibleClosureRequests() async {
+    closureCalls++;
+    final error = closureError;
+    if (error != null) throw error;
+    final result = closureResult;
+    if (result is List) {
+      return [
+        for (final item in result)
+          item is Map ? Map<String, dynamic>.from(item) : item,
+      ];
+    }
+    return result;
   }
 
   @override
@@ -2000,6 +2686,18 @@ class FakeProjectGateway implements ProjectGateway {
   @override
   Future<Object?> updateProjectStage(Map<String, dynamic> parameters) =>
       _mutate('update_project_stage', parameters);
+
+  @override
+  Future<Object?> submitClosureRequest(Map<String, dynamic> parameters) =>
+      _mutate('submit_closure_request', parameters);
+
+  @override
+  Future<Object?> approveClosureRequest(Map<String, dynamic> parameters) =>
+      _mutate('approve_closure_request', parameters);
+
+  @override
+  Future<Object?> rejectClosureRequest(Map<String, dynamic> parameters) =>
+      _mutate('reject_closure_request', parameters);
 
   Future<Object?> _mutate(String name, Map<String, dynamic> parameters) async {
     mutationCalls++;

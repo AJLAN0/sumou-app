@@ -204,6 +204,12 @@ Gate:
 
 ### Step 11.5 — Closure workflow and delivery links
 
+Status:
+
+- **11.5A:** safe closure-request read backend contract prepared locally;
+  migration not applied to DEV.
+- **11.5B:** Flutter closure workflow not started.
+
 Scope:
 
 - resolve the closure display-name mismatch with an approved safe read contract

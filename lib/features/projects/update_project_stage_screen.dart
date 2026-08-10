@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../auth/providers/auth_controller.dart';
@@ -13,7 +14,7 @@ import 'widgets/project_card.dart';
 
 /// Full-screen, mobile-first flow for updating a project's current stage.
 ///
-/// Mock-only: loads the project by id, lets the user pick the current stage and
+/// Loads the project by id, lets an authorized user pick the current stage and
 /// add optional notes, then writes it back via
 /// [ProjectRepository.updateProjectStage] and returns to the details screen.
 class UpdateProjectStageScreen extends ConsumerWidget {
@@ -42,6 +43,13 @@ class UpdateProjectStageScreen extends ConsumerWidget {
             return const SumouEmptyState(
               title: 'المشروع غير موجود',
               icon: Icons.search_off,
+            );
+          }
+          if (!project.isActive) {
+            return const SumouEmptyState(
+              title: 'تحديث المرحلة غير متاح',
+              message: 'يمكن تحديث المراحل فقط للمشاريع النشطة أو قيد التنفيذ.',
+              icon: Icons.lock_outline,
             );
           }
           return _UpdateStageBody(project: project);
@@ -85,6 +93,7 @@ class _UpdateStageBodyState extends ConsumerState<_UpdateStageBody> {
   }
 
   Future<void> _save() async {
+    if (_saving || !widget.project.isActive) return;
     if (_selectedStageId == null) {
       ScaffoldMessenger.of(
         context,
@@ -96,23 +105,31 @@ class _UpdateStageBodyState extends ConsumerState<_UpdateStageBody> {
     final repo = ref.read(projectRepositoryProvider);
     final userId = ref.read(authControllerProvider).currentUser?.id;
     final notes = _notesController.text.trim();
-    final updated = await repo.updateProjectStage(
-      widget.project.id,
-      _selectedStageId!,
-      notes: notes.isEmpty ? null : notes,
-      updatedBy: userId,
-    );
-    ref.invalidate(projectByIdProvider(widget.project.id));
-    ref.invalidate(managerProjectsProvider);
-    ref.invalidate(photographerProjectsProvider);
+    ProjectModel? updated;
+    String? failureMessage;
+    try {
+      updated = await repo.updateProjectStage(
+        widget.project.id,
+        _selectedStageId!,
+        notes: notes.isEmpty ? null : notes,
+        updatedBy: userId,
+      );
+    } on ProjectRepositoryException catch (error) {
+      failureMessage = error.messageAr;
+    } catch (_) {
+      failureMessage = 'تعذّر تحديث المرحلة بأمان، حاول مرة أخرى';
+    }
     if (!mounted) return;
     if (updated == null) {
       setState(() => _saving = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('تعذّر تحديث المرحلة')),
+        SnackBar(content: Text(failureMessage ?? 'تعذّر تحديث المرحلة')),
       );
       return;
     }
+    ref.invalidate(projectByIdProvider(widget.project.id));
+    ref.invalidate(managerProjectsProvider);
+    ref.invalidate(photographerProjectsProvider);
     context.pop();
     messenger.showSnackBar(
       const SnackBar(content: Text('تم تحديث مرحلة المشروع')),

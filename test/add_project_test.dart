@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
-import 'package:sumou_app/core/providers/repository_providers.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'test_helpers.dart';
@@ -16,12 +15,7 @@ void main() {
     WidgetTester tester, {
     MockProjectRepository? repository,
   }) async {
-    final container = makeMockContainer(
-      extra: [
-        if (repository != null)
-          projectRepositoryProvider.overrideWith((ref) => repository),
-      ],
-    );
+    final container = makeMockContainer(projectRepository: repository);
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)

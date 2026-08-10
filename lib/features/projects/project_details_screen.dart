@@ -17,8 +17,8 @@ import 'widgets/stage_timeline.dart';
 String _date(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
-/// Full-screen project details (read-only). Loads the project by id; actions
-/// are UI-only placeholders gated by the signed-in user's permissions.
+/// Full-screen project details. Reads tolerate the RLS-visible partial project
+/// graph; supported actions are UX-gated while the backend remains authoritative.
 class ProjectDetailsScreen extends ConsumerWidget {
   const ProjectDetailsScreen({super.key, required this.projectId});
 
@@ -61,13 +61,28 @@ class _Details extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).currentUser;
-    // Stage updates: needs the permission, and for a photographer also requires
-    // being assigned to this project (a manager can update any project).
-    final isManager = user?.hasRole(RoleType.manager) ?? false;
+    final isAdmin = user?.hasRole(RoleType.admin) ?? false;
+    final ownsProject = user != null && project.managerId == user.id;
+    final isManager = isAdmin || ownsProject;
     final isAssigned = project.isAssignedTo(user?.id ?? '');
     final canUpdateStages =
-        (user?.hasPermission(AppFeature.canUpdateStages) ?? false) &&
-        (isManager || isAssigned);
+        project.isActive &&
+        (isAdmin ||
+            ((ownsProject || isAssigned) &&
+                (user?.hasPermission(AppFeature.canUpdateStages) ?? false)));
+    final canEditBasics =
+        project.isActive &&
+        (isAdmin ||
+            (ownsProject && user.hasPermission(AppFeature.canEditProject)));
+    final canAssignTeam =
+        project.isActive &&
+        (isAdmin ||
+            (ownsProject &&
+                user.hasPermission(AppFeature.canAssignPhotographers)));
+    final canReviewClosure =
+        project.status == ProjectStatus.pendingClosure &&
+        (isAdmin ||
+            (ownsProject && user.hasPermission(AppFeature.canApproveClosure)));
     // Closure requests: needs the permission and being assigned to the project.
     final canRequestClosure =
         (user?.hasPermission(AppFeature.canRequestClosure) ?? false) &&
@@ -118,14 +133,16 @@ class _Details extends ConsumerWidget {
         // basics edit, stage update, and team management; "إنهاء المشروع" reviews
         // and accepts the photographer's closure request.
         if (isManager) ...[
-          SumouButton(
-            label: 'تعديل المشروع',
-            icon: Icons.edit_outlined,
-            onPressed:
-                () => context.push(AppRoutes.projectManagePath(project.id)),
-          ),
-          const SizedBox(height: 10),
-          if (!project.isCompleted) ...[
+          if (canEditBasics || canUpdateStages || canAssignTeam) ...[
+            SumouButton(
+              label: 'تعديل المشروع',
+              icon: Icons.edit_outlined,
+              onPressed:
+                  () => context.push(AppRoutes.projectManagePath(project.id)),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (canReviewClosure) ...[
             SumouButton(
               label: 'إنهاء المشروع',
               variant: SumouButtonVariant.secondary,
@@ -301,10 +318,8 @@ class _TeamMemberCard extends StatelessWidget {
           ),
           if (role.value > 0)
             Text(
-              '${role.value} ر.س',
-              style: AppTextStyles.label.copyWith(
-                color: AppColors.financeYellow,
-              ),
+              'قيمة الإسناد: ${role.value}',
+              style: AppTextStyles.label.copyWith(color: AppColors.textMuted),
             ),
         ],
       ),

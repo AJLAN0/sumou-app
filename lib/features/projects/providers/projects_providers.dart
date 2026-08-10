@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/assignable_project_staff.dart';
 import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_delivery_link.dart';
 import '../../../core/models/project_model.dart';
@@ -13,15 +14,15 @@ import '../../auth/providers/auth_controller.dart';
 typedef ClosureRequestView =
     ({ClosureRequestModel request, ProjectModel project});
 
-/// Projects owned by the currently signed-in manager (mock-backed, read-only).
+/// Projects owned by the currently signed-in manager.
 final managerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
   final user = ref.watch(authControllerProvider).currentUser;
   if (user == null) return Future.value(const <ProjectModel>[]);
   return ref.read(projectRepositoryProvider).getProjectsForManager(user.id);
 });
 
-/// Projects the currently signed-in photographer is assigned to (mock-backed,
-/// read-only). Empty when signed out.
+/// Projects the currently signed-in photographer is assigned to. Empty when
+/// signed out. RLS-visible partial team graphs remain valid project data.
 final photographerProjectsProvider = FutureProvider<List<ProjectModel>>((ref) {
   final user = ref.watch(authControllerProvider).currentUser;
   if (user == null) return Future.value(const <ProjectModel>[]);
@@ -45,7 +46,7 @@ final calendarProjectsProvider = FutureProvider<List<ProjectModel>>((
   return const <ProjectModel>[];
 });
 
-/// A single project by id (mock-backed, read-only). Null when not found.
+/// A single RLS-visible project by id. Null when not found.
 final projectByIdProvider = FutureProvider.family<ProjectModel?, String>(
   (ref, id) => ref.read(projectRepositoryProvider).getProjectById(id),
 );
@@ -63,13 +64,17 @@ final managerCandidatesProvider = FutureProvider<List<UserModel>>((ref) async {
   return users.where((u) => u.hasRole(RoleType.manager)).toList();
 });
 
-/// Active users that can be assigned as photographers/team members.
-final photographerCandidatesProvider = FutureProvider<List<UserModel>>((
-  ref,
-) async {
-  final users = await ref.watch(assignableUsersProvider.future);
-  return users.where((u) => u.hasRole(RoleType.photographer)).toList();
-});
+/// Minimal staff catalog and authoritative availability for today's local
+/// calendar date. Manager screens do not perform broad profile/role discovery.
+final photographerCandidatesProvider =
+    FutureProvider<List<AssignableProjectStaff>>((ref) {
+      final now = DateTime.now();
+      return ref
+          .read(projectRepositoryProvider)
+          .getAssignableProjectStaff(
+            onDate: DateTime(now.year, now.month, now.day),
+          );
+    });
 
 /// Active-project count per assigned user id (UI-only capacity signal).
 ///
@@ -90,7 +95,7 @@ final photographerActiveCountsProvider = FutureProvider<Map<String, int>>((
 });
 
 /// Pending closure requests for the signed-in manager's projects, each joined
-/// with its project (mock-backed). Empty when signed out or not a manager.
+/// with its RLS-visible project. Empty when signed out.
 final managerClosureRequestsProvider = FutureProvider<List<ClosureRequestView>>(
   (ref) async {
     final user = ref.watch(authControllerProvider).currentUser;
@@ -152,8 +157,8 @@ final managerAllClosureRequestsProvider =
       return result;
     });
 
-/// All projects in the system (mock-backed, read-only). Used by the admin
-/// overview dashboard, which is not scoped to a single role.
+/// All projects visible under the caller's RLS scope. Admin callers receive the
+/// complete live set; other callers remain scoped by the backend.
 final allProjectsProvider = FutureProvider<List<ProjectModel>>(
   (ref) => ref.read(projectRepositoryProvider).getProjects(),
 );

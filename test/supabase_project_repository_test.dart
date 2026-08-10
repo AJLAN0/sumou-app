@@ -2085,14 +2085,19 @@ void main() {
       }
     });
 
-    test('normal app provider remains MockProjectRepository', () {
+    test('normal app provider uses SupabaseProjectRepository', () {
       final source =
           File(
             'lib/core/providers/repository_providers.dart',
           ).readAsStringSync();
 
-      expect(source, contains('MockProjectRepository'));
-      expect(source, isNot(contains('SupabaseProjectRepository(client)')));
+      expect(
+        source,
+        contains(
+          'SupabaseProjectRepository(ref.watch(supabaseClientProvider))',
+        ),
+      );
+      expect(source, isNot(contains('kDebugMode')));
     });
   });
 }

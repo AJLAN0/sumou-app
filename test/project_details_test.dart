@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
-import 'package:sumou_app/core/providers/repository_providers.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/data/repositories/project_repository.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
@@ -18,12 +17,7 @@ void main() {
     String projectName, {
     ProjectRepository? repository,
   }) async {
-    final container = makeMockContainer(
-      extra: [
-        if (repository != null)
-          projectRepositoryProvider.overrideWithValue(repository),
-      ],
-    );
+    final container = makeMockContainer(projectRepository: repository);
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)
@@ -66,20 +60,34 @@ void main() {
     expect(find.text('7. النشر'), findsOneWidget);
   });
 
-  testWidgets('manager sees exactly the two main actions', (tester) async {
+  testWidgets('manager sees only supported actions for an active project', (
+    tester,
+  ) async {
     await openDetails(tester, 'تصوير ميداني — مهرجان الرياض');
-    // Actions are at the bottom of a lazy ListView. Scroll to the last manager
-    // action so the whole action group is built and visible before asserting.
+    await tester.scrollUntilVisible(
+      find.text('تعديل المشروع'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('تعديل المشروع'), findsOneWidget);
+    expect(find.text('إنهاء المشروع'), findsNothing);
+    // Stage update / assign are merged into تعديل المشروع, not separate actions.
+    expect(find.text('تحديث المرحلة'), findsNothing);
+    expect(find.text('إسناد مصور'), findsNothing);
+  });
+
+  testWidgets('manager sees closure review only for pending closure', (
+    tester,
+  ) async {
+    await openDetails(tester, 'تصوير زواج — العليا');
     await tester.scrollUntilVisible(
       find.text('إنهاء المشروع'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('تعديل المشروع'), findsOneWidget);
+
     expect(find.text('إنهاء المشروع'), findsOneWidget);
-    // Stage update / assign are merged into تعديل المشروع, not separate actions.
-    expect(find.text('تحديث المرحلة'), findsNothing);
-    expect(find.text('إسناد مصور'), findsNothing);
+    expect(find.text('تعديل المشروع'), findsNothing);
   });
 
   testWidgets('تعديل المشروع opens the manage hub with merged options', (

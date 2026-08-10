@@ -7,17 +7,14 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'providers/projects_providers.dart';
 
-/// Manager "الفريق" tab: a read-only availability view of photographers, with a
-/// simple متاح/مشغول signal from their active-project load. Mock-backed.
+/// Manager "الفريق" tab: a read-only view of the minimal assignable-staff RPC.
+/// The backend availability boolean is displayed without local inference.
 class ManagerTeamScreen extends ConsumerWidget {
   const ManagerTeamScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final photographersAsync = ref.watch(photographerCandidatesProvider);
-    final counts =
-        ref.watch(photographerActiveCountsProvider).valueOrNull ??
-        const <String, int>{};
 
     return photographersAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -31,7 +28,7 @@ class ManagerTeamScreen extends ConsumerWidget {
           );
         }
         final available =
-            photographers.where((u) => (counts[u.id] ?? 0) < 2).length;
+            photographers.where((candidate) => candidate.isAvailable).length;
         return ListView(
           children: [
             const SizedBox(height: 4),
@@ -42,8 +39,8 @@ class ManagerTeamScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             const SumouSectionHeader(title: 'المصورون'),
             const SizedBox(height: 12),
-            for (final u in photographers) ...[
-              _TeamMemberCard(user: u, activeCount: counts[u.id] ?? 0),
+            for (final candidate in photographers) ...[
+              _TeamMemberCard(candidate: candidate),
               const SizedBox(height: 10),
             ],
             const SizedBox(height: 12),
@@ -93,14 +90,13 @@ class _AvailabilityStrip extends StatelessWidget {
 }
 
 class _TeamMemberCard extends StatelessWidget {
-  const _TeamMemberCard({required this.user, required this.activeCount});
+  const _TeamMemberCard({required this.candidate});
 
-  final UserModel user;
-  final int activeCount;
+  final AssignableProjectStaff candidate;
 
   @override
   Widget build(BuildContext context) {
-    final available = activeCount < 2;
+    final available = candidate.isAvailable;
     final statusColor =
         available ? AppColors.accentGreen : AppColors.financeYellow;
     final statusLabel = available ? 'متاح' : 'مشغول';
@@ -120,7 +116,7 @@ class _TeamMemberCard extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Text(
-                  user.avatarInitials,
+                  UserModel.initialsFrom(candidate.fullName),
                   style: AppTextStyles.label.copyWith(
                     color: AppColors.textWhite,
                   ),
@@ -131,10 +127,12 @@ class _TeamMemberCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.fullName, style: AppTextStyles.titleMedium),
+                    Text(candidate.fullName, style: AppTextStyles.titleMedium),
                     const SizedBox(height: 2),
                     Text(
-                      '$activeCount مشاريع نشطة',
+                      available
+                          ? 'متاح في تاريخ اليوم'
+                          : 'غير متاح في تاريخ اليوم',
                       style: AppTextStyles.bodyMuted,
                     ),
                   ],
@@ -159,13 +157,13 @@ class _TeamMemberCard extends StatelessWidget {
               ),
             ],
           ),
-          if (user.photoTypes.isNotEmpty) ...[
+          if (candidate.photographerTypes.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final t in user.photoTypes)
+                for (final type in candidate.photographerTypes)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -176,7 +174,7 @@ class _TeamMemberCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      t,
+                      type.nameAr,
                       style: AppTextStyles.label.copyWith(
                         color: AppColors.primaryTeal,
                       ),

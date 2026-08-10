@@ -235,11 +235,11 @@ Gate:
 
 Status:
 
-- **11.6A:** project-team type-integrity backend hardening prepared locally;
-  migration not applied to DEV.
-- **11.6B:** provider cutover and tracking integration not started.
-- Provider cutover remains blocked until the owner applies the Step 11.6A
-  migration to DEV.
+- **11.6A:** project-team type-integrity hardening applied to DEV by the owner.
+- **11.6B:** public tracking and the real project/tracking provider cutover are
+  complete after the focused automated gates.
+- **11.6C:** full regression, owner-controlled DEV role/mobile QA, final security
+  closure, and the Sprint 11 completion decision remain pending.
 
 Scope:
 

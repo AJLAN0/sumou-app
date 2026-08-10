@@ -44,6 +44,13 @@ class AssignPhotographersScreen extends ConsumerWidget {
               icon: Icons.search_off,
             );
           }
+          if (!project.isActive) {
+            return const SumouEmptyState(
+              title: 'إدارة الفريق غير متاحة',
+              message: 'يمكن تعديل الفريق فقط للمشاريع النشطة أو قيد التنفيذ.',
+              icon: Icons.lock_outline,
+            );
+          }
           return _AssignBody(project: project);
         },
       ),

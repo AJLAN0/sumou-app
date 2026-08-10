@@ -43,6 +43,12 @@ void main() {
     // The name field is pre-filled with the project title.
     expect(find.text('تصوير ميداني — مهرجان الرياض'), findsWidgets);
     expect(find.widgetWithText(SumouButton, 'حفظ'), findsOneWidget);
+    expect(find.text('نوع المشروع (غير قابل للتغيير)'), findsOneWidget);
+    expect(
+      find.text('حالة المشروع (تتغير عبر المسار المعتمد فقط)'),
+      findsOneWidget,
+    );
+    expect(find.byType(ChoiceChip), findsNothing);
   });
 
   testWidgets('saving valid data shows a success snackbar', (tester) async {

@@ -63,8 +63,35 @@ void main() {
     expect(find.text('تم إنهاء المشروع'), findsOneWidget);
   });
 
-  testWidgets('no request yet shows a waiting empty state', (tester) async {
-    await openEnd(tester, 'تصوير ميداني — مهرجان الرياض');
-    expect(find.text('لا يوجد طلب إنهاء'), findsOneWidget);
+  testWidgets('active project does not expose closure review navigation', (
+    tester,
+  ) async {
+    final container = makeMockContainer();
+    addTearDown(container.dispose);
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: 'manager', password: MockUsers.devPassword);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SumouApp()),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('المشاريع'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('تصوير ميداني — مهرجان الرياض'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('تصوير ميداني — مهرجان الرياض'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('تعديل المشروع'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('إنهاء المشروع'), findsNothing);
   });
 }

@@ -173,21 +173,25 @@ class _Body extends ConsumerWidget {
           ),
         const SizedBox(height: 24),
 
-        // ---- admin actions (placeholders) ----
+        // ---- trusted admin actions ----
         const SumouSectionHeader(title: 'إجراءات الإدارة'),
         const SizedBox(height: 12),
-        _ActionCard(
-          icon: Icons.edit_outlined,
-          label: 'تعديل بيانات المشروع',
-          onTap: () => context.push(AppRoutes.adminProjectEditPath(project.id)),
-        ),
-        const SizedBox(height: 10),
-        _ActionCard(
-          icon: Icons.group_outlined,
-          label: 'تعديل الفريق',
-          onTap: () => context.push(AppRoutes.adminProjectTeamPath(project.id)),
-        ),
-        const SizedBox(height: 10),
+        if (project.isActive) ...[
+          _ActionCard(
+            icon: Icons.edit_outlined,
+            label: 'تعديل بيانات المشروع',
+            onTap:
+                () => context.push(AppRoutes.adminProjectEditPath(project.id)),
+          ),
+          const SizedBox(height: 10),
+          _ActionCard(
+            icon: Icons.group_outlined,
+            label: 'تعديل الفريق',
+            onTap:
+                () => context.push(AppRoutes.adminProjectTeamPath(project.id)),
+          ),
+          const SizedBox(height: 10),
+        ],
         _ActionCard(
           icon: Icons.timeline_outlined,
           label: 'مراقبة المراحل',

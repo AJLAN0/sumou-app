@@ -42,8 +42,9 @@ class _TeamDraft {
 
 /// Full-screen, mobile-first multi-step flow for creating a project.
 ///
-/// The normal provider remains mock-backed until the planned repository cutover;
-/// the screen itself uses only the repository contract and never calls Supabase.
+/// The screen uses only the repository contract and never calls Supabase
+/// directly; the trusted backend remains authoritative for creation and team
+/// assignment.
 class AddProjectScreen extends ConsumerStatefulWidget {
   const AddProjectScreen({super.key});
 
@@ -474,6 +475,10 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authControllerProvider).currentUser;
+    final canCreate =
+        (user?.hasRole(RoleType.admin) ?? false) ||
+        (user?.hasPermission(AppFeature.canAddProject) ?? false);
     return SumouScaffold(
       padding: EdgeInsets.zero,
       appBar: SumouAppBar(
@@ -483,25 +488,32 @@ class _AddProjectScreenState extends ConsumerState<AddProjectScreen> {
           onPressed: () => context.pop(),
         ),
       ),
-      body: Column(
-        children: [
-          _StepIndicator(step: _step, total: _kStepTitles.length),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-              child: _buildStep(),
-            ),
-          ),
-          _BottomBar(
-            isLastStep: _step == _lastStep,
-            canGoBack: true,
-            saving: _saving,
-            onNext: _next,
-            onBack: _back,
-            onSave: _save,
-          ),
-        ],
-      ),
+      body:
+          !canCreate
+              ? const SumouEmptyState(
+                title: 'إنشاء المشروع غير متاح',
+                message: 'ليست لديك صلاحية إنشاء مشروع جديد.',
+                icon: Icons.lock_outline,
+              )
+              : Column(
+                children: [
+                  _StepIndicator(step: _step, total: _kStepTitles.length),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      child: _buildStep(),
+                    ),
+                  ),
+                  _BottomBar(
+                    isLastStep: _step == _lastStep,
+                    canGoBack: true,
+                    saving: _saving,
+                    onNext: _next,
+                    onBack: _back,
+                    onSave: _save,
+                  ),
+                ],
+              ),
     );
   }
 

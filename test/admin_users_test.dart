@@ -1,7 +1,10 @@
 // Tests for admin users CRUD (add / edit / delete).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
@@ -43,6 +46,25 @@ void main() {
     );
     await tester.pumpAndSettle();
     return container;
+  }
+
+  Future<void> openCreateForm(
+    WidgetTester tester,
+    _RecordingUserRepository repository,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await openUsers(tester, repository: repository);
+    await tester.tap(find.text('إضافة مستخدم'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> submitCreate(WidgetTester tester) async {
+    final submit = find.widgetWithText(SumouButton, 'إضافة المستخدم');
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
   }
 
   // ---- widget flows ----
@@ -110,6 +132,22 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final repository = _CountingUserRepository();
+    final copiedValues = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedValues.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
     await openUsers(tester, repository: repository);
     final readsBeforeCreate = repository.getUsersCalls;
 
@@ -124,6 +162,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Mock-Temp-Password1!'), findsOneWidget);
+    expect(find.textContaining('مرة واحدة فقط'), findsOneWidget);
+    await tester.tap(find.text('نسخ'));
+    await tester.pump();
+    expect(copiedValues, contains('Mock-Temp-Password1!'));
     expect(repository.getUsersCalls, greaterThan(readsBeforeCreate));
     final createSecret = repository.lastCreateSecret!;
     await tester.tap(find.widgetWithText(SumouButton, 'تم'));
@@ -141,12 +183,154 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Mock-Reset-Password1!'), findsOneWidget);
+    await tester.tap(find.text('نسخ'));
+    await tester.pump();
+    expect(copiedValues, contains('Mock-Reset-Password1!'));
     expect(repository.getUsersCalls, greaterThan(readsBeforeReset));
     final resetSecret = repository.lastResetSecret!;
     await tester.tap(find.widgetWithText(SumouButton, 'تم'));
     await tester.pumpAndSettle();
     expect(resetSecret.isCleared, isTrue);
     expect(find.text('Mock-Reset-Password1!'), findsNothing);
+  });
+
+  testWidgets('create validates required name and username syntax locally', (
+    tester,
+  ) async {
+    final repository = _RecordingUserRepository();
+    await openCreateForm(tester, repository);
+    final name = _formField('الاسم الكامل');
+    final username = _formField('اسم المستخدم');
+
+    await tester.enterText(name, 'مستخدم اختبار');
+    await submitCreate(tester);
+    expect(find.text('اسم المستخدم مطلوب'), findsOneWidget);
+    expect(repository.provisionCalls, 0);
+
+    for (final invalid in ['a', 'a' * 51, 'bad user!']) {
+      await tester.enterText(username, invalid);
+      await submitCreate(tester);
+      expect(repository.provisionCalls, 0);
+    }
+
+    await tester.enterText(name, '   ');
+    await tester.enterText(username, 'valid.user');
+    await submitCreate(tester);
+    expect(repository.provisionCalls, 0);
+  });
+
+  testWidgets('create normalizes username and preserves role invariants', (
+    tester,
+  ) async {
+    final repository = _RecordingUserRepository();
+    await openCreateForm(tester, repository);
+    await tester.enterText(_formField('الاسم الكامل'), 'مستخدم اختبار');
+    await tester.enterText(_formField('اسم المستخدم'), '  TEST.User  ');
+    await submitCreate(tester);
+    await tester.pumpAndSettle();
+
+    expect(repository.provisionCalls, 1);
+    expect(repository.lastUsername, 'test.user');
+    expect(repository.lastRoles, contains(RoleType.manager));
+    expect(repository.lastRoles!.toSet().length, repository.lastRoles!.length);
+    expect(repository.lastDefaultRole, RoleType.manager);
+    expect(repository.lastRoles, contains(repository.lastDefaultRole));
+  });
+
+  testWidgets('photographer requires unique allowlisted type selections', (
+    tester,
+  ) async {
+    final repository = _RecordingUserRepository();
+    await openCreateForm(tester, repository);
+    await tester.enterText(_formField('الاسم الكامل'), 'مصور اختبار');
+    await tester.enterText(_formField('اسم المستخدم'), 'photo.user');
+    await tester.ensureVisible(find.text('مصور').last);
+    await tester.tap(find.text('مصور').last);
+    await tester.pump();
+    await submitCreate(tester);
+    expect(find.text('اختر نوع تصوير واحداً على الأقل للمصور'), findsOneWidget);
+    expect(repository.provisionCalls, 0);
+
+    for (final label in ['تصوير', 'فيديو', 'إنستغرام', 'تصميم']) {
+      await tester.tap(find.text(label));
+    }
+    await submitCreate(tester);
+    await tester.pumpAndSettle();
+
+    expect(repository.provisionCalls, 1);
+    expect(
+      repository.lastRoles,
+      containsAll([RoleType.manager, RoleType.photographer]),
+    );
+    expect(repository.lastRoles!.toSet().length, repository.lastRoles!.length);
+    expect(
+      repository.lastPhotoTypes,
+      containsAll(['photo', 'video', 'instagram', 'design']),
+    );
+    expect(
+      repository.lastPhotoTypes!.toSet().length,
+      repository.lastPhotoTypes!.length,
+    );
+  });
+
+  testWidgets('create form excludes Finance roles and Finance permission', (
+    tester,
+  ) async {
+    await openCreateForm(tester, _RecordingUserRepository());
+
+    expect(find.text(RoleType.finance.nameAr), findsNothing);
+    expect(find.text(RoleType.weddingFinance.nameAr), findsNothing);
+    expect(find.textContaining('إدارة المالية'), findsNothing);
+  });
+
+  testWidgets('pending create locks submit and deduplicates requests', (
+    tester,
+  ) async {
+    final repository =
+        _RecordingUserRepository()
+          ..provisionCompleter = Completer<UserProvisioningResult>();
+    await openCreateForm(tester, repository);
+    await tester.enterText(_formField('الاسم الكامل'), 'مستخدم اختبار');
+    await tester.enterText(_formField('اسم المستخدم'), 'pending.user');
+    final submit = find.widgetWithText(SumouButton, 'إضافة المستخدم');
+    await tester.ensureVisible(submit);
+
+    await tester.tap(submit);
+    await tester.tap(submit);
+    await tester.pump();
+
+    expect(repository.provisionCalls, 1);
+    expect(
+      tester.widget<SumouButton>(find.byType(SumouButton).last).onPressed,
+      isNull,
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    repository.provisionCompleter!.complete(
+      UserProvisioningResult(
+        userId: 'created-user',
+        temporaryPassword: OneTimePassword('Synthetic-Temp1!'),
+      ),
+    );
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('failed creation never displays a temporary password', (
+    tester,
+  ) async {
+    final repository =
+        _RecordingUserRepository()
+          ..provisionFailure = UserRepositoryFailure.createFailed;
+    await openCreateForm(tester, repository);
+    await tester.enterText(_formField('الاسم الكامل'), 'مستخدم اختبار');
+    await tester.enterText(_formField('اسم المستخدم'), 'failed.user');
+    await submitCreate(tester);
+    await tester.pumpAndSettle();
+
+    expect(repository.provisionCalls, 1);
+    expect(find.text('تعذّر إنشاء المستخدم، حاول مرة أخرى'), findsOneWidget);
+    expect(find.textContaining('Synthetic-Temp'), findsNothing);
+    expect(find.textContaining('كلمة المرور المؤقتة هذه'), findsNothing);
   });
 
   testWidgets('permission and backend capabilities gate real-flow actions', (
@@ -240,6 +424,115 @@ void main() {
           .onPressed,
       isNotNull,
     );
+  });
+
+  testWidgets('reset is unavailable to a non-admin even with permission', (
+    tester,
+  ) async {
+    const manager = UserModel(
+      id: 'u-manager-only',
+      fullName: 'مدير مشاريع',
+      username: 'manager_only',
+      defaultRole: RoleType.manager,
+      roles: [RoleType.manager],
+      permissions: FeaturePermissions(canManageUsers: true),
+    );
+    final repository = _RecordingUserRepository();
+    final container = ProviderContainer(
+      overrides: [
+        authRepositoryProvider.overrideWith(
+          (_) => MockAuthRepository(
+            accounts: const [
+              MockAccount(user: manager, password: MockUsers.devPassword),
+            ],
+          ),
+        ),
+        userRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: manager.username, password: MockUsers.devPassword);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scaffold(body: UsersScreen())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pumpAndSettle();
+
+    final reset = find.widgetWithText(SumouButton, 'إعادة تعيين كلمة المرور');
+    expect(tester.widget<SumouButton>(reset).onPressed, isNull);
+    expect(repository.resetCalls, 0);
+  });
+
+  testWidgets('reset cancel performs zero repository requests', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final repository = _RecordingUserRepository();
+    await openUsers(tester, repository: repository);
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إعادة تعيين كلمة المرور'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('إلغاء'));
+    await tester.pumpAndSettle();
+
+    expect(repository.resetCalls, 0);
+  });
+
+  testWidgets('pending reset deduplicates confirmation submissions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final repository =
+        _RecordingUserRepository()
+          ..resetCompleter = Completer<UserPasswordResetResult>();
+    await openUsers(tester, repository: repository);
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('إعادة تعيين كلمة المرور'));
+    await tester.pumpAndSettle();
+    final confirm = find.text('إعادة التعيين');
+    await tester.ensureVisible(confirm);
+
+    await tester.tap(confirm);
+    await tester.pump();
+
+    expect(repository.resetCalls, 1);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('سعد المطيري'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    final pendingReset = find.byWidgetPredicate(
+      (widget) =>
+          widget is SumouButton && widget.label == 'إعادة تعيين كلمة المرور',
+    );
+    expect(tester.widget<SumouButton>(pendingReset).onPressed, isNull);
+    await tester.tap(pendingReset, warnIfMissed: false);
+    await tester.pump();
+    expect(repository.resetCalls, 1);
+
+    repository.resetCompleter!.complete(
+      UserPasswordResetResult(
+        userId: repository.lastResetUserId!,
+        mustChangePassword: true,
+        temporaryPassword: OneTimePassword('Synthetic-Reset1!'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Synthetic-Reset1!'), findsOneWidget);
+    await tester.tap(find.widgetWithText(SumouButton, 'تم'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
   });
 
   // ---- repository ----
@@ -375,4 +668,62 @@ class _UnsupportedMutationRepository extends MockUserRepository {
   @override
   UserRepositoryCapabilities get capabilities =>
       const UserRepositoryCapabilities.supabaseStep10_7();
+}
+
+class _RecordingUserRepository extends MockUserRepository {
+  int provisionCalls = 0;
+  int resetCalls = 0;
+  String? lastUsername;
+  RoleType? lastDefaultRole;
+  List<RoleType>? lastRoles;
+  List<String>? lastPhotoTypes;
+  String? lastResetUserId;
+  Completer<UserProvisioningResult>? provisionCompleter;
+  Completer<UserPasswordResetResult>? resetCompleter;
+  UserRepositoryFailure? provisionFailure;
+
+  @override
+  Future<List<StaffPhotoTypeOption>> getAvailablePhotoTypes() async => const [
+    StaffPhotoTypeOption(code: 'photo', nameAr: 'تصوير'),
+    StaffPhotoTypeOption(code: 'video', nameAr: 'فيديو'),
+    StaffPhotoTypeOption(code: 'instagram', nameAr: 'إنستغرام'),
+    StaffPhotoTypeOption(code: 'design', nameAr: 'تصميم'),
+  ];
+
+  @override
+  Future<UserProvisioningResult> provisionUser({
+    required String fullName,
+    required String username,
+    required RoleType defaultRole,
+    required List<RoleType> roles,
+    List<String> photographerTypeCodes = const [],
+    Map<AppFeature, bool> permissionOverrides = const {},
+  }) async {
+    provisionCalls++;
+    lastUsername = username;
+    lastDefaultRole = defaultRole;
+    lastRoles = List.of(roles);
+    lastPhotoTypes = List.of(photographerTypeCodes);
+    final completer = provisionCompleter;
+    if (completer != null) return completer.future;
+    final failure = provisionFailure;
+    if (failure != null) throw UserRepositoryException(failure);
+    return UserProvisioningResult(
+      userId: 'synthetic-created-user',
+      temporaryPassword: OneTimePassword('Synthetic-Temp1!'),
+    );
+  }
+
+  @override
+  Future<UserPasswordResetResult> resetPassword(String userId) async {
+    resetCalls++;
+    lastResetUserId = userId;
+    final completer = resetCompleter;
+    if (completer != null) return completer.future;
+    return UserPasswordResetResult(
+      userId: userId,
+      mustChangePassword: true,
+      temporaryPassword: OneTimePassword('Synthetic-Reset1!'),
+    );
+  }
 }

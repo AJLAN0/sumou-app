@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/supabase/auth_identity.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -88,8 +89,9 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     final name = _name.text.trim();
-    final username = _username.text.trim();
+    final username = AuthIdentity.normalize(_username.text);
     if (name.isEmpty) {
       _snack('الاسم مطلوب');
       return;
@@ -98,11 +100,19 @@ class _UserFormSheetState extends ConsumerState<_UserFormSheet> {
       _snack('اسم المستخدم مطلوب');
       return;
     }
+    if (!AuthIdentity.isValid(username)) {
+      _snack('اسم المستخدم يجب أن يكون من 2 إلى 50 حرفاً إنجليزياً صالحاً');
+      return;
+    }
     if (_roles.isEmpty) {
       _snack('اختر دوراً واحداً على الأقل');
       return;
     }
     _roles.add(_default); // keep the invariant
+    if (_roles.contains(RoleType.photographer) && _photoTypeCodes.isEmpty) {
+      _snack('اختر نوع تصوير واحداً على الأقل للمصور');
+      return;
+    }
 
     setState(() => _saving = true);
     final repo = ref.read(userRepositoryProvider);

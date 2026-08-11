@@ -23,6 +23,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _username = TextEditingController();
   final _password = TextEditingController();
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -82,8 +83,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             controller: _password,
             label: 'كلمة المرور',
             hint: 'كلمة المرور',
-            obscureText: true,
+            obscureText: !_showPassword,
             prefixIcon: Icons.lock_outline,
+            suffixIcon: IconButton(
+              key: const ValueKey('toggle-login-password'),
+              onPressed: () => setState(() => _showPassword = !_showPassword),
+              icon: Icon(
+                _showPassword ? Icons.visibility_off : Icons.visibility,
+              ),
+            ),
             textInputAction: TextInputAction.done,
           ),
           if (auth.errorMessage != null) ...[

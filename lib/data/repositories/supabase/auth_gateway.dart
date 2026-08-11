@@ -1,4 +1,20 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    as supabase
+    show AuthException;
+
+enum AuthSignInFailure { invalidCredentials, serverError }
+
+/// Value-free sign-in failure crossing the SDK gateway boundary.
+///
+/// Only an explicit `invalid_credentials` Auth code is classified as a caller
+/// credential error. Network, rate-limit, and unexpected SDK/Auth failures are
+/// all collapsed to [AuthSignInFailure.serverError].
+class AuthSignInException implements Exception {
+  const AuthSignInException(this.reason);
+
+  final AuthSignInFailure reason;
+}
 
 /// Narrow data boundary between [SupabaseAuthRepository] and Supabase.
 ///
@@ -151,15 +167,26 @@ class SupabaseAuthGateway implements AuthGateway {
     required String email,
     required String password,
   }) async {
-    final res = await _client.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
-    final user = res.user;
-    if (user == null) {
-      throw const AuthException('sign-in returned no user');
+    try {
+      final res = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      final user = res.user;
+      if (user == null) {
+        throw const AuthSignInException(AuthSignInFailure.serverError);
+      }
+      return user.id;
+    } on supabase.AuthException catch (error) {
+      if (error.code == 'invalid_credentials') {
+        throw const AuthSignInException(AuthSignInFailure.invalidCredentials);
+      }
+      throw const AuthSignInException(AuthSignInFailure.serverError);
+    } on AuthSignInException {
+      rethrow;
+    } catch (_) {
+      throw const AuthSignInException(AuthSignInFailure.serverError);
     }
-    return user.id;
   }
 
   @override

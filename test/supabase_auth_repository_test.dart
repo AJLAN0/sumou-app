@@ -59,6 +59,20 @@ void main() {
       expect(failureOf(err!), AuthFailure.invalidCredentials);
     });
 
+    test(
+      'network, rate-limit, and unexpected Auth errors → loginFailed',
+      () async {
+        final g = FakeAuthGateway(signInFailure: AuthSignInFailure.serverError);
+        final err = await repoWith(g)
+            .login(username: 'manager', password: 'Synthetic!Password1')
+            .then<Object?>((_) => null, onError: (error) => error);
+
+        expect(failureOf(err!), AuthFailure.loginFailed);
+        expect((err as AuthException).message, isNull);
+        expect(g.signInCalls, 1);
+      },
+    );
+
     test('profile-load failure after sign-in signs out', () async {
       final g = FakeAuthGateway(
         profile: profileRow(),

@@ -8,6 +8,7 @@ import 'package:sumou_app/app/router.dart';
 import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/core/providers/repository_providers.dart';
 import 'package:sumou_app/core/widgets/sumou_button.dart';
+import 'package:sumou_app/core/widgets/sumou_text_field.dart';
 import 'package:sumou_app/data/repositories/auth_repository.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/profile/password_policy.dart';
@@ -38,6 +39,7 @@ class _ScreenAuthRepository implements AuthRepository {
   int changeCalls = 0;
   Completer<void>? changeCompleter;
   AuthFailure? changeFailure;
+  String? rawFailureMessage;
 
   @override
   Future<UserModel> login({
@@ -64,7 +66,7 @@ class _ScreenAuthRepository implements AuthRepository {
     changeCalls++;
     await changeCompleter?.future;
     final failure = changeFailure;
-    if (failure != null) throw AuthException(failure);
+    if (failure != null) throw AuthException(failure, rawFailureMessage);
   }
 }
 
@@ -160,6 +162,26 @@ void main() {
       );
       expect(same.failures, contains(PasswordPolicyFailure.matchesCurrent));
     });
+
+    test('rejects missing lowercase and trailing whitespace directly', () {
+      final missingLowercase = PasswordPolicy.validate(
+        currentPassword: 'Other!Pass1',
+        newPassword: 'ABCDEFGHIJK1!',
+      );
+      expect(
+        missingLowercase.failures,
+        contains(PasswordPolicyFailure.missingLowercase),
+      );
+
+      final trailingWhitespace = PasswordPolicy.validate(
+        currentPassword: 'Other!Pass1',
+        newPassword: 'Aa1!abcdefgh ',
+      );
+      expect(
+        trailingWhitespace.failures,
+        contains(PasswordPolicyFailure.surroundingWhitespace),
+      );
+    });
   });
 
   testWidgets('forced success routes a multi-role user to role selection', (
@@ -200,6 +222,130 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('دخول سمو'), findsWidgets);
     expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+  });
+
+  testWidgets('change-password route does not redirect recursively', (
+    tester,
+  ) async {
+    final container = await _pumpForced(tester, _forcedManager);
+
+    container.read(goRouterProvider).go(AppRoutes.changePassword);
+    await tester.pumpAndSettle();
+
+    expect(find.text('تحديث كلمة المرور مطلوب'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(3));
+  });
+
+  testWidgets('confirmation mismatch is rejected and forced flag stays set', (
+    tester,
+  ) async {
+    final repository = _ScreenAuthRepository(_forcedManager);
+    final container = await _pumpForced(
+      tester,
+      _forcedManager,
+      repository: repository,
+    );
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'Current!Pass1');
+    await tester.enterText(fields.at(1), 'N3w!Password2');
+    await tester.enterText(fields.at(2), 'Different!Pass3');
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SumouButton, 'حفظ'));
+    await tester.pumpAndSettle();
+
+    expect(repository.changeCalls, 0);
+    expect(find.text('كلمتا المرور غير متطابقتين'), findsOneWidget);
+    expect(
+      container.read(authControllerProvider).requiresPasswordChange,
+      isTrue,
+    );
+  });
+
+  testWidgets('empty confirmation is rejected before password request', (
+    tester,
+  ) async {
+    final repository = _ScreenAuthRepository(_forcedManager);
+    await _pumpForced(tester, _forcedManager, repository: repository);
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'Current!Pass1');
+    await tester.enterText(fields.at(1), 'N3w!Password2');
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SumouButton, 'حفظ'));
+    await tester.pumpAndSettle();
+
+    expect(repository.changeCalls, 0);
+    expect(find.text('يرجى تعبئة جميع الحقول'), findsOneWidget);
+  });
+
+  testWidgets('rate-limit failure is generic, secret-safe, and keeps flag', (
+    tester,
+  ) async {
+    const currentPassword = 'Current!Pass1';
+    const newPassword = 'N3w!Password2';
+    const rawFailure = 'rate_limit token@example.internal access_token';
+    final repository =
+        _ScreenAuthRepository(_forcedManager)
+          ..changeFailure = AuthFailure.passwordChangeFailed
+          ..rawFailureMessage = rawFailure;
+    final container = await _pumpForced(
+      tester,
+      _forcedManager,
+      repository: repository,
+    );
+    await _fillValidForm(tester);
+
+    await tester.tap(find.widgetWithText(SumouButton, 'حفظ'));
+    await tester.pumpAndSettle();
+
+    expect(repository.changeCalls, 1);
+    expect(
+      find.text('تعذّر إكمال تغيير كلمة المرور، حاول مرة أخرى'),
+      findsOneWidget,
+    );
+    expect(find.textContaining(rawFailure), findsNothing);
+    final errorText = tester.widget<Text>(
+      find.text('تعذّر إكمال تغيير كلمة المرور، حاول مرة أخرى'),
+    );
+    expect(errorText.data, isNot(contains(currentPassword)));
+    expect(errorText.data, isNot(contains(newPassword)));
+    expect(
+      container.read(authControllerProvider).requiresPasswordChange,
+      isTrue,
+    );
+  });
+
+  testWidgets('disposed password form does not retain controller values', (
+    tester,
+  ) async {
+    final container = await _pumpForced(tester, _forcedManager);
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'Current!Pass1');
+    await tester.enterText(fields.at(1), 'N3w!Password2');
+    await tester.enterText(fields.at(2), 'N3w!Password2');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const SumouApp()),
+    );
+    await tester.pumpAndSettle();
+
+    final rebuilt = find.byType(SumouTextField);
+    expect(
+      tester.widget<SumouTextField>(rebuilt.at(0)).controller!.text,
+      isEmpty,
+    );
+    expect(
+      tester.widget<SumouTextField>(rebuilt.at(1)).controller!.text,
+      isEmpty,
+    );
+    expect(
+      tester.widget<SumouTextField>(rebuilt.at(2)).controller!.text,
+      isEmpty,
+    );
   });
 
   testWidgets('inline policy feedback and hide/show controls are present', (

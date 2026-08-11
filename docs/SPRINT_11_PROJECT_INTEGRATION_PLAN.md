@@ -245,8 +245,10 @@ Status:
   automatable requirements are fully automated (46.9%); 169 automatable
   scenarios are missing direct tests. The remaining owner backlog includes 199
   DEV/RLS, 46 device, and 27 TestFlight requirements.
-- **Next — 11.6E:** implement the missing automated coverage identified by the
-  audit; it has not started.
+- **11.6E1:** Authentication/User/Admin P0 automation complete; 52 accepted
+  audit requirements now have direct local evidence.
+- **11.6E2:** pending. Owner-controlled DEV QA and device/TestFlight QA also
+  remain pending; Sprint 11 is incomplete.
 - Owner-controlled DEV role/mobile QA remains pending. Sprint 11 is not complete
   until the returned owner QA is reviewed and approved.
 

@@ -84,12 +84,19 @@ class AuthController extends Notifier<AuthState> {
     required String username,
     required String password,
   }) async {
+    if (state.isLoading) return;
     // An explicit login supersedes startup restoration: clear isInitializing on
     // every path (a stale `true` would hold the router on Splash and hide the
     // error) and bump the generation so an older in-flight restore can never
     // overwrite this result.
     _beginOperation();
     _initFuture = Future<void>.value();
+    if (username.trim().isEmpty || password.isEmpty) {
+      state = AuthState(
+        errorMessage: _messageFor(AuthFailure.invalidCredentials),
+      );
+      return;
+    }
     state = state.copyWith(
       isLoading: true,
       isInitializing: false,
@@ -206,6 +213,7 @@ class AuthController extends Notifier<AuthState> {
 
   String _messageFor(AuthFailure reason) => switch (reason) {
     AuthFailure.invalidCredentials => 'اسم المستخدم أو كلمة المرور غير صحيحة',
+    AuthFailure.loginFailed => 'تعذّر تسجيل الدخول، حاول مرة أخرى',
     AuthFailure.accountDisabled => 'هذا الحساب موقوف، يرجى التواصل مع الإدارة',
     AuthFailure.notAuthenticated => 'يجب تسجيل الدخول أولاً',
     AuthFailure.profileUnavailable =>

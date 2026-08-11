@@ -1,5 +1,7 @@
 // Tests for the manager approve/reject closure-request flow.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,13 +10,17 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
+import 'package:sumou_app/data/repositories/project_repository.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'test_helpers.dart';
 
 void main() {
   // Logs in as the manager, opens the "الطلبات" hub, then the closure inbox.
-  Future<void> openRequests(WidgetTester tester) async {
-    final container = makeMockContainer();
+  Future<void> openRequests(
+    WidgetTester tester, {
+    ProjectRepository? repository,
+  }) async {
+    final container = makeMockContainer(projectRepository: repository);
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)
@@ -41,7 +47,9 @@ void main() {
     expect(find.text('رفض'), findsOneWidget);
   });
 
-  testWidgets('approving clears the request from the inbox', (tester) async {
+  testWidgets('approved request remains visible without review actions', (
+    tester,
+  ) async {
     await openRequests(tester);
     await tester.tap(find.text('قبول'));
     await tester.pumpAndSettle();
@@ -49,10 +57,12 @@ void main() {
     await tester.tap(find.text('قبول وإنهاء'));
     await tester.pumpAndSettle();
 
-    expect(find.text('لا توجد طلبات إغلاق'), findsOneWidget);
+    expect(find.text('مقبول'), findsOneWidget);
+    expect(find.text('قبول'), findsNothing);
+    expect(find.text('رفض'), findsNothing);
   });
 
-  testWidgets('rejecting requires a reason then clears the request', (
+  testWidgets('rejecting requires a reason and retains the decision', (
     tester,
   ) async {
     await openRequests(tester);
@@ -69,7 +79,39 @@ void main() {
     await tester.tap(find.widgetWithText(SumouButton, 'تأكيد الرفض'));
     await tester.pumpAndSettle();
 
-    expect(find.text('لا توجد طلبات إغلاق'), findsOneWidget);
+    expect(find.text('مرفوض'), findsOneWidget);
+    expect(find.textContaining('سبب الرفض: الجودة غير كافية'), findsOneWidget);
+    expect(find.text('قبول'), findsNothing);
+    expect(find.text('رفض'), findsNothing);
+  });
+
+  testWidgets('approve failure shows safe Arabic without diagnostics', (
+    tester,
+  ) async {
+    await openRequests(tester, repository: _FailingApproveRepository());
+    await tester.tap(find.text('قبول'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('قبول وإنهاء'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('الإجراء غير متاح حاليًا، حاول لاحقًا'), findsOneWidget);
+    expect(find.textContaining('raw-backend-secret'), findsNothing);
+  });
+
+  testWidgets('approve loading prevents a duplicate mutation', (tester) async {
+    final repository = _DelayedApproveRepository();
+    await openRequests(tester, repository: repository);
+    await tester.tap(find.text('قبول'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('قبول وإنهاء'));
+    await tester.pump();
+    await tester.tap(find.text('رفض'));
+    await tester.pump();
+
+    expect(repository.calls, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    repository.complete();
+    await tester.pumpAndSettle();
   });
 
   test('approveClosureRequest completes the project', () async {
@@ -104,4 +146,26 @@ void main() {
     expect(await repo.approveClosureRequest('nope'), isNull);
     expect(await repo.rejectClosureRequest('nope', 'x'), isNull);
   });
+}
+
+class _FailingApproveRepository extends MockProjectRepository {
+  @override
+  Future<ClosureRequestModel?> approveClosureRequest(String requestId) {
+    throw const ProjectRepositoryException(
+      ProjectRepositoryFailure.unavailable,
+    );
+  }
+}
+
+class _DelayedApproveRepository extends MockProjectRepository {
+  final _completer = Completer<ClosureRequestModel?>();
+  var calls = 0;
+
+  @override
+  Future<ClosureRequestModel?> approveClosureRequest(String requestId) {
+    calls++;
+    return _completer.future;
+  }
+
+  void complete() => _completer.complete(null);
 }

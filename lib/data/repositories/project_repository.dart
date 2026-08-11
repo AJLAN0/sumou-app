@@ -1,7 +1,48 @@
+import '../../core/models/assignable_project_staff.dart';
 import '../../core/models/closure_request_model.dart';
 import '../../core/models/project_enums.dart';
+import '../../core/models/project_delivery_link.dart';
 import '../../core/models/project_model.dart';
 import '../../core/models/project_team_role.dart';
+
+/// Safe failure categories shared by real project repositories and Arabic UI
+/// mapping. Backend diagnostics are intentionally not retained.
+enum ProjectRepositoryFailure {
+  notAuthenticated,
+  forbidden,
+  notFound,
+  invalidInput,
+  invalidData,
+  loadFailed,
+  unavailable,
+  unsupportedOperation,
+  saveFailed,
+}
+
+class ProjectRepositoryException implements Exception {
+  const ProjectRepositoryException(this.reason);
+
+  final ProjectRepositoryFailure reason;
+
+  String get messageAr => switch (reason) {
+    ProjectRepositoryFailure.notAuthenticated =>
+      'انتهت الجلسة، سجّل الدخول مرة أخرى',
+    ProjectRepositoryFailure.forbidden => 'ليست لديك صلاحية لتنفيذ هذا الإجراء',
+    ProjectRepositoryFailure.notFound => 'المشروع غير موجود',
+    ProjectRepositoryFailure.invalidInput =>
+      'تحقق من بيانات المشروع وحاول مرة أخرى',
+    ProjectRepositoryFailure.invalidData ||
+    ProjectRepositoryFailure.loadFailed => 'تعذّر تحميل بيانات المشاريع بأمان',
+    ProjectRepositoryFailure.unavailable =>
+      'الإجراء غير متاح حاليًا، حاول لاحقًا',
+    ProjectRepositoryFailure.unsupportedOperation =>
+      'هذا الإجراء غير متاح حتى يجهز مسار الخادم الآمن',
+    ProjectRepositoryFailure.saveFailed => 'تعذّر حفظ المشروع، حاول مرة أخرى',
+  };
+
+  @override
+  String toString() => 'ProjectRepositoryException(${reason.name})';
+}
 
 /// Read access to projects and closure requests.
 ///
@@ -15,6 +56,13 @@ abstract interface class ProjectRepository {
   Future<List<ProjectModel>> getProjectsForPhotographer(String userId);
   Future<List<ProjectModel>> getCompletedProjects();
 
+  /// Return the server-authoritative staff candidates and availability for one
+  /// assignment calendar date.
+  Future<List<AssignableProjectStaff>> getAssignableProjectStaff({
+    required DateTime onDate,
+    String? excludeProjectId,
+  });
+
   /// Search by project name, client name, serial, or team member name.
   Future<List<ProjectModel>> searchProjects(String query);
 
@@ -25,6 +73,10 @@ abstract interface class ProjectRepository {
   });
 
   Future<List<ClosureRequestModel>> getClosureRequests();
+
+  /// Return every management-visible delivery-link row for [projectId],
+  /// including retained or non-public states. This contract is read-only.
+  Future<List<ProjectDeliveryLink>> getProjectLinks(String projectId);
 
   /// Create a new project and return the persisted model (with its id, serial,
   /// and initial stages). When [serial] is null one is generated. Mock-backed
@@ -42,9 +94,9 @@ abstract interface class ProjectRepository {
     List<ProjectTeamRole> teamRoles = const [],
   });
 
-  /// Replace the full team on an existing project and return the updated model.
-  /// Roles are re-keyed to the project. Returns null when [projectId] is
-  /// unknown. Mock-backed in Sprint 2.
+  /// Replace a project's team and return the updated model. The production
+  /// implementation uses trusted `assign_team_roles` and preserves persisted
+  /// external members; the mock retains its legacy in-memory replacement.
   Future<ProjectModel?> assignTeamRoles(
     String projectId,
     List<ProjectTeamRole> teamRoles,

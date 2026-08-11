@@ -109,4 +109,19 @@ void main() {
       expect(await repo.trackBySerial('NOPE'), isNull);
     });
   });
+
+  group('MockProjectRepository delivery links', () {
+    test('returns a read-only project-scoped link list', () async {
+      final repo = MockProjectRepository();
+
+      final links = await repo.getProjectLinks('p-4');
+
+      expect(links, hasLength(1));
+      expect(links.single.label, 'ملفات التسليم');
+      expect(links.single.isApproved, isTrue);
+      expect(links.single.isClientVisible, isTrue);
+      expect(() => links.add(links.single), throwsUnsupportedError);
+      expect(await repo.getProjectLinks('p-1'), isEmpty);
+    });
+  });
 }

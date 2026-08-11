@@ -5,12 +5,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sumou_app/app/app.dart';
+import 'package:sumou_app/core/models/client_tracking_model.dart';
+import 'package:sumou_app/data/repositories/tracking_repository.dart';
 import 'test_helpers.dart';
 
+class _FailingTrackingRepository implements TrackingRepository {
+  int calls = 0;
+
+  @override
+  Future<ClientTrackingModel?> trackBySerial(String serial) async {
+    calls += 1;
+    throw StateError('raw backend diagnostics token@example.test');
+  }
+
+  @override
+  Future<void> submitReview({
+    required String serial,
+    required int rating,
+    String? message,
+  }) => throw UnimplementedError();
+}
+
 void main() {
-  Future<void> bootToTrack(WidgetTester tester) async {
+  Future<void> bootToTrack(
+    WidgetTester tester, {
+    TrackingRepository? repository,
+  }) async {
     await tester.pumpWidget(
-      ProviderScope(overrides: mockAuthOverrides(), child: const SumouApp()),
+      ProviderScope(
+        overrides: mockAppOverrides(trackingRepository: repository),
+        child: const SumouApp(),
+      ),
     );
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
@@ -26,10 +51,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('rejects a too-short code', (tester) async {
+  testWidgets('malformed code uses the same neutral not-found state', (
+    tester,
+  ) async {
     await bootToTrack(tester);
     await enterCode(tester, 'ab');
-    expect(find.text('الرمز قصير جداً، تحقق منه وحاول مجدداً'), findsOneWidget);
+    expect(find.text('لم يتم العثور على مشروع بهذا الرمز'), findsOneWidget);
+    expect(find.textContaining('قصير'), findsNothing);
   });
 
   testWidgets('unknown code shows not-found error', (tester) async {
@@ -43,6 +71,7 @@ void main() {
     await enterCode(tester, 'X7K-29QM-4R');
     expect(find.text('حملة انستقرام — رمضان'), findsOneWidget);
     expect(find.text('جاري الإبداع ⏳'), findsOneWidget);
+    expect(find.text('إرسال التقييم'), findsNothing);
   });
 
   testWidgets('delivered project shows the approved link', (tester) async {
@@ -51,5 +80,24 @@ void main() {
     expect(find.text('تم التسليم'), findsWidgets);
     expect(find.text('الصور'), findsOneWidget);
     expect(find.text('https://example.test/photos'), findsOneWidget);
+    expect(find.text('إرسال التقييم'), findsNothing);
+  });
+
+  testWidgets('network failure is safe and offers explicit retry', (
+    tester,
+  ) async {
+    final repository = _FailingTrackingRepository();
+    await bootToTrack(tester, repository: repository);
+
+    await enterCode(tester, 'FLD-A1B2-C3');
+
+    expect(find.text('تعذّر تتبع المشروع الآن، حاول مرة أخرى'), findsOneWidget);
+    expect(find.text('إعادة المحاولة'), findsOneWidget);
+    expect(find.textContaining('token@example.test'), findsNothing);
+    expect(repository.calls, 1);
+
+    await tester.tap(find.text('إعادة المحاولة'));
+    await tester.pumpAndSettle();
+    expect(repository.calls, 2);
   });
 }

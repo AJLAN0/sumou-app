@@ -1,6 +1,7 @@
 import '../../../core/models/closure_request_model.dart';
 import '../../../core/models/project_enums.dart';
 import '../../../core/models/project_model.dart';
+import '../../../core/models/project_delivery_link.dart';
 import '../../../core/models/project_stage_model.dart';
 import '../../../core/models/project_team_role.dart';
 
@@ -56,14 +57,18 @@ class MockProjects {
     startDate: DateTime(2026, 6, 10),
     endDate: DateTime(2026, 6, 20),
     notes: 'تغطية كاملة لليوم الأول والثاني',
-    teamRoles: const [
+    teamRoles: [
       ProjectTeamRole(
         id: 'p-1-r1',
         projectId: 'p-1',
+        teamMemberId: 'p-1-m1',
+        photographerTypeId: '10000000-0000-4000-8000-000000000001',
+        photographerTypeCode: 'photo',
         type: 'مصور فوتوغرافي',
         personName: _photographerName,
         userId: _photographer,
         value: 1500,
+        date: DateTime(2026, 6, 10),
       ),
     ],
     stages: _stages('p-1', ProjectStageTitles.threeStage, currentOrder: 2),
@@ -81,13 +86,17 @@ class MockProjects {
     status: ProjectStatus.inProgress,
     startDate: DateTime(2026, 6, 1),
     endDate: DateTime(2026, 6, 30),
-    teamRoles: const [
+    teamRoles: [
       ProjectTeamRole(
         id: 'p-2-r1',
         projectId: 'p-2',
+        teamMemberId: 'p-2-m1',
+        photographerTypeId: '10000000-0000-4000-8000-000000000003',
+        photographerTypeCode: 'instagram',
         type: 'انستقرام',
         personName: _photographerName,
         userId: _photographer,
+        date: DateTime(2026, 6, 1),
       ),
     ],
     stages: _stages('p-2', ProjectStageTitles.sevenStage, currentOrder: 4),
@@ -105,14 +114,18 @@ class MockProjects {
     status: ProjectStatus.completed,
     startDate: DateTime(2026, 5, 1),
     endDate: DateTime(2026, 5, 3),
-    teamRoles: const [
+    teamRoles: [
       ProjectTeamRole(
         id: 'p-3-r1',
         projectId: 'p-3',
+        teamMemberId: 'p-3-m1',
+        photographerTypeId: '10000000-0000-4000-8000-000000000001',
+        photographerTypeCode: 'photo',
         type: 'مصور فوتوغرافي',
         personName: _photographerName,
         userId: _photographer,
         value: 1200,
+        date: DateTime(2026, 5, 1),
       ),
     ],
     stages: _stages(
@@ -135,14 +148,18 @@ class MockProjects {
     status: ProjectStatus.pendingClosure,
     startDate: DateTime(2026, 6, 16),
     endDate: DateTime(2026, 6, 16),
-    teamRoles: const [
+    teamRoles: [
       ProjectTeamRole(
         id: 'p-4-r1',
         projectId: 'p-4',
+        teamMemberId: 'p-4-m1',
+        photographerTypeId: '10000000-0000-4000-8000-000000000001',
+        photographerTypeCode: 'photo',
         type: 'مصور فوتوغرافي',
         personName: _photographerName,
         userId: _photographer,
         value: 2000,
+        date: DateTime(2026, 6, 16),
       ),
     ],
     stages: _stages('p-4', ProjectStageTitles.threeStage, currentOrder: 3),
@@ -165,6 +182,19 @@ class MockProjects {
       createdAt: DateTime(2026, 6, 17),
       reportFileUrl: 'mock://reports/p-4.pdf',
       deliveryLink: 'https://example.test/delivery/p-4',
+    ),
+  ];
+
+  static final List<ProjectDeliveryLink> projectLinks = [
+    ProjectDeliveryLink(
+      id: 'link-1',
+      projectId: 'p-4',
+      label: 'ملفات التسليم',
+      url: 'https://example.test/delivery/p-4',
+      isApproved: true,
+      isClientVisible: true,
+      isActive: true,
+      createdAt: DateTime(2026, 6, 17),
     ),
   ];
 }

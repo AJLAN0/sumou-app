@@ -1,13 +1,17 @@
 /// A team assignment on a project: a photo-type role filled by a person.
 ///
 /// [userId] links to a [UserModel] when the person has an account; [personName]
-/// covers external people without one. [value] is the agreed amount (SAR).
+/// covers external people without one. [value] is opaque assignment metadata;
+/// it must not be interpreted, labelled, or aggregated as finance.
 class ProjectTeamRole {
   const ProjectTeamRole({
     required this.id,
     required this.projectId,
     required this.type,
     required this.personName,
+    this.teamMemberId,
+    this.photographerTypeId,
+    this.photographerTypeCode,
     this.userId,
     this.value = 0,
     this.date,
@@ -16,7 +20,13 @@ class ProjectTeamRole {
   final String id;
   final String projectId;
 
-  /// Photography type, e.g. «مصور فوتوغرافي».
+  /// Stable normalized backend identifiers retained for trusted team writes.
+  /// They are never intended for user-facing display.
+  final String? teamMemberId;
+  final String? photographerTypeId;
+  final String? photographerTypeCode;
+
+  /// Arabic catalog display name, e.g. «مصور فوتوغرافي».
   final String type;
   final String personName;
 

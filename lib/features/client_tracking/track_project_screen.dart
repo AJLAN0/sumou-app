@@ -3,16 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
+import '../../core/models/client_tracking_model.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/tracking_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'providers/tracking_providers.dart';
 
 /// Public screen where a client enters a secret project code to track it.
 ///
-/// No employee login required. Uses the (mock) [TrackingRepository]; on a valid
-/// code it stores the result and routes to the result screen.
+/// No employee login required. Uses the anonymous RPC-backed
+/// [TrackingRepository]; on a valid code it stores the minimized result and
+/// routes to the result screen.
 class TrackProjectScreen extends ConsumerStatefulWidget {
   const TrackProjectScreen({super.key});
 
@@ -21,10 +24,9 @@ class TrackProjectScreen extends ConsumerStatefulWidget {
 }
 
 class _TrackProjectScreenState extends ConsumerState<TrackProjectScreen> {
-  static const int _minLength = 4;
-
   final _code = TextEditingController();
   bool _loading = false;
+  bool _loadFailed = false;
   String? _error;
 
   @override
@@ -34,25 +36,37 @@ class _TrackProjectScreenState extends ConsumerState<TrackProjectScreen> {
   }
 
   Future<void> _track() async {
+    if (_loading) return;
     FocusScope.of(context).unfocus();
-    final code = _code.text.trim();
-    if (code.isEmpty) {
-      setState(() => _error = 'يرجى إدخال الرمز السري للمشروع');
-      return;
-    }
-    if (code.length < _minLength) {
-      setState(() => _error = 'الرمز قصير جداً، تحقق منه وحاول مجدداً');
-      return;
-    }
 
     setState(() {
       _loading = true;
+      _loadFailed = false;
       _error = null;
     });
 
-    final result = await ref
-        .read(trackingRepositoryProvider)
-        .trackBySerial(code);
+    ClientTrackingModel? result;
+    try {
+      result = await ref
+          .read(trackingRepositoryProvider)
+          .trackBySerial(_code.text);
+    } on TrackingRepositoryException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+        _error = error.messageAr;
+      });
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+        _error = 'تعذّر تتبع المشروع الآن، حاول مرة أخرى';
+      });
+      return;
+    }
     if (!mounted) return;
 
     setState(() => _loading = false);
@@ -109,7 +123,7 @@ class _TrackProjectScreenState extends ConsumerState<TrackProjectScreen> {
           SumouTextField(
             controller: _code,
             label: 'الرمز السري',
-            hint: 'مثال: X7K-29QM-4R',
+            hint: 'مثال: FLD-A1B2-C3',
             prefixIcon: Icons.qr_code_2,
             textInputAction: TextInputAction.done,
           ),
@@ -119,7 +133,7 @@ class _TrackProjectScreenState extends ConsumerState<TrackProjectScreen> {
           ],
           const SizedBox(height: 24),
           SumouButton(
-            label: 'تتبع',
+            label: _loadFailed ? 'إعادة المحاولة' : 'تتبع',
             loading: _loading,
             onPressed: _loading ? null : _track,
           ),

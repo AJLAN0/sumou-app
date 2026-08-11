@@ -7,6 +7,7 @@ import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../auth/providers/auth_controller.dart';
 import 'providers/projects_providers.dart';
 import 'widgets/project_card.dart';
 
@@ -42,6 +43,24 @@ class ManageProjectScreen extends ConsumerWidget {
               icon: Icons.search_off,
             );
           }
+          final user = ref.watch(authControllerProvider).currentUser;
+          final isAdmin = user?.hasRole(RoleType.admin) ?? false;
+          final ownsProject = user != null && project.managerId == user.id;
+          final canEdit =
+              project.isActive &&
+              (isAdmin ||
+                  (ownsProject &&
+                      user.hasPermission(AppFeature.canEditProject)));
+          final canUpdateStage =
+              project.isActive &&
+              (isAdmin ||
+                  (ownsProject &&
+                      user.hasPermission(AppFeature.canUpdateStages)));
+          final canManageTeam =
+              project.isActive &&
+              (isAdmin ||
+                  (ownsProject &&
+                      user.hasPermission(AppFeature.canAssignPhotographers)));
           return ListView(
             children: [
               const SizedBox(height: 8),
@@ -51,35 +70,47 @@ class ManageProjectScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               // pushReplacement so finishing a sub-flow returns to the project
               // details (not back to this hub).
-              _HubCard(
-                icon: Icons.edit_outlined,
-                title: 'تعديل بيانات المشروع',
-                subtitle: 'الاسم، العميل، النوع، الحالة، والتواريخ',
-                onTap:
-                    () => context.pushReplacement(
-                      AppRoutes.projectEditPath(project.id),
-                    ),
-              ),
-              const SizedBox(height: 12),
-              _HubCard(
-                icon: Icons.update,
-                title: 'تحديث المرحلة',
-                subtitle: 'نقل المشروع إلى مرحلته الحالية',
-                onTap:
-                    () => context.pushReplacement(
-                      AppRoutes.projectStagePath(project.id),
-                    ),
-              ),
-              const SizedBox(height: 12),
-              _HubCard(
-                icon: Icons.group_outlined,
-                title: 'إدارة الفريق',
-                subtitle: 'إسناد المصورين وتعديل الفريق',
-                onTap:
-                    () => context.pushReplacement(
-                      AppRoutes.projectAssignPath(project.id),
-                    ),
-              ),
+              if (canEdit) ...[
+                _HubCard(
+                  icon: Icons.edit_outlined,
+                  title: 'تعديل بيانات المشروع',
+                  subtitle: 'الاسم، العميل، التواريخ، والملاحظات',
+                  onTap:
+                      () => context.pushReplacement(
+                        AppRoutes.projectEditPath(project.id),
+                      ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (canUpdateStage) ...[
+                _HubCard(
+                  icon: Icons.update,
+                  title: 'تحديث المرحلة',
+                  subtitle: 'نقل المشروع إلى مرحلته الحالية',
+                  onTap:
+                      () => context.pushReplacement(
+                        AppRoutes.projectStagePath(project.id),
+                      ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (canManageTeam) ...[
+                _HubCard(
+                  icon: Icons.group_outlined,
+                  title: 'إدارة الفريق',
+                  subtitle: 'إسناد المصورين وتعديل الفريق',
+                  onTap:
+                      () => context.pushReplacement(
+                        AppRoutes.projectAssignPath(project.id),
+                      ),
+                ),
+              ],
+              if (!canEdit && !canUpdateStage && !canManageTeam)
+                const SumouEmptyState(
+                  title: 'لا توجد إجراءات متاحة',
+                  message: 'حالة المشروع أو صلاحياتك الحالية لا تسمح بالتعديل.',
+                  icon: Icons.lock_outline,
+                ),
               const SizedBox(height: 24),
             ],
           );

@@ -83,10 +83,35 @@ void main() {
       expect(weddings.single.id, 'p-4');
     });
 
+    test('assignable staff mock remains deterministic and immutable', () async {
+      final candidates = await repo.getAssignableProjectStaff(
+        onDate: DateTime(2026, 8, 9),
+      );
+
+      final photographer = candidates.firstWhere(
+        (candidate) => candidate.userId == 'u-photographer',
+      );
+      expect(photographer.photographerTypes.map((type) => type.code), [
+        'photo',
+        'instagram',
+      ]);
+      expect(
+        () => photographer.photographerTypes.clear(),
+        throwsUnsupportedError,
+      );
+    });
+
     test('closure requests', () async {
       final requests = await repo.getClosureRequests();
       expect(requests.length, 1);
       expect(requests.single.isPending, isTrue);
+    });
+
+    test('delivery-link retained state is read-only metadata', () async {
+      final link = (await repo.getProjectLinks('p-4')).single;
+
+      expect(link.isRemoved, isFalse);
+      expect(link.url, startsWith('https://'));
     });
   });
 }

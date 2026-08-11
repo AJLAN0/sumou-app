@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'closure_actions.dart';
 import 'providers/projects_providers.dart';
-import 'widgets/closure_request_card.dart';
 
 /// Manager "إنهاء المشروع" screen.
 ///
@@ -64,6 +64,13 @@ class EndProjectScreen extends ConsumerWidget {
                   icon: Icons.hourglass_empty,
                 );
               }
+              if (project.status != ProjectStatus.pendingClosure) {
+                return const SumouEmptyState(
+                  title: 'الطلب غير جاهز للمراجعة',
+                  message: 'يجب أن يكون المشروع بانتظار اعتماد الإغلاق.',
+                  icon: Icons.lock_clock_outlined,
+                );
+              }
               return ListView(
                 children: [
                   const SizedBox(height: 8),
@@ -87,11 +94,10 @@ class EndProjectScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ClosureRequestCard(
+                  ClosureRequestReviewCard(
                     request: request,
+                    project: project,
                     clientName: project.clientName,
-                    onApprove: () => approveClosureFlow(context, ref, request),
-                    onReject: () => rejectClosureFlow(context, ref, request),
                   ),
                   const SizedBox(height: 24),
                 ],

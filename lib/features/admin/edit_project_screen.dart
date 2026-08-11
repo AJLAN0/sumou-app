@@ -5,25 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/widgets/widgets.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../projects/providers/projects_providers.dart';
-
-/// Editable project statuses for the admin basic-edit flow. Closure approval is
-/// not done here — this is a mock admin override only.
-const List<ProjectStatus> _kEditableStatuses = [
-  ProjectStatus.active,
-  ProjectStatus.completed,
-  ProjectStatus.pendingClosure,
-];
 
 String _fmtDate(DateTime? d) {
   if (d == null) return '—';
   return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 }
 
-/// Admin basic-edit for a project (full-screen form). Edits title, client, type,
-/// status, dates, and notes only — no team/stage/manager/closure changes.
+/// Admin basic-edit for a project (full-screen form). The trusted contract edits
+/// only title, client, dates, and notes while preserving type and status.
 class AdminEditProjectScreen extends ConsumerWidget {
   const AdminEditProjectScreen({super.key, required this.projectId});
 
@@ -72,8 +65,6 @@ class _EditBodyState extends ConsumerState<_EditBody> {
   late final TextEditingController _nameController;
   late final TextEditingController _clientController;
   late final TextEditingController _notesController;
-  late ProjectType _type;
-  late ProjectStatus _status;
   late DateTime _startDate;
   late DateTime _endDate;
   bool _showErrors = false;
@@ -86,8 +77,6 @@ class _EditBodyState extends ConsumerState<_EditBody> {
     _nameController = TextEditingController(text: p.name);
     _clientController = TextEditingController(text: p.clientName);
     _notesController = TextEditingController(text: p.notes ?? '');
-    _type = p.type;
-    _status = p.status;
     _startDate = p.startDate;
     _endDate = p.endDate;
   }
@@ -134,56 +123,54 @@ class _EditBodyState extends ConsumerState<_EditBody> {
   }
 
   Future<void> _save() async {
+    if (_saving || !widget.project.isActive) return;
     if (!_valid) {
       setState(() => _showErrors = true);
       return;
     }
-    // Confirm when the status changes (mock admin override).
-    if (_status != widget.project.status) {
-      final ok = await showSumouConfirmSheet(
-        context,
-        title: 'تغيير حالة المشروع',
-        message:
-            'سيتم تغيير حالة المشروع إلى «${sumouStatusLabel(_status)}». هل تريد المتابعة؟',
-        confirmLabel: 'تأكيد',
-      );
-      if (!ok) return;
-    }
-    if (!mounted) return;
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final updated = await ref
-        .read(projectRepositoryProvider)
-        .updateProjectBasics(
-          widget.project.id,
-          name: _nameController.text.trim(),
-          clientName: _clientController.text.trim(),
-          type: _type,
-          status: _status,
-          startDate: _startDate,
-          endDate: _endDate,
-          notes: _notesController.text.trim(),
-        );
+    ProjectModel? updated;
+    String? failureMessage;
+    try {
+      updated = await ref
+          .read(projectRepositoryProvider)
+          .updateProjectBasics(
+            widget.project.id,
+            name: _nameController.text.trim(),
+            clientName: _clientController.text.trim(),
+            type: widget.project.type,
+            status: widget.project.status,
+            startDate: _startDate,
+            endDate: _endDate,
+            notes: _notesController.text.trim(),
+          );
+    } on ProjectRepositoryException catch (error) {
+      failureMessage = error.messageAr;
+    } catch (_) {
+      failureMessage = 'تعذّر حفظ المشروع بأمان، حاول مرة أخرى';
+    }
+    if (!mounted) return;
+    if (updated == null) {
+      setState(() => _saving = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text(failureMessage ?? 'تعذّر حفظ التغييرات')),
+      );
+      return;
+    }
     // Refresh the details + lists.
     ref.invalidate(projectByIdProvider(widget.project.id));
     ref.invalidate(allProjectsProvider);
     ref.invalidate(managerProjectsProvider);
     ref.invalidate(photographerProjectsProvider);
-    if (!mounted) return;
-    if (updated == null) {
-      setState(() => _saving = false);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('تعذّر حفظ التغييرات')),
-      );
-      return;
-    }
     navigator.pop();
     messenger.showSnackBar(const SnackBar(content: Text('تم حفظ التغييرات')));
   }
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = widget.project.isActive;
     return Column(
       children: [
         Expanded(
@@ -195,6 +182,7 @@ class _EditBodyState extends ConsumerState<_EditBody> {
                 SumouTextField(
                   controller: _nameController,
                   label: 'اسم المشروع',
+                  enabled: canEdit,
                   onChanged: (_) => setState(() {}),
                 ),
                 if (_showErrors && _nameError != null) _ErrorText(_nameError!),
@@ -202,51 +190,32 @@ class _EditBodyState extends ConsumerState<_EditBody> {
                 SumouTextField(
                   controller: _clientController,
                   label: 'اسم العميل',
+                  enabled: canEdit,
                   onChanged: (_) => setState(() {}),
                 ),
                 if (_showErrors && _clientError != null)
                   _ErrorText(_clientError!),
                 const SizedBox(height: 16),
-                Text('نوع المشروع', style: AppTextStyles.label),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final t in ProjectType.values)
-                      _ChoiceChip(
-                        label: t.nameAr,
-                        selected: _type == t,
-                        onTap: () => setState(() => _type = t),
-                      ),
-                  ],
+                _ReadOnlyField(
+                  label: 'نوع المشروع (غير قابل للتغيير)',
+                  value: widget.project.type.nameAr,
                 ),
                 const SizedBox(height: 16),
-                Text('حالة المشروع', style: AppTextStyles.label),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final s in _kEditableStatuses)
-                      _ChoiceChip(
-                        label: sumouStatusLabel(s),
-                        selected: _status == s,
-                        onTap: () => setState(() => _status = s),
-                      ),
-                  ],
+                _ReadOnlyField(
+                  label: 'حالة المشروع (تتغير عبر المسار المعتمد فقط)',
+                  value: widget.project.status.nameAr,
                 ),
                 const SizedBox(height: 16),
                 _DateField(
                   label: 'تاريخ البداية',
                   value: _startDate,
-                  onTap: () => _pickDate(isStart: true),
+                  onTap: canEdit ? () => _pickDate(isStart: true) : null,
                 ),
                 const SizedBox(height: 16),
                 _DateField(
                   label: 'تاريخ التسليم',
                   value: _endDate,
-                  onTap: () => _pickDate(isStart: false),
+                  onTap: canEdit ? () => _pickDate(isStart: false) : null,
                 ),
                 if (_showErrors && _dateError != null) _ErrorText(_dateError!),
                 const SizedBox(height: 16),
@@ -254,7 +223,15 @@ class _EditBodyState extends ConsumerState<_EditBody> {
                   controller: _notesController,
                   label: 'ملاحظات (اختياري)',
                   maxLines: 3,
+                  enabled: canEdit,
                 ),
+                if (!canEdit) ...[
+                  const SizedBox(height: 16),
+                  const SumouErrorBox(
+                    message:
+                        'تعديل البيانات متاح فقط للمشاريع النشطة أو قيد التنفيذ',
+                  ),
+                ],
               ],
             ),
           ),
@@ -278,7 +255,7 @@ class _EditBodyState extends ConsumerState<_EditBody> {
                     label: 'حفظ',
                     icon: Icons.check,
                     loading: _saving,
-                    onPressed: _saving ? null : _save,
+                    onPressed: _saving || !canEdit ? null : _save,
                   ),
                 ),
               ],
@@ -290,45 +267,21 @@ class _EditBodyState extends ConsumerState<_EditBody> {
   }
 }
 
-/// Arabic label for an editable project status.
-String sumouStatusLabel(ProjectStatus status) => switch (status) {
-  ProjectStatus.active => 'نشط',
-  ProjectStatus.completed => 'منتهي',
-  ProjectStatus.pendingClosure => 'بانتظار الإغلاق',
-  _ => status.nameAr,
-};
-
-class _ChoiceChip extends StatelessWidget {
-  const _ChoiceChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+class _ReadOnlyField extends StatelessWidget {
+  const _ReadOnlyField({required this.label, required this.value});
 
   final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentGreen : AppColors.textMuted;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color:
-              selected
-                  ? AppColors.accentGreen.withValues(alpha: 0.15)
-                  : AppColors.surfaceSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.accentGreen : AppColors.border,
-          ),
-        ),
-        child: Text(label, style: AppTextStyles.label.copyWith(color: color)),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        SumouCard(child: Text(value, style: AppTextStyles.bodyMuted)),
+      ],
     );
   }
 }
@@ -342,7 +295,7 @@ class _DateField extends StatelessWidget {
 
   final String label;
   final DateTime value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

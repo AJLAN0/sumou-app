@@ -1,5 +1,7 @@
 // Tests for the submit-closure-request flow.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,14 +10,18 @@ import 'package:sumou_app/app/app.dart';
 import 'package:sumou_app/core/models/models.dart';
 import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
+import 'package:sumou_app/data/repositories/project_repository.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/projects/submit_closure_request_screen.dart';
 import 'test_helpers.dart';
 
 void main() {
-  // Logs in as the photographer, opens a project, opens the closure screen.
-  Future<void> openClosure(WidgetTester tester, String projectName) async {
-    final container = makeMockContainer();
+  Future<void> openProject(
+    WidgetTester tester,
+    String projectName, {
+    ProjectRepository? repository,
+  }) async {
+    final container = makeMockContainer(projectRepository: repository);
     addTearDown(container.dispose);
     await container
         .read(authControllerProvider.notifier)
@@ -35,6 +41,15 @@ void main() {
     );
     await tester.tap(find.text(projectName));
     await tester.pumpAndSettle();
+  }
+
+  // Logs in as the photographer, opens a project, opens the closure screen.
+  Future<void> openClosure(
+    WidgetTester tester,
+    String projectName, {
+    ProjectRepository? repository,
+  }) async {
+    await openProject(tester, projectName, repository: repository);
 
     final closureButton = find.widgetWithText(SumouButton, 'طلب إغلاق');
     final detailsScroll = find.byType(Scrollable).first;
@@ -53,6 +68,8 @@ void main() {
     await openClosure(tester, 'تصوير ميداني — مهرجان الرياض');
     expect(find.text('بيانات التسليم'), findsOneWidget);
     expect(find.text('رابط التسليم'), findsWidgets);
+    expect(find.byType(TextFormField), findsNWidgets(3));
+    expect(find.textContaining('هوية مقدم الطلب'), findsNothing);
   });
 
   testWidgets('requires a delivery link', (tester) async {
@@ -88,13 +105,60 @@ void main() {
     expect(find.text('بانتظار الموافقة'), findsWidgets);
   });
 
-  testWidgets('shows a notice when a pending request already exists', (
+  testWidgets('pending project cannot enter the submission flow', (
     tester,
   ) async {
     // p-4 (تصوير زواج — العليا) already has a seeded pending closure request.
-    await openClosure(tester, 'تصوير زواج — العليا');
-    expect(find.text('يوجد طلب إغلاق قيد المراجعة'), findsOneWidget);
-    expect(find.text('إرسال طلب الإغلاق'), findsNothing);
+    await openProject(tester, 'تصوير زواج — العليا');
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -1000));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(SumouButton, 'طلب إغلاق'), findsNothing);
+  });
+
+  testWidgets('safe repository errors are shown without raw diagnostics', (
+    tester,
+  ) async {
+    final repository = _FailingSubmitRepository();
+    await openClosure(
+      tester,
+      'تصوير ميداني — مهرجان الرياض',
+      repository: repository,
+    );
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'https://delivery.test/p1',
+    );
+    await tester.tap(find.widgetWithText(SumouButton, 'إرسال طلب الإغلاق'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ليست لديك صلاحية لتنفيذ هذا الإجراء'), findsOneWidget);
+    expect(find.textContaining('raw-backend-secret'), findsNothing);
+    expect(repository.calls, 1);
+  });
+
+  testWidgets('loading state prevents a second closure submission', (
+    tester,
+  ) async {
+    final repository = _DelayedSubmitRepository();
+    await openClosure(
+      tester,
+      'تصوير ميداني — مهرجان الرياض',
+      repository: repository,
+    );
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'https://delivery.test/p1',
+    );
+    final submit = find.widgetWithText(SumouButton, 'إرسال طلب الإغلاق');
+    await tester.tap(submit);
+    await tester.pump();
+    await tester.tap(find.byType(SumouButton).last);
+    await tester.pump();
+
+    expect(repository.calls, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    repository.complete();
+    await tester.pumpAndSettle();
   });
 
   test(
@@ -144,4 +208,41 @@ void main() {
     );
     expect(result, isNull);
   });
+}
+
+class _FailingSubmitRepository extends MockProjectRepository {
+  var calls = 0;
+
+  @override
+  Future<ClosureRequestModel?> submitClosureRequest({
+    required String projectId,
+    required String submittedBy,
+    required String submittedByName,
+    String? deliveryLink,
+    String? reportFileUrl,
+    String? notes,
+  }) async {
+    calls++;
+    throw const ProjectRepositoryException(ProjectRepositoryFailure.forbidden);
+  }
+}
+
+class _DelayedSubmitRepository extends MockProjectRepository {
+  final _completer = Completer<ClosureRequestModel?>();
+  var calls = 0;
+
+  @override
+  Future<ClosureRequestModel?> submitClosureRequest({
+    required String projectId,
+    required String submittedBy,
+    required String submittedByName,
+    String? deliveryLink,
+    String? reportFileUrl,
+    String? notes,
+  }) {
+    calls++;
+    return _completer.future;
+  }
+
+  void complete() => _completer.complete(null);
 }

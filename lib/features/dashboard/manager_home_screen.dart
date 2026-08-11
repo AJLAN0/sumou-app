@@ -7,12 +7,13 @@ import '../../core/models/models.dart';
 import '../../core/widgets/widgets.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../auth/providers/auth_controller.dart';
 import '../projects/providers/projects_providers.dart';
 import '../shell/shell_providers.dart';
 
 /// Manager home dashboard (home tab of the manager shell).
 ///
-/// A clean, operational monthly summary computed from the mock repositories.
+/// A clean, operational monthly summary computed from repository data.
 /// Cards and quick actions switch the shell to the matching bottom-nav tab.
 class ManagerHomeScreen extends ConsumerWidget {
   const ManagerHomeScreen({super.key});
@@ -35,9 +36,7 @@ class ManagerHomeScreen extends ConsumerWidget {
     final projects = ref.watch(managerProjectsProvider).valueOrNull;
     final closures = ref.watch(managerAllClosureRequestsProvider).valueOrNull;
     final photographers = ref.watch(photographerCandidatesProvider).valueOrNull;
-    final counts =
-        ref.watch(photographerActiveCountsProvider).valueOrNull ??
-        const <String, int>{};
+    final user = ref.watch(authControllerProvider).currentUser;
 
     final activeCount = projects?.where((p) => p.isActive).length;
     final pendingClosures =
@@ -46,7 +45,10 @@ class ManagerHomeScreen extends ConsumerWidget {
             .length;
     final totalPhotographers = photographers?.length;
     final availablePhotographers =
-        photographers?.where((u) => (counts[u.id] ?? 0) < 2).length;
+        photographers?.where((candidate) => candidate.isAvailable).length;
+    final canAddProject =
+        (user?.hasRole(RoleType.admin) ?? false) ||
+        (user?.hasPermission(AppFeature.canAddProject) ?? false);
 
     String n(int? value) => value?.toString() ?? '—';
 
@@ -94,12 +96,14 @@ class ManagerHomeScreen extends ConsumerWidget {
         const SizedBox(height: 24),
         const SumouSectionHeader(title: 'إجراءات سريعة'),
         const SizedBox(height: 12),
-        SumouButton(
-          label: 'إضافة مشروع',
-          icon: Icons.add,
-          onPressed: () => context.push(AppRoutes.addProject),
-        ),
-        const SizedBox(height: 10),
+        if (canAddProject) ...[
+          SumouButton(
+            label: 'إضافة مشروع',
+            icon: Icons.add,
+            onPressed: () => context.push(AppRoutes.addProject),
+          ),
+          const SizedBox(height: 10),
+        ],
         SumouButton(
           label: 'عرض الطلبات',
           variant: SumouButtonVariant.secondary,

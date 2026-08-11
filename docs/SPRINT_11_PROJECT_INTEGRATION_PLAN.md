@@ -235,11 +235,14 @@ Gate:
 
 Status:
 
-- **11.6A:** project-team type-integrity hardening applied to DEV by the owner.
-- **11.6B:** public tracking and the real project/tracking provider cutover are
-  complete after the focused automated gates.
-- **11.6C:** full regression, owner-controlled DEV role/mobile QA, final security
-  closure, and the Sprint 11 completion decision remain pending.
+- **11.6A:** complete; project-team type-integrity hardening was applied to DEV
+  by the owner.
+- **11.6B:** complete; public tracking and the real project/tracking provider
+  cutover passed the focused automated gates.
+- **11.6C:** automated regression, analysis, provider, trusted-contract,
+  security, unsupported-operation, and public-minimization gates are complete.
+- Owner-controlled DEV role/mobile QA remains pending. Sprint 11 is not complete
+  until the returned owner QA is reviewed and approved.
 
 Scope:
 

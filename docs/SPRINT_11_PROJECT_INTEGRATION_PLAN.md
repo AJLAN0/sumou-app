@@ -241,10 +241,10 @@ Status:
   cutover passed the focused automated gates.
 - **11.6C:** automated regression, analysis, provider, trusted-contract,
   security, unsupported-operation, and public-minimization gates are complete.
-- **11.6D:** QA coverage audit complete: 349/432 locally automatable
-  requirements are fully automated (80.8%); 30 automatable scenarios are
-  missing direct tests. The remaining owner backlog includes 126 DEV/RLS, 32
-  device, and 31 TestFlight requirements.
+- **11.6D:** corrected QA traceability audit complete: 298/365 locally
+  automatable requirements are fully automated (81.6%); 34 automatable
+  scenarios are missing direct tests. The remaining owner backlog includes 179
+  DEV/RLS, 46 device, and 25 TestFlight requirements.
 - **Next — 11.6E:** implement the missing automated coverage identified by the
   audit; it has not started.
 - Owner-controlled DEV role/mobile QA remains pending. Sprint 11 is not complete

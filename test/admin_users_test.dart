@@ -14,6 +14,7 @@ import 'package:sumou_app/core/widgets/widgets.dart';
 import 'package:sumou_app/data/repositories/mock/mock_repositories.dart';
 import 'package:sumou_app/data/repositories/user_repository.dart';
 import 'package:sumou_app/features/admin/users_screen.dart';
+import 'package:sumou_app/features/admin/widgets/admin_chips.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
 import 'package:sumou_app/features/shell/role_based_bottom_nav.dart';
 import 'test_helpers.dart';
@@ -67,6 +68,29 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<ProviderContainer> pumpUsersScreen(
+    WidgetTester tester,
+    UserRepository repository, {
+    bool settle = true,
+  }) async {
+    final container = makeMockContainer(
+      extra: [userRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    await container
+        .read(authControllerProvider.notifier)
+        .login(username: 'admin', password: MockUsers.devPassword);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scaffold(body: UsersScreen())),
+      ),
+    );
+    await tester.pump();
+    if (settle) await tester.pumpAndSettle();
+    return container;
+  }
+
   // ---- widget flows ----
 
   testWidgets('add button opens the user form', (tester) async {
@@ -103,6 +127,129 @@ void main() {
 
     expect(find.text('لا يوجد مستخدمون'), findsOneWidget);
     expect(find.text('لم تتم إضافة مستخدمين بعد'), findsOneWidget);
+  });
+
+  testWidgets(
+    'loading failure and explicit retry perform one additional load',
+    (tester) async {
+      final repository = _ControlledListUserRepository();
+      await pumpUsersScreen(tester, repository, settle: false);
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(repository.getUsersCalls, 1);
+
+      repository.firstLoad.completeError(
+        const UserRepositoryException(UserRepositoryFailure.loadFailed),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('تعذّر تحميل المستخدمين'), findsOneWidget);
+      expect(find.text('إعادة المحاولة'), findsOneWidget);
+      expect(find.textContaining('database-secret'), findsNothing);
+      expect(repository.getUsersCalls, 1);
+
+      await tester.tap(find.text('إعادة المحاولة'));
+      await tester.pumpAndSettle();
+
+      expect(repository.getUsersCalls, 2);
+      expect(find.text(_adminListUsers.first.fullName), findsOneWidget);
+      expect(find.text('تعذّر تحميل المستخدمين'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'user cards show default and extra roles without private identity fields',
+    (tester) async {
+      await pumpUsersScreen(tester, MockUserRepository(users: _adminListUsers));
+
+      expect(find.text('أحمد السالم'), findsOneWidget);
+      expect(find.text('@ahmad.manager'), findsOneWidget);
+      expect(find.text(RoleType.manager.nameAr), findsOneWidget);
+      expect(find.text(RoleType.admin.nameAr), findsNWidgets(2));
+      expect(find.text('synthetic.internal@auth.invalid'), findsNothing);
+      expect(find.textContaining('Synthetic-Temporary'), findsNothing);
+      expect(find.textContaining('service_role'), findsNothing);
+      expect(find.textContaining('synthetic-access-token'), findsNothing);
+
+      final fieldsBeforeDetails = find.byType(TextFormField).evaluate().length;
+      await tester.tap(find.text('أحمد السالم'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('الأدوار'), findsOneWidget);
+      expect(find.text(RoleType.manager.nameAr), findsNWidgets(2));
+      expect(find.text(RoleType.admin.nameAr), findsNWidgets(3));
+      expect(find.byType(TextFormField).evaluate().length, fieldsBeforeDetails);
+      expect(find.text('synthetic.internal@auth.invalid'), findsNothing);
+      expect(find.textContaining('Synthetic-Temporary'), findsNothing);
+      expect(find.textContaining('service_role'), findsNothing);
+      expect(find.textContaining('synthetic-access-token'), findsNothing);
+    },
+  );
+
+  testWidgets('full-name and username search return deterministic users', (
+    tester,
+  ) async {
+    await pumpUsersScreen(tester, MockUserRepository(users: _adminListUsers));
+    final search = find.byType(TextFormField);
+
+    await tester.enterText(search, 'نورة');
+    await tester.pump();
+    expect(find.text('نورة الفهد'), findsOneWidget);
+    expect(find.text('أحمد السالم'), findsNothing);
+    expect(find.text('ليلى المسؤول'), findsNothing);
+
+    await tester.enterText(search, 'layla.admin');
+    await tester.pump();
+    expect(find.text('ليلى المسؤول'), findsOneWidget);
+    expect(find.text('أحمد السالم'), findsNothing);
+    expect(find.text('نورة الفهد'), findsNothing);
+  });
+
+  testWidgets('status and role filters return deterministic user subsets', (
+    tester,
+  ) async {
+    await pumpUsersScreen(tester, MockUserRepository(users: _adminListUsers));
+
+    Future<void> expectFilter(
+      String label, {
+      required List<String> visible,
+      required List<String> hidden,
+    }) async {
+      await tester.tap(find.widgetWithText(AdminFilterChip, label));
+      await tester.pump();
+      for (final name in visible) {
+        expect(find.text(name), findsOneWidget, reason: '$label: $name');
+      }
+      for (final name in hidden) {
+        expect(find.text(name), findsNothing, reason: '$label: $name');
+      }
+    }
+
+    await expectFilter(
+      'نشط',
+      visible: ['أحمد السالم', 'ليلى المسؤول'],
+      hidden: ['نورة الفهد'],
+    );
+    await expectFilter(
+      'غير نشط',
+      visible: ['نورة الفهد'],
+      hidden: ['أحمد السالم', 'ليلى المسؤول'],
+    );
+    await expectFilter(
+      'المدراء',
+      visible: ['أحمد السالم'],
+      hidden: ['نورة الفهد', 'ليلى المسؤول'],
+    );
+    await expectFilter(
+      'المصورين',
+      visible: ['نورة الفهد'],
+      hidden: ['أحمد السالم', 'ليلى المسؤول'],
+    );
+    await expectFilter(
+      'الأدمن',
+      visible: ['أحمد السالم', 'ليلى المسؤول'],
+      hidden: ['نورة الفهد'],
+    );
   });
 
   testWidgets('deleting a user shows a success snackbar', (tester) async {
@@ -623,6 +770,44 @@ Finder _formField(String label) => find.descendant(
   ),
   matching: find.byType(TextFormField),
 );
+
+const _adminListUsers = <UserModel>[
+  UserModel(
+    id: 'list-manager-admin',
+    fullName: 'أحمد السالم',
+    username: 'ahmad.manager',
+    email: 'synthetic.internal@auth.invalid',
+    defaultRole: RoleType.manager,
+    roles: [RoleType.manager, RoleType.admin],
+  ),
+  UserModel(
+    id: 'list-photographer',
+    fullName: 'نورة الفهد',
+    username: 'noura.photo',
+    defaultRole: RoleType.photographer,
+    roles: [RoleType.photographer],
+    active: false,
+  ),
+  UserModel(
+    id: 'list-admin',
+    fullName: 'ليلى المسؤول',
+    username: 'layla.admin',
+    defaultRole: RoleType.admin,
+    roles: [RoleType.admin],
+  ),
+];
+
+class _ControlledListUserRepository extends MockUserRepository {
+  final Completer<List<UserModel>> firstLoad = Completer<List<UserModel>>();
+  int getUsersCalls = 0;
+
+  @override
+  Future<List<UserModel>> getUsers() {
+    getUsersCalls++;
+    if (getUsersCalls == 1) return firstLoad.future;
+    return Future<List<UserModel>>.value(_adminListUsers);
+  }
+}
 
 class _CountingUserRepository extends MockUserRepository {
   int getUsersCalls = 0;

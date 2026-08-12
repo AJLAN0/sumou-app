@@ -154,6 +154,19 @@ void main() {
     );
   });
 
+  test('production logging sinks do not receive configuration values', () {
+    final calls = _productionLoggingCalls();
+    expect(
+      calls.where(
+        (call) => RegExp(
+          r'SupabaseConfig|SUPABASE_URL|SUPABASE_ANON_KEY|config\.(?:url|anonKey)',
+          caseSensitive: false,
+        ).hasMatch(call),
+      ),
+      isEmpty,
+    );
+  });
+
   test(
     'production logging sinks do not receive sensitive request payloads',
     () {

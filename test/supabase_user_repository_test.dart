@@ -102,6 +102,32 @@ void main() {
     });
 
     test(
+      'duplicate profile IDs fail closed before users are returned',
+      () async {
+        final gateway =
+            FakeUserAdminGateway()
+              ..profiles = [
+                validProfile(),
+                Map<String, dynamic>.from(validProfile()),
+              ];
+        final repository = SupabaseUserRepository.withGateway(gateway);
+
+        await expectLater(
+          repository.getUsers(),
+          throwsA(
+            isA<UserRepositoryException>().having(
+              (error) => error.reason,
+              'reason',
+              UserRepositoryFailure.invalidData,
+            ),
+          ),
+        );
+        expect(gateway.roleAssignmentCalls, 0);
+        expect(gateway.photoAssignmentCalls, 0);
+      },
+    );
+
+    test(
       'query failures do not become an empty list or expose raw errors',
       () async {
         final gateway = FakeUserAdminGateway()..throwOnProfiles = true;

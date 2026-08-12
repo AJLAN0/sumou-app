@@ -75,6 +75,77 @@ void main() {
     expect(find.text('حفظ من دون فريق'), findsOneWidget);
   });
 
+  testWidgets(
+    'assignment value is metadata without finance or payment labels',
+    (tester) async {
+      await openAssign(tester, 'تصوير ميداني — مهرجان الرياض');
+      await tester.scrollUntilVisible(
+        find.text('قيمة الإسناد (اختياري)'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      final visibleText =
+          tester
+              .widgetList<Text>(find.byType(Text))
+              .map((widget) => widget.data ?? '')
+              .join(' ')
+              .toLowerCase();
+      expect(visibleText, contains('قيمة الإسناد'));
+      for (final prohibited in <String>[
+        'finance',
+        'payment',
+        'price',
+        'cost',
+        'salary',
+        'sar',
+        'ريال',
+        'سعر',
+        'دفع',
+        'مالية',
+      ]) {
+        expect(visibleText, isNot(contains(prohibited)), reason: prohibited);
+      }
+    },
+  );
+
+  testWidgets(
+    'cancelling clear-team performs no mutation or optimistic clear',
+    (tester) async {
+      final repository = _RecordingProjectRepository();
+      await openAssign(
+        tester,
+        'تصوير ميداني — مهرجان الرياض',
+        repository: repository,
+      );
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('حفظ الإسناد'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('إزالة جميع أعضاء الفريق'), findsOneWidget);
+      expect(repository.assignCalls, 0);
+      await tester.tap(find.text('إلغاء'));
+      await tester.pumpAndSettle();
+
+      expect(repository.assignCalls, 0);
+      expect(find.text('الفريق المختار (0)'), findsOneWidget);
+      expect(find.text('تم تحديث فريق المشروع'), findsNothing);
+      final persisted = await repository.getProjectById('p-1');
+      expect(persisted!.teamRoles, hasLength(1));
+      expect(persisted.teamRoles.single.personName, 'نورة الحنايا');
+
+      await tester.tap(find.byIcon(Icons.arrow_back).first);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('نورة الحنايا'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('نورة الحنايا'), findsOneWidget);
+    },
+  );
+
   testWidgets('assigning a new member updates the project team', (
     tester,
   ) async {

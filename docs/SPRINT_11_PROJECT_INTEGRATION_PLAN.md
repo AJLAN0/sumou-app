@@ -247,8 +247,10 @@ Status:
   DEV/RLS, 46 device, and 27 TestFlight requirements.
 - **11.6E1:** Authentication/User/Admin P0 automation complete; 52 accepted
   audit requirements now have direct local evidence.
-- **11.6E2:** pending. Owner-controlled DEV QA and device/TestFlight QA also
-  remain pending; Sprint 11 is incomplete.
+- **11.6E2:** complete; all 18 accepted project/security P0 local-automation
+  gaps now have direct passing evidence. **11.6E3 P1 automation is pending.**
+  Owner-controlled DEV QA and device/TestFlight QA also remain pending; Sprint
+  11 is incomplete.
 - Owner-controlled DEV role/mobile QA remains pending. Sprint 11 is not complete
   until the returned owner QA is reviewed and approved.
 

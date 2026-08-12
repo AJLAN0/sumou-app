@@ -2,7 +2,7 @@
 
 ## Outcome
 
-The accepted authoritative inventory remains **657 exact requirements**. This pass re-opened cited test bodies and retained A/B only where a named test directly proves the requirement or a precisely stated subset. It downgraded **137** former A rows, changed **31** former B rows, and reclassified **0** former C rows out of local automation.
+The accepted authoritative inventory remains **657 exact requirements**. This pass re-opened cited test bodies and retained A/B only where a named test directly proves the requirement or a precisely stated subset. It downgraded **137** former A rows, changed **31** former B rows, and reclassified **0** former C rows out of local automation. Step 11.6E2 subsequently promoted exactly the accepted **18 P0** rows from C to A after their direct local evidence passed.
 
 ## Source reconciliation
 
@@ -44,9 +44,9 @@ The accepted authoritative inventory remains **657 exact requirements**. This pa
 
 | Status | Count | % of all 657 |
 |---|---:|---:|
-| A Automated | 213 | 32.4% |
+| A Automated | 231 | 35.2% |
 | B Partially automated | 13 | 2.0% |
-| C Missing automated test | 117 | 17.8% |
+| C Missing automated test | 99 | 15.1% |
 | D DEV integration required | 199 | 30.3% |
 | E Device manual required | 46 | 7.0% |
 | F TestFlight release required | 27 | 4.1% |
@@ -54,7 +54,7 @@ The accepted authoritative inventory remains **657 exact requirements**. This pa
 | H Test-data setup | 23 | 3.5% |
 | **Total** | **657** | **100.0%** |
 
-Automatable means A+B+C only. The corrected denominator is **343**. Fully automated coverage is **213/343 = 62.1%**. Full-or-partial coverage is **226/343 = 65.9%**.
+Automatable means A+B+C only. The corrected denominator is **343**. Fully automated coverage is **231/343 = 67.3%**. Full-or-partial coverage is **244/343 = 71.1%**.
 
 ## Evidence rules applied
 
@@ -478,9 +478,9 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 | TEAM-028 | 19. Team assignment and availability | Race condition where availability changes before save fails safely. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | TEAM-029 | 19. Team assignment and availability | Unavailable result reveals no reason. | A AUTOMATED | REPOSITORY | test/assign_photographers_test.dart — `keeps unavailable candidate disabled without a reason` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | TEAM-030 | 19. Team assignment and availability | Assignment value remains metadata only. | A AUTOMATED | REPOSITORY | test/supabase_project_repository_test.dart — `groups one internal person with multiple types in exact payload` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
-| TEAM-031 | 19. Team assignment and availability | Assignment value is never presented as finance/payment. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/assign_photographers_test.dart; prevents regression of this exact local behavior. |
+| TEAM-031 | 19. Team assignment and availability | Assignment value is never presented as finance/payment. | A AUTOMATED | WIDGET | test/assign_photographers_test.dart — `assignment value is metadata without finance or payment labels` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | TEAM-032 | 19. Team assignment and availability | Clear-team operation requires confirmation. | A AUTOMATED | REPOSITORY | test/assign_photographers_test.dart — `requires confirmation before clearing the whole team` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
-| TEAM-033 | 19. Team assignment and availability | Cancel clear-team performs no mutation. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/assign_photographers_test.dart; prevents regression of this exact local behavior. |
+| TEAM-033 | 19. Team assignment and availability | Cancel clear-team performs no mutation. | A AUTOMATED | WIDGET | test/assign_photographers_test.dart — `cancelling clear-team performs no mutation or optimistic clear` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | TEAM-034 | 19. Team assignment and availability | Save invokes one trusted RPC. | A AUTOMATED | REPOSITORY | test/supabase_project_repository_test.dart — `groups one internal person with multiple types in exact payload` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | TEAM-035 | 19. Team assignment and availability | No direct multi-table Flutter writes occur. | A AUTOMATED | REPOSITORY | test/supabase_project_repository_test.dart — `gateway source contains only approved RPC contracts` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | PARTIAL-001 | 20. Partial RLS project graphs | Photographer sees the assigned project. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
@@ -520,7 +520,7 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 | CLOSUREREVIEW-004 | 22. Closure approval and rejection | Photographer cannot approve their own request. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | CLOSUREREVIEW-005 | 22. Closure approval and rejection | Only pending requests show review controls. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | CLOSUREREVIEW-006 | 22. Closure approval and rejection | Parent project must be `pending_closure`. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
-| CLOSUREREVIEW-007 | 22. Closure approval and rejection | Approve requires confirmation where provided. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/closure_requests_test.dart; prevents regression of this exact local behavior. |
+| CLOSUREREVIEW-007 | 22. Closure approval and rejection | Approve requires confirmation where provided. | A AUTOMATED | WIDGET | test/closure_requests_test.dart — `approval confirmation cancel is inert and confirm calls once` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | CLOSUREREVIEW-008 | 22. Closure approval and rejection | Approval updates closure status to approved. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | CLOSUREREVIEW-009 | 22. Closure approval and rejection | Approval updates project state correctly. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | CLOSUREREVIEW-010 | 22. Closure approval and rejection | Reject requires a nonblank reason. | A AUTOMATED | REPOSITORY | test/closure_requests_test.dart — `rejecting requires a reason and retains the decision` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
@@ -576,7 +576,7 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 | TRACK-025 | 24. Public client tracking | No review/rating form appears. | A AUTOMATED | WIDGET | test/supabase_tracking_repository_test.dart — `submitReview is unsupported and performs zero gateway calls` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | TRACK-026 | 24. Public client tracking | Network failure displays safe retry. | A AUTOMATED | WIDGET | test/tracking_test.dart — `network failure is safe and offers explicit retry` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | TRACK-027 | 24. Public client tracking | Retry is user-triggered, not automatic. | A AUTOMATED | REPOSITORY | test/supabase_tracking_repository_test.dart — `server or network failure maps safely without retry` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
-| TRACK-028 | 24. Public client tracking | Repeated search does not make hidden duplicate requests. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/tracking_test.dart; prevents regression of this exact local behavior. |
+| TRACK-028 | 24. Public client tracking | Repeated search does not make hidden duplicate requests. | A AUTOMATED | WIDGET | test/tracking_test.dart — `rapid repeated search has one pending request and one result` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | DENY-001 | 25. Permission denial scenarios | Manager without `can_add_project` cannot create. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | DENY-002 | 25. Permission denial scenarios | Manager without `can_edit_project` cannot edit. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | DENY-003 | 25. Permission denial scenarios | Manager without `can_assign_photographers` cannot load/use assignment actions. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
@@ -591,7 +591,7 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 | DENY-012 | 25. Permission denial scenarios | `can_manage_finance` grants nothing in this app. | A AUTOMATED | WIDGET | test/permissions_mapping_test.dart — `can_manage_finance (inactive/excluded) never maps to a feature` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | DENY-013 | 25. Permission denial scenarios | UI gate never broadens backend authorization. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | DENY-014 | 25. Permission denial scenarios | Manually navigating to a hidden route still fails safely. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
-| DENY-015 | 25. Permission denial scenarios | Forbidden response exposes no SQLSTATE/message/details/hint. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/authorization_denial_test.dart; prevents regression of this exact local behavior. |
+| DENY-015 | 25. Permission denial scenarios | Forbidden response exposes no SQLSTATE/message/details/hint. | A AUTOMATED | WIDGET | test/closure_requests_test.dart — `forbidden failure renders bounded Arabic without diagnostics` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | FAILURE-001 | 26. Offline, timeout, and retry behavior | Cold launch offline does not remain permanently stuck. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
 | FAILURE-002 | 26. Offline, timeout, and retry behavior | Login offline shows safe Arabic error. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
 | FAILURE-003 | 26. Offline, timeout, and retry behavior | Session restoration offline remains coherent. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
@@ -612,30 +612,30 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 | FAILURE-018 | 26. Offline, timeout, and retry behavior | Restoring connectivity and tapping retry succeeds. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
 | FAILURE-019 | 26. Offline, timeout, and retry behavior | Loading overlays/buttons are dismissed after failure. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P1: add direct WIDGET coverage in test/failure_state_test.dart; prevents regression of this exact local behavior. |
 | FAILURE-020 | 26. Offline, timeout, and retry behavior | No infinite spinner remains. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P1: add direct WIDGET coverage in test/failure_state_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-001 | 27. Security and privacy | No service-role key exists in Flutter. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
+| SECURITY-001 | 27. Security and privacy | No service-role key exists in Flutter. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `production Flutter exposes no service-role initialization path` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | SECURITY-002 | 27. Security and privacy | No service-role key appears in app bundle logs. | F TESTFLIGHT_RELEASE_REQUIRED | TESTFLIGHT | — | Existing implementation inspected; implementation alone is not evidence. | Verify from the distributed TestFlight/App Store build. |
-| SECURITY-003 | 27. Security and privacy | No password is logged. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-004 | 27. Security and privacy | No temporary password is logged. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-005 | 27. Security and privacy | No JWT/access token is logged. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-006 | 27. Security and privacy | No Authorization header is logged. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-007 | 27. Security and privacy | No internal Auth email is displayed. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/security_error_ui_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-008 | 27. Security and privacy | No raw PostgREST error is displayed. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/security_error_ui_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-009 | 27. Security and privacy | No SQLSTATE is displayed. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/security_error_ui_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-010 | 27. Security and privacy | No database function/table name appears in Arabic error UI. | C MISSING_AUTOMATED_TEST | WIDGET | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct WIDGET coverage in test/security_error_ui_test.dart; prevents regression of this exact local behavior. |
-| SECURITY-011 | 27. Security and privacy | No request payload is printed. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
+| SECURITY-003 | 27. Security and privacy | No password is logged. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `production logging sinks do not receive password values` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-004 | 27. Security and privacy | No temporary password is logged. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `production logging sinks do not receive temporary passwords` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-005 | 27. Security and privacy | No JWT/access token is logged. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `production logging sinks do not receive JWT or access tokens` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-006 | 27. Security and privacy | No Authorization header is logged. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `production logging sinks do not receive Authorization headers` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-007 | 27. Security and privacy | No internal Auth email is displayed. | A AUTOMATED | WIDGET | test/closure_requests_test.dart — `forbidden failure renders bounded Arabic without diagnostics` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-008 | 27. Security and privacy | No raw PostgREST error is displayed. | A AUTOMATED | WIDGET | test/closure_requests_test.dart — `forbidden failure renders bounded Arabic without diagnostics` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-009 | 27. Security and privacy | No SQLSTATE is displayed. | A AUTOMATED | WIDGET | test/closure_requests_test.dart — `forbidden failure renders bounded Arabic without diagnostics` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-010 | 27. Security and privacy | No database function/table name appears in Arabic error UI. | A AUTOMATED | WIDGET | test/closure_requests_test.dart — `forbidden failure renders bounded Arabic without diagnostics` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
+| SECURITY-011 | 27. Security and privacy | No request payload is printed. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `production logging sinks do not receive sensitive request payloads` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | SECURITY-012 | 27. Security and privacy | No user can access another user’s leave details. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | SECURITY-013 | 27. Security and privacy | No photographer can read teammate hidden metadata. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | SECURITY-014 | 27. Security and privacy | Anonymous client cannot directly read profiles. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | SECURITY-015 | 27. Security and privacy | Anonymous client cannot directly read projects. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | SECURITY-016 | 27. Security and privacy | Anonymous client cannot directly read project links. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | SECURITY-017 | 27. Security and privacy | State-changing project actions use trusted RPCs only. | A AUTOMATED | STATIC_SECURITY | test/supabase_project_repository_test.dart — `gateway source contains only approved RPC contracts` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
-| SECURITY-018 | 27. Security and privacy | Auth administrative actions use Edge Functions only. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
+| SECURITY-018 | 27. Security and privacy | Auth administrative actions use Edge Functions only. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `Auth administrative actions use approved Edge Functions only` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | SECURITY-019 | 27. Security and privacy | RLS remains authoritative for direct authenticated reads. | D DEV_INTEGRATION_REQUIRED | RLS_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Execute against SUMOU-DEV; verify deployed Auth/RPC/RLS/audit truth. |
 | SECURITY-020 | 27. Security and privacy | Screenshots/QA notes contain no credentials. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
 | SECURITY-021 | 27. Security and privacy | Clipboard password is copied only after explicit user action. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
-| SECURITY-022 | 27. Security and privacy | One-time password is absent from repository/provider state. | C MISSING_AUTOMATED_TEST | REPOSITORY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct REPOSITORY coverage in test/supabase_user_repository_test.dart; prevents regression of this exact local behavior. |
+| SECURITY-022 | 27. Security and privacy | One-time password is absent from repository/provider state. | A AUTOMATED | REPOSITORY | test/supabase_user_repository_test.dart — `one-time password remains only in operation result, not repository/provider/user state` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | SECURITY-023 | 27. Security and privacy | Finance/payment/Rekaz features remain absent. | B PARTIALLY_AUTOMATED | STATIC_SECURITY | test/permissions_mapping_test.dart — `can_manage_finance (inactive/excluded) never maps to a feature`; automated subset: finance permission cannot map; still required: whole-app absence scan | Existing implementation inspected; implementation alone is not evidence. | automated subset: finance permission cannot map; still required: whole-app absence scan |
-| SECURITY-024 | 27. Security and privacy | Notification/FCM/push/reminder features remain absent. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | P0: add direct STATIC_SECURITY coverage in test/security_invariants_test.dart; prevents regression of this exact local behavior. |
+| SECURITY-024 | 27. Security and privacy | Notification/FCM/push/reminder features remain absent. | A AUTOMATED | STATIC_SECURITY | test/security_invariants_test.dart — `excluded notification, FCM, push, reminder, payment, and Rekaz integrations remain absent` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | RTL-001 | 28. Arabic RTL and mobile usability | Arabic direction is RTL. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
 | RTL-002 | 28. Arabic RTL and mobile usability | Back arrows point correctly. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
 | RTL-003 | 28. Arabic RTL and mobile usability | Text fields align correctly. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Execute on representative physical devices. |
@@ -728,26 +728,10 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 
 ## Final automation backlog
 
-### P0 (18)
+### P0 (0)
 
-- **TEAM-031** — Assignment value is never presented as finance/payment. Level: `WIDGET`; target: `test/assign_photographers_test.dart`; value: prevents regression of this exact local behavior.
-- **TEAM-033** — Cancel clear-team performs no mutation. Level: `WIDGET`; target: `test/assign_photographers_test.dart`; value: prevents regression of this exact local behavior.
-- **CLOSUREREVIEW-007** — Approve requires confirmation where provided. Level: `WIDGET`; target: `test/closure_requests_test.dart`; value: prevents regression of this exact local behavior.
-- **TRACK-028** — Repeated search does not make hidden duplicate requests. Level: `WIDGET`; target: `test/tracking_test.dart`; value: prevents regression of this exact local behavior.
-- **DENY-015** — Forbidden response exposes no SQLSTATE/message/details/hint. Level: `WIDGET`; target: `test/authorization_denial_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-001** — No service-role key exists in Flutter. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-003** — No password is logged. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-004** — No temporary password is logged. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-005** — No JWT/access token is logged. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-006** — No Authorization header is logged. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-007** — No internal Auth email is displayed. Level: `WIDGET`; target: `test/security_error_ui_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-008** — No raw PostgREST error is displayed. Level: `WIDGET`; target: `test/security_error_ui_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-009** — No SQLSTATE is displayed. Level: `WIDGET`; target: `test/security_error_ui_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-010** — No database function/table name appears in Arabic error UI. Level: `WIDGET`; target: `test/security_error_ui_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-011** — No request payload is printed. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-018** — Auth administrative actions use Edge Functions only. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-022** — One-time password is absent from repository/provider state. Level: `REPOSITORY`; target: `test/supabase_user_repository_test.dart`; value: prevents regression of this exact local behavior.
-- **SECURITY-024** — Notification/FCM/push/reminder features remain absent. Level: `STATIC_SECURITY`; target: `test/security_invariants_test.dart`; value: prevents regression of this exact local behavior.
+All 18 accepted P0 local-automation gaps now have direct passing evidence. P1
+work remains intentionally unstarted.
 
 ### P1 (98)
 
@@ -858,20 +842,20 @@ Automatable means A+B+C only. The corrected denominator is **343**. Fully automa
 
 - Source and matrix rows: **657/657**.
 - A+B+C+D+E+F+G+H: **657**.
-- C rows and backlog entries: **117/117**.
+- C rows and backlog entries: **99/99**.
 - Source IDs, wording, and per-section counts are unchanged.
-- Remaining A rows: **213**, each with a named direct test.
+- Remaining A rows: **231**, each with a named direct test.
 - Remaining B rows: **13**, each with a named partial test and explicit remainder.
-- All **128** unique A/B named-test references were matched to their declarations
+- All **142** unique A/B named-test references were matched to their declarations
   and inspected bodies; the parameterized tracking names and escaped-regex name
   were also verified from their generating declarations.
 - Every C row has a locally appropriate level and a concrete existing or
   proposed test-file target.
-- Step 11.6E1 adds only the documented local auth/user tests and minimal runtime
-  fixes; no backend, DEV, or Production change is included.
+- Step 11.6E2 adds only the documented local project/security tests and evidence
+  updates; no runtime, backend, DEV, or Production change is included.
 
 ## Validation
 
-- `flutter test --concurrency=1`: **+433, all tests passed**.
+- `flutter test --concurrency=1`: **474 tests passed**.
 - `flutter analyze`: **no issues found**.
 - `git diff --check`: **passed**.

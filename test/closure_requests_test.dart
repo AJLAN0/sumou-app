@@ -62,6 +62,29 @@ void main() {
     expect(find.text('رفض'), findsNothing);
   });
 
+  testWidgets('approval confirmation cancel is inert and confirm calls once', (
+    tester,
+  ) async {
+    final repository = _RecordingApproveRepository();
+    await openRequests(tester, repository: repository);
+
+    await tester.tap(find.text('قبول'));
+    await tester.pumpAndSettle();
+    expect(find.text('قبول طلب الإغلاق'), findsOneWidget);
+    expect(repository.calls, 0);
+    await tester.tap(find.text('إلغاء'));
+    await tester.pumpAndSettle();
+    expect(repository.calls, 0);
+    expect(find.text('تصوير زواج — العليا'), findsOneWidget);
+
+    await tester.tap(find.text('قبول'));
+    await tester.pumpAndSettle();
+    expect(repository.calls, 0);
+    await tester.tap(find.text('قبول وإنهاء'));
+    await tester.pumpAndSettle();
+    expect(repository.calls, 1);
+  });
+
   testWidgets('rejecting requires a reason and retains the decision', (
     tester,
   ) async {
@@ -85,17 +108,30 @@ void main() {
     expect(find.text('رفض'), findsNothing);
   });
 
-  testWidgets('approve failure shows safe Arabic without diagnostics', (
+  testWidgets('forbidden failure renders bounded Arabic without diagnostics', (
     tester,
   ) async {
-    await openRequests(tester, repository: _FailingApproveRepository());
+    await openRequests(tester, repository: _MaliciousForbiddenRepository());
     await tester.tap(find.text('قبول'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('قبول وإنهاء'));
     await tester.pumpAndSettle();
 
-    expect(find.text('الإجراء غير متاح حاليًا، حاول لاحقًا'), findsOneWidget);
-    expect(find.textContaining('raw-backend-secret'), findsNothing);
+    expect(
+      find.text('تعذّر تنفيذ العملية بأمان، حاول مرة أخرى'),
+      findsOneWidget,
+    );
+    for (final prohibited in <String>[
+      'SQLSTATE 42501',
+      'PostgREST details',
+      'hint=synthetic_hint',
+      'profiles',
+      'project_team_members',
+      'assign_team_roles',
+      'synthetic.user@auth.invalid',
+    ]) {
+      expect(find.textContaining(prohibited), findsNothing);
+    }
   });
 
   testWidgets('approve loading prevents a duplicate mutation', (tester) async {
@@ -148,12 +184,27 @@ void main() {
   });
 }
 
-class _FailingApproveRepository extends MockProjectRepository {
+class _MaliciousForbiddenRepository extends MockProjectRepository {
   @override
   Future<ClosureRequestModel?> approveClosureRequest(String requestId) {
-    throw const ProjectRepositoryException(
-      ProjectRepositoryFailure.unavailable,
-    );
+    throw _SyntheticForbiddenFailure();
+  }
+}
+
+class _SyntheticForbiddenFailure implements Exception {
+  @override
+  String toString() =>
+      'SQLSTATE 42501 PostgREST details hint=synthetic_hint profiles '
+      'project_team_members assign_team_roles synthetic.user@auth.invalid';
+}
+
+class _RecordingApproveRepository extends MockProjectRepository {
+  var calls = 0;
+
+  @override
+  Future<ClosureRequestModel?> approveClosureRequest(String requestId) {
+    calls++;
+    return super.approveClosureRequest(requestId);
   }
 }
 

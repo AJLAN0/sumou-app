@@ -1,8 +1,13 @@
+import 'dart:io';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sumou_app/core/models/models.dart';
+import 'package:sumou_app/core/providers/repository_providers.dart';
 import 'package:sumou_app/data/repositories/supabase/supabase_user_repository.dart';
 import 'package:sumou_app/data/repositories/supabase/user_gateway.dart';
 import 'package:sumou_app/data/repositories/user_repository.dart';
+import 'package:sumou_app/features/admin/providers/admin_providers.dart';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const managerRoleId = '22222222-2222-4222-8222-222222222222';
@@ -181,6 +186,61 @@ void main() {
           result.temporaryPassword.toString(),
           isNot(contains('Temp-Password9!')),
         );
+        result.temporaryPassword.clear();
+        expect(result.temporaryPassword.isCleared, isTrue);
+      },
+    );
+
+    test(
+      'one-time password remains only in operation result, not repository/provider/user state',
+      () async {
+        const secret = 'Synthetic-One-Time9!';
+        final gateway =
+            FakeUserAdminGateway()
+              ..createResponse = const AdminUserFunctionResponse(
+                status: 201,
+                data: {
+                  'user': {
+                    'id': userId,
+                    'username': 'new.user',
+                    'full_name': 'مستخدم جديد',
+                    'default_role': 'manager',
+                    'roles': ['manager'],
+                    'photographer_types': [],
+                    'permission_overrides': [],
+                    'is_active': true,
+                    'must_change_password': true,
+                  },
+                  'temp_password': secret,
+                },
+              );
+        final repository = SupabaseUserRepository.withGateway(gateway);
+        final container = ProviderContainer(
+          overrides: [userRepositoryProvider.overrideWithValue(repository)],
+        );
+        addTearDown(container.dispose);
+
+        final result = await repository.provisionUser(
+          fullName: 'مستخدم جديد',
+          username: 'new.user',
+          defaultRole: RoleType.manager,
+          roles: const [RoleType.manager],
+        );
+        final cachedUsers = await container.read(usersListProvider.future);
+        final userModelSource =
+            File('lib/core/models/user_model.dart').readAsStringSync();
+
+        expect(result.temporaryPassword.value, secret);
+        expect(repository.toString(), isNot(contains(secret)));
+        expect(
+          container.read(usersListProvider).toString(),
+          isNot(contains(secret)),
+        );
+        expect(cachedUsers, isEmpty);
+        expect(cachedUsers.toString(), isNot(contains(secret)));
+        expect(userModelSource, isNot(contains('temporaryPassword')));
+        expect(userModelSource, isNot(contains('temp_password')));
+
         result.temporaryPassword.clear();
         expect(result.temporaryPassword.isCleared, isTrue);
       },

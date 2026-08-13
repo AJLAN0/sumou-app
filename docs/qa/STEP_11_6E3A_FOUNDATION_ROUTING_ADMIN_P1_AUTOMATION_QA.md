@@ -3,15 +3,16 @@
 ## Outcome
 
 Step 11.6E3A assessed exactly **47** accepted P1 candidates from BUILD,
-PUBLIC, SESSION, ROLE, and USERS. It added direct local evidence for **44** and
-reclassified **3** BUILD checks to the layer that can truthfully verify them.
-No candidate was left partial or skipped, and no already-covered candidate was
-discovered.
+PUBLIC, SESSION, ROLE, and USERS. It added direct local evidence for **44**,
+kept **2** BUILD repository-preflight checks in the local automation backlog,
+and reclassified **1** BUILD check to the DEV integration layer. No candidate
+was left partial or skipped, and no already-covered candidate was discovered.
 
 - Newly automated: **44**
 - Already covered: **0**
 - Partial: **0**
-- Reclassified: **3**
+- Reclassified: **1**
+- Retained C / local preflight pending: **2**
 - Skipped: **0**
 - New tests: **25**
 - Focused result: **90 passing** across the six changed focused test files
@@ -32,12 +33,19 @@ Newly automated IDs:
   USERS-012, USERS-013, USERS-014, USERS-015, USERS-016, USERS-017,
   USERS-019, USERS-020, USERS-021
 
-Reclassified IDs:
+Local preflight IDs retained as C:
 
-- BUILD-001: `F TESTFLIGHT_RELEASE_REQUIRED`. A feature branch must not pretend
-  to be `main`; the merged release branch/commit is a pre-release check.
-- BUILD-003: `E DEVICE_MANUAL_REQUIRED`. `config/dev.json` is intentionally
-  ignored owner-machine state and must not make clean checkout/CI tests fail.
+- BUILD-001: `C MISSING_AUTOMATED_TEST / STATIC_SECURITY`. Verify with a
+  dedicated local/release repository preflight on the final merged `main`;
+  TestFlight cannot prove Git branch state, and feature-branch Flutter tests
+  must not require `main`.
+- BUILD-003: `C MISSING_AUTOMATED_TEST / STATIC_SECURITY`. Verify in a local
+  owner/release preflight; a device cannot prove developer-machine filesystem
+  state, the ignored file must never be committed, and normal CI must not
+  depend on it.
+
+Reclassified ID:
+
 - BUILD-005: `D DEV_INTEGRATION_REQUIRED`. A synthetic HTTPS parser test cannot
   prove that the owner's ignored configuration points to the real SUMOU-DEV
   project.
@@ -90,12 +98,12 @@ credential was added or printed.
 - Authoritative requirements: **657**
 - A Automated: **275**
 - B Partially automated: **13**
-- C Missing automation: **52**
-- D/E/F reclassification changes: **+1 / +1 / +1**
-- Automatable denominator: **340**
-- Fully automated: **275/340 = 80.9%**
-- Full-or-partial: **288/340 = 84.7%**
-- Remaining P1: **51**
+- C Missing automation: **54**
+- D/E/F reclassification changes: **+1 / +0 / +0**
+- Automatable denominator: **342**
+- Fully automated: **275/342 = 80.4%**
+- Full-or-partial: **288/342 = 84.2%**
+- Remaining P1: **53**
 - Remaining P2: **1**
 
 ## Scope confirmation

@@ -2,7 +2,7 @@
 
 ## Outcome
 
-The accepted authoritative inventory remains **657 exact requirements**. Step 11.6E3A assessed 47 accepted P1 candidates, added direct evidence for 44, and moved 3 BUILD checks to their genuine owner/environment layers. Evidence remains exact: repository implementation alone is not counted.
+The accepted authoritative inventory remains **657 exact requirements**. Step 11.6E3A assessed 47 accepted P1 candidates, added direct evidence for 44, retained 2 repository preflight checks in the local-automation backlog, and moved BUILD-005 to its genuine DEV integration layer. Evidence remains exact: repository implementation alone is not counted.
 
 ## Source reconciliation
 
@@ -46,15 +46,15 @@ The accepted authoritative inventory remains **657 exact requirements**. Step 11
 |---|---:|---:|
 | A Automated | 275 | 41.9% |
 | B Partially automated | 13 | 2.0% |
-| C Missing automated test | 52 | 7.9% |
+| C Missing automated test | 54 | 8.2% |
 | D DEV integration required | 200 | 30.4% |
-| E Device manual required | 47 | 7.2% |
-| F TestFlight release required | 28 | 4.3% |
+| E Device manual required | 46 | 7.0% |
+| F TestFlight release required | 27 | 4.1% |
 | G Intentionally unsupported | 19 | 2.9% |
 | H Test-data setup | 23 | 3.5% |
 | **Total** | **657** | **100.0%** |
 
-Automatable means A+B+C only. The corrected denominator is **340**. Fully automated coverage is **275/340 = 80.9%**. Full-or-partial coverage is **288/340 = 84.7%**.
+Automatable means A+B+C only. The corrected denominator is **342**. Fully automated coverage is **275/342 = 80.4%**. Full-or-partial coverage is **288/342 = 84.2%**.
 
 ## Evidence rules applied
 
@@ -91,9 +91,9 @@ Automatable means A+B+C only. The corrected denominator is **340**. Fully automa
 | DATA-P9 | 1. Recommended DEV test data | P9 — Rejected closure project | H TEST_DATA_SETUP | TEST_DATA | — | Existing implementation inspected; implementation alone is not evidence. | Known automatically: no; manual DEV: yes; disposable: yes; UI creation: partial. |
 | DATA-P10 | 1. Recommended DEV test data | P10 — Project owned by another manager | H TEST_DATA_SETUP | TEST_DATA | — | Existing implementation inspected; implementation alone is not evidence. | Known automatically: no; manual DEV: yes; disposable: yes; UI creation: partial. |
 | DATA-P11 | 1. Recommended DEV test data | P11 — Project containing a retained external member | H TEST_DATA_SETUP | TEST_DATA | — | Existing implementation inspected; implementation alone is not evidence. | Known automatically: no; manual DEV: yes; disposable: yes; UI creation: partial. |
-| BUILD-001 | 2. Build and DEV configuration | `git branch --show-current` returns `main`. | F TESTFLIGHT_RELEASE_REQUIRED | TESTFLIGHT | — | Existing implementation inspected; implementation alone is not evidence. | Feature-branch development cannot equal main; verify the merged release commit/branch during pre-release QA. |
+| BUILD-001 | 2. Build and DEV configuration | `git branch --show-current` returns `main`. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Verify through a dedicated local/release repository preflight on the final merged `main` branch. Do not add a Flutter test that requires feature branches to equal `main`. |
 | BUILD-002 | 2. Build and DEV configuration | `pubspec.yaml` displays the intended version/build. | A AUTOMATED | STATIC_SECURITY | test/repository_invariants_test.dart — `pubspec version 1.4.0+5 is wired to iOS bundle values` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
-| BUILD-003 | 2. Build and DEV configuration | `config/dev.json` exists locally. | E DEVICE_MANUAL_REQUIRED | DEVICE | — | Existing implementation inspected; implementation alone is not evidence. | Ignored local configuration is owner/machine state; verify it in the local device preflight without committing secrets. |
+| BUILD-003 | 2. Build and DEV configuration | `config/dev.json` exists locally. | C MISSING_AUTOMATED_TEST | STATIC_SECURITY | — | Existing implementation inspected; implementation alone is not evidence. | Verify through a local owner/release preflight. Never commit `config/dev.json`, and do not make normal CI depend on the ignored secret-bearing file. |
 | BUILD-004 | 2. Build and DEV configuration | `config/dev.json` is ignored by Git. | A AUTOMATED | STATIC_SECURITY | test/repository_invariants_test.dart — `Git ignores the local DEV config but tracks its example` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
 | BUILD-005 | 2. Build and DEV configuration | DEV configuration contains a real HTTPS project URL. | D DEV_INTEGRATION_REQUIRED | BACKEND_INTEGRATION | — | Existing implementation inspected; implementation alone is not evidence. | Only the owner environment can prove that its ignored configuration targets the real SUMOU-DEV HTTPS URL; synthetic parser tests are not that evidence. |
 | BUILD-006 | 2. Build and DEV configuration | Configuration uses a publishable/anon key, never `service_role`. | A AUTOMATED | STATIC_SECURITY | test/repository_invariants_test.dart — `production configuration accepts only URL and publishable key inputs` | Existing implementation inspected; implementation alone is not evidence. | Named test body directly asserts this requirement. |
@@ -732,8 +732,10 @@ Automatable means A+B+C only. The corrected denominator is **340**. Fully automa
 
 All 18 accepted P0 local-automation gaps have direct passing evidence. Step 11.6E3A completed its foundation, routing, session, role, and admin-users P1 batch; the remaining P1 work is reserved for E3B/E3C.
 
-### P1 (51)
+### P1 (53)
 
+- **BUILD-001** — `git branch --show-current` returns `main`. Level: `STATIC_SECURITY`; target: dedicated local/release repository preflight on final merged `main`; value: verifies release ancestry without making feature-branch Flutter tests fail.
+- **BUILD-003** — `config/dev.json` exists locally. Level: `STATIC_SECURITY`; target: local owner/release preflight outside normal CI; value: verifies required machine state without committing or exposing ignored configuration.
 - **PROJREAD-006** — Loading state renders correctly. Level: `WIDGET`; target: `test/project_read_ui_test.dart`; value: prevents regression of this exact local behavior.
 - **PROJREAD-007** — Read failure offers explicit retry. Level: `WIDGET`; target: `test/project_read_ui_test.dart`; value: prevents regression of this exact local behavior.
 - **PROJREAD-008** — Search by project name works. Level: `WIDGET`; target: `test/project_read_ui_test.dart`; value: prevents regression of this exact local behavior.
@@ -794,7 +796,7 @@ All 18 accepted P0 local-automation gaps have direct passing evidence. Step 11.6
 
 - Source and matrix rows: **657/657**.
 - A+B+C+D+E+F+G+H: **657**.
-- C rows and backlog entries: **52/52** (51 P1 + 1 P2).
+- C rows and backlog entries: **54/54** (53 P1 + 1 P2).
 - Source IDs, wording, and per-section counts are unchanged.
 - Remaining A rows: **275**, each with a named direct test.
 - Remaining B rows: **13**, each with a named partial test and explicit remainder.

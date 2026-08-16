@@ -58,9 +58,13 @@ class SupabaseAuthRepository implements AuthRepository {
         email: internalEmail,
         password: password,
       );
+    } on AuthSignInException catch (error) {
+      throw AuthException(switch (error.reason) {
+        AuthSignInFailure.invalidCredentials => AuthFailure.invalidCredentials,
+        AuthSignInFailure.serverError => AuthFailure.loginFailed,
+      });
     } catch (_) {
-      // Wrong credentials / unknown user / sign-in error → generic, no leak.
-      throw const AuthException(AuthFailure.invalidCredentials);
+      throw const AuthException(AuthFailure.loginFailed);
     }
 
     // Auth succeeded — load the full public context. If anything is wrong, sign

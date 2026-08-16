@@ -1,12 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sumou_app/app/app.dart';
+import 'package:sumou_app/app/router.dart';
 import 'package:sumou_app/core/models/feature_permissions.dart';
 import 'package:sumou_app/core/models/role_type.dart';
+import 'package:sumou_app/core/models/user_model.dart';
 import 'package:sumou_app/core/providers/repository_providers.dart';
+import 'package:sumou_app/data/repositories/mock/mock_auth_repository.dart';
+import 'package:sumou_app/data/repositories/mock/mock_project_repository.dart';
+import 'package:sumou_app/data/repositories/mock/mock_users.dart';
 import 'package:sumou_app/data/repositories/supabase/supabase_auth_repository.dart';
+import 'package:sumou_app/data/repositories/supabase/auth_gateway.dart';
 import 'package:sumou_app/features/auth/providers/auth_controller.dart';
+import 'package:sumou_app/features/projects/providers/projects_providers.dart';
+import 'package:sumou_app/features/shell/role_based_bottom_nav.dart';
 
 import 'fakes/fake_auth_gateway.dart';
+import 'test_helpers.dart';
 
 /// A container whose auth repository is the REAL SupabaseAuthRepository backed by
 /// a fake gateway (no network) — so we exercise controller + repository together.
@@ -21,6 +31,21 @@ ProviderContainer containerWith(FakeAuthGateway g) {
   addTearDown(c.dispose);
   return c;
 }
+
+ProviderContainer appContainerWith(FakeAuthGateway gateway) {
+  final container = makeMockContainer(
+    extra: [
+      authRepositoryProvider.overrideWith(
+        (ref) => SupabaseAuthRepository.withGateway(gateway),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  return container;
+}
+
+String locationOf(ProviderContainer container) =>
+    container.read(goRouterProvider).routeInformationProvider.value.uri.path;
 
 void main() {
   group('AuthController.initializeSession', () {
@@ -380,4 +405,152 @@ void main() {
       expect(g.lastRolePermissionIds, ['r-admin']);
     });
   });
+
+  group('restoration routing failures', () {
+    testWidgets('expired session returns to entry with no stale protected UI', (
+      tester,
+    ) async {
+      final gateway = FakeAuthGateway(
+        session: 'expired-user',
+        sessionExpired: true,
+      );
+      addTearDown(gateway.dispose);
+      final container = appContainerWith(gateway);
+      await tester.runAsync(() async {
+        final restoration =
+            container.read(authControllerProvider.notifier).initializeSession();
+        await Future<void>.delayed(Duration.zero);
+        expect(gateway.authEventSubscriptions, 1);
+        gateway.authEvents.add(
+          const AuthSessionEvent(AuthSessionEventKind.signedOut),
+        );
+        await restoration;
+      });
+      expect(container.read(authControllerProvider).isInitializing, isFalse);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SumouApp(),
+        ),
+      );
+      container.read(goRouterProvider).go(AppRoutes.adminHome);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(locationOf(container), AppRoutes.entry);
+      expect(find.text('دخول سمو'), findsOneWidget);
+      expect(find.byType(RoleBasedBottomNav), findsNothing);
+      expect(container.read(authControllerProvider).currentUser, isNull);
+    });
+
+    testWidgets('invalid refresh token fails closed to the public entry', (
+      tester,
+    ) async {
+      final gateway = FakeAuthGateway(
+        session: 'invalid-refresh-user',
+        sessionExpired: true,
+      );
+      addTearDown(gateway.dispose);
+      final container = appContainerWith(gateway);
+      await tester.runAsync(() async {
+        final restoration =
+            container.read(authControllerProvider.notifier).initializeSession();
+        await Future<void>.delayed(Duration.zero);
+        expect(gateway.authEventSubscriptions, 1);
+        gateway.authEvents.addError(
+          StateError('synthetic invalid refresh credential'),
+        );
+        await restoration;
+      });
+      expect(container.read(authControllerProvider).isInitializing, isFalse);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SumouApp(),
+        ),
+      );
+      container.read(goRouterProvider).go(AppRoutes.managerHome);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(locationOf(container), AppRoutes.entry);
+      expect(find.text('دخول سمو'), findsOneWidget);
+      expect(find.byType(RoleBasedBottomNav), findsNothing);
+      expect(
+        find.textContaining('synthetic invalid refresh credential'),
+        findsNothing,
+      );
+    });
+  });
+
+  test(
+    'logout and account switch invalidate role and project caches',
+    () async {
+      const secondAccount = UserModel(
+        id: 'u-second-account',
+        fullName: 'مصور الحساب الثاني',
+        username: 'second_account',
+        defaultRole: RoleType.photographer,
+        roles: [RoleType.photographer],
+      );
+      final authRepository = MockAuthRepository(
+        accounts: const [
+          MockAccount(
+            user: UserModel(
+              id: 'u-manager',
+              fullName: 'مدير الحساب الأول',
+              username: 'first_account',
+              defaultRole: RoleType.manager,
+              roles: [RoleType.manager],
+            ),
+            password: 'Synthetic-First1!',
+          ),
+          MockAccount(user: secondAccount, password: 'Synthetic-Second1!'),
+        ],
+      );
+      final container = makeMockContainer(
+        projectRepository: MockProjectRepository(),
+        extra: [authRepositoryProvider.overrideWithValue(authRepository)],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+
+      await controller.login(
+        username: 'first_account',
+        password: 'Synthetic-First1!',
+      );
+      final firstProjects = await container.read(
+        managerProjectsProvider.future,
+      );
+      expect(firstProjects, isNotEmpty);
+      expect(
+        container.read(authControllerProvider).activeRole,
+        RoleType.manager,
+      );
+
+      await controller.logout();
+      expect(container.read(authControllerProvider).selectedRole, isNull);
+      expect(await container.read(managerProjectsProvider.future), isEmpty);
+
+      await controller.login(
+        username: 'second_account',
+        password: 'Synthetic-Second1!',
+      );
+      final secondProjects = await container.read(
+        managerProjectsProvider.future,
+      );
+      expect(
+        container.read(authControllerProvider).currentUser?.id,
+        secondAccount.id,
+      );
+      expect(
+        container.read(authControllerProvider).activeRole,
+        RoleType.photographer,
+      );
+      expect(secondProjects, isEmpty);
+      expect(secondProjects, isNot(equals(firstProjects)));
+    },
+  );
 }

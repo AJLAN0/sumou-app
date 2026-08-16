@@ -5,6 +5,11 @@ enum AuthFailure {
   /// Wrong username/password (never reveals whether the username exists).
   invalidCredentials,
 
+  /// Sign-in failed for a non-credential reason (network, rate limiting, or
+  /// an unexpected Auth service response). This must never be presented as a
+  /// wrong-password result.
+  loginFailed,
+
   /// The account is inactive / soft-deleted and cannot be used.
   accountDisabled,
 

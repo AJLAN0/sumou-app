@@ -9,6 +9,7 @@ class FakeAuthGateway implements AuthGateway {
   FakeAuthGateway({
     this.userId = 'u1',
     this.signInError = false,
+    this.signInFailure,
     this.profile,
     this.roles = const [],
     this.photoTypes = const [],
@@ -32,6 +33,9 @@ class FakeAuthGateway implements AuthGateway {
 
   /// When true, [signInWithPassword] throws (wrong credentials).
   bool signInError;
+
+  /// Optional typed SDK/Auth outcome. This is value-free by design.
+  AuthSignInFailure? signInFailure;
 
   Map<String, dynamic>? profile;
   List<Map<String, dynamic>> roles;
@@ -93,7 +97,11 @@ class FakeAuthGateway implements AuthGateway {
     signInCalls++;
     lastEmail = email;
     lastPassword = password;
-    if (signInError) throw StateError('invalid credentials');
+    final failure = signInFailure;
+    if (failure != null) throw AuthSignInException(failure);
+    if (signInError) {
+      throw const AuthSignInException(AuthSignInFailure.invalidCredentials);
+    }
     return userId;
   }
 

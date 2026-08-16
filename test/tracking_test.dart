@@ -1,5 +1,7 @@
 // Tests for the public client-tracking flow (no login required).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,24 @@ class _FailingTrackingRepository implements TrackingRepository {
   Future<ClientTrackingModel?> trackBySerial(String serial) async {
     calls += 1;
     throw StateError('raw backend diagnostics token@example.test');
+  }
+
+  @override
+  Future<void> submitReview({
+    required String serial,
+    required int rating,
+    String? message,
+  }) => throw UnimplementedError();
+}
+
+class _PendingTrackingRepository implements TrackingRepository {
+  final completer = Completer<ClientTrackingModel?>();
+  int calls = 0;
+
+  @override
+  Future<ClientTrackingModel?> trackBySerial(String serial) {
+    calls++;
+    return completer.future;
   }
 
   @override
@@ -99,5 +119,27 @@ void main() {
     await tester.tap(find.text('إعادة المحاولة'));
     await tester.pumpAndSettle();
     expect(repository.calls, 2);
+  });
+
+  testWidgets('rapid repeated search has one pending request and one result', (
+    tester,
+  ) async {
+    final repository = _PendingTrackingRepository();
+    await bootToTrack(tester, repository: repository);
+    await tester.enterText(find.byType(TextField), 'FLD-A1B2-C3');
+    final track = find.text('تتبع');
+
+    await tester.tap(track);
+    await tester.tap(track);
+    await tester.pump();
+
+    expect(repository.calls, 1);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    repository.completer.complete(null);
+    await tester.pumpAndSettle();
+
+    expect(repository.calls, 1);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('لم يتم العثور على مشروع بهذا الرمز'), findsOneWidget);
   });
 }
